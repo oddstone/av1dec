@@ -75,6 +75,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);interface/;.</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -98,7 +99,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
@@ -147,17 +148,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
+    <ClCompile Include="av1dec.cpp" />
+    <ClCompile Include="codecparsers\Av1Parser.cpp" />
+    <ClCompile Include="codecparsers\bitReader.cpp" />
+    <ClCompile Include="tests\decodeinput.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="av1dec.cpp" />
-    <ClCompile Include="stdafx.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
+    <ClInclude Include="codecparsers\Av1Parser.h" />
+    <ClInclude Include="codecparsers\bitReader.h" />
+    <ClInclude Include="common\log.h" />
+    <ClInclude Include="common\NonCopyable.h" />
+    <ClInclude Include="interface\videocommondefs.h" />
+    <ClInclude Include="interface\videodecoderdefs.h" />
+    <ClInclude Include="interface\videodecoderhost.h" />
+    <ClInclude Include="interface\videodecoderinterface.h" />
+    <ClInclude Include="interface\yami.h" />
+    <ClInclude Include="tests\decodeinput.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

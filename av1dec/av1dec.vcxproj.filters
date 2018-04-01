@@ -15,19 +15,49 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="av1dec.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="codecparsers\bitReader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="tests\decodeinput.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="codecparsers\Av1Parser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="codecparsers\bitReader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\log.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\NonCopyable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="interface\videocommondefs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="interface\videodecoderdefs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="interface\videodecoderhost.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="interface\videodecoderinterface.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="interface\yami.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\decodeinput.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="codecparsers\Av1Parser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
