@@ -2,6 +2,7 @@
 #include "config.h"
 #endif
 
+#include <string.h>
 #include "Av1Parser.h"
 #include "common/log.h"
 
@@ -231,6 +232,25 @@ namespace Av1 {
 
 	}
 
+	bool SequenceHeader::parseTimingInfo(BitReader& br)
+	{
+		bool timing_info_present_flag;
+		READ(timing_info_present_flag);
+		if (timing_info_present_flag) {
+			READ(num_units_in_tick);
+			READ(time_scale);
+			READ(equal_picture_interval);
+			ASSERT(0);
+			if (equal_picture_interval) {
+
+			}
+		}
+		return true;
+		
+
+
+	}
+
 	bool SequenceHeader::parse(BitReader& br)
 	{
 		READ_BITS(seq_profile, 2);
@@ -249,8 +269,7 @@ namespace Av1 {
 			}
 
 		}
-		uint8_t frame_width_bits_minus_1;
-		uint8_t frame_height_bits_minus_1;
+
 		READ_BITS(frame_width_bits_minus_1, 4);
 		READ_BITS(frame_height_bits_minus_1, 4);
 		READ_BITS(max_frame_width_minus_1, frame_width_bits_minus_1 + 1);
@@ -311,8 +330,9 @@ namespace Av1 {
 		READ(enable_restoration);
 		if (!parseColorConfig(br))
 			return false;
-
-
+		if (!parseTimingInfo(br))
+			return false;
+		READ(film_grain_params_present);
 		return true;
 	}
 	Parser::Parser()
@@ -338,21 +358,18 @@ namespace Av1 {
 			BitReader br(data + (reader.getPos() >> 3), sz);
 			if (type == OBU_SEQUENCE_HEADER) {
 				ret = parseSequenceHeader(br);
-			}
-			else if (type == OBU_TD) {
+			} else if (type == OBU_TD) {
 				ret = parseTemporalDelimiter(br);
-			}
-			else if (type == OBU_FRAME_HEADER) {
+			} else if (type == OBU_FRAME_HEADER) {
 				ret = parseFrameHeader(br);
-			}
-			else if (type == OBU_TILE_GROUP) {
+			} else if (type == OBU_TILE_GROUP) {
 				ret = praseTileGroup(br);
-			}
-			else if (type = OBU_METADATA) {
+			} else if (type == OBU_METADATA) {
 				ret = parseMetadata(br);
-			}
-			else if (type == OBU_PADDING) {
+			} else if (type == OBU_PADDING) {
 				ret = parsePadding(br);
+			} else if (type == OBU_FRAME) {
+				ret = parseFrame(br);
 			}
 			else {
 				ret = praseReserved(br);
@@ -377,7 +394,13 @@ namespace Av1 {
 	}
 	bool Parser::parseFrameHeader(BitReader& br)
 	{
-		br.skip(br.getRemainingBitsCount());
+		if (m_seenFrameHeader) {
+			ASSERT(0);
+		} else {
+			m_seenFrameHeader = true;
+			if (!m_frameHeader.parse(br, m_sequence))
+				return false;
+		}
 		return true;
 	}
 	bool Parser::praseTileGroup(BitReader& br)
@@ -392,6 +415,179 @@ namespace Av1 {
 	{
 		return true;
 	}
+
+	FrameHeader::FrameHeader()
+	{
+		memset(this, 0, sizeof(*this));		
+	}
+
+	bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
+	{
+
+		uint32_t idLen = (sequence.additional_frame_id_length_minus1 + sequence.delta_frame_id_length_minus2 + 3);
+		READ(show_existing_frame);
+		if (show_existing_frame == 1) {
+			READ_BITS(frame_to_show_map_idx, 3);
+			refresh_frame_flags = 0;
+			/*if (sequence.frame_id_numbers_present_flag) {
+				READ_BITS(display_frame_id, idLen);
+			}*/
+			ASSERT(0);
+			return true;
+		}
+		READ_BITS(frame_type, 2);
+		FrameIsIntra = (frame_type == INTRA_ONLY_FRAME || frame_type == KEY_FRAME);
+		READ(show_frame);
+		if (show_frame) {
+			showable_frame = false;
+		} else {
+			READ(showable_frame);
+		}
+		if (frame_type == KEY_FRAME && show_frame) {
+			memset(RefValid, 0, sizeof(RefValid));
+		}
+		if (frame_type == SWITCH_FRAME) {
+			error_resilient_mode = true;
+		} else {
+			READ(error_resilient_mode);
+		}
+		READ(disable_cdf_update);
+		if (sequence.seq_force_screen_content_tools == SELECT_SCREEN_CONTENT_TOOLS) {
+			READ(allow_screen_content_tools);
+		} else {
+			allow_screen_content_tools = (bool)sequence.seq_force_screen_content_tools;
+		}
+
+		if (allow_screen_content_tools) {
+			if (sequence.seq_force_integer_mv == SELECT_INTEGER_MV) {
+				READ(force_integer_mv);
+			} else {
+				force_integer_mv = (bool)sequence.seq_force_integer_mv;
+			}
+		} else {
+			force_integer_mv = false;
+		}
+		if (sequence.frame_id_numbers_present_flag) {
+			PrevFrameID = current_frame_id;
+			READ_BITS(current_frame_id, idLen);
+			mark_ref_frames(sequence, idLen);
+		}
+		if (frame_type == SWITCH_FRAME) {
+			frame_size_override_flag = true;
+		} else {
+			READ(frame_size_override_flag);
+		}
+		READ(order_hint);
+		if (FrameIsIntra || error_resilient_mode) {
+			primary_ref_frame = PRIMARY_REF_NONE;
+		} else {
+			READ_BITS(primary_ref_frame, 3);
+		}
+		allow_high_precision_mv = false;
+		use_ref_frame_mvs = false;
+		allow_intrabc = false;
+		if (frame_type == KEY_FRAME) {
+			if (show_frame) {
+				refresh_frame_flags = (1 << NUM_REF_FRAMES) - 1;
+			}
+			else {
+				READ(refresh_frame_flags);
+			}
+			if (!parseFrameSize(br, sequence))
+				return false;
+			if (!parseRenderSize(br))
+				return false;
+			if (allow_screen_content_tools && UpscaledWidth == FrameWidth) {
+				READ(allow_intrabc);
+			}
+	
+		} else {
+
+		}
+		return true;
+
+	}
+	void FrameHeader::mark_ref_frames(const SequenceHeader& sequence, uint8_t idLen)
+	{
+		uint8_t diffLen = sequence.delta_frame_id_length_minus2 + 2;
+		for (int i = 0; i < NUM_REF_FRAMES; i++) {
+			if (current_frame_id > (1 << diffLen)) {
+				if (RefFrameId[i] > current_frame_id ||
+					RefFrameId[i] < (current_frame_id - (1 << diffLen)))
+					RefValid[i] = false;
+			} else {
+				if (RefFrameId[i] > current_frame_id ||
+					RefFrameId[i] < ((1 << idLen) +
+						current_frame_id -
+						(1 << diffLen)))
+					RefValid[i] = false;
+			}
+		}
+
+	}
+	bool FrameHeader::parseFrameSize(BitReader& br, const SequenceHeader& sequence)
+	{
+		if (frame_size_override_flag) {
+			uint32_t frame_width_minus_1, frame_height_minus_1;
+			READ_BITS(frame_width_minus_1, sequence.frame_width_bits_minus_1 + 1);
+			READ_BITS(frame_height_minus_1, sequence.frame_height_bits_minus_1 + 1);
+			FrameWidth = frame_width_minus_1 + 1;
+			FrameHeight = frame_height_minus_1 + 1;
+		} else{
+			FrameWidth = sequence.max_frame_width_minus_1 + 1;
+			FrameHeight = sequence.max_frame_height_minus_1 + 1;
+		}
+		MiCols = 2 * ((FrameWidth + 7) >> 3);
+		MiRows = 2 * ((FrameHeight + 7) >> 3);
+		return parseSuperresParams(br, sequence);
+	}
+	bool FrameHeader::parseSuperresParams(BitReader& br, const SequenceHeader& sequence)
+	{
+
+		if (sequence.enable_superres) {
+			READ(use_superres);
+		} else {
+			use_superres = false;
+		}
+		if (use_superres) {
+			uint8_t coded_denom;
+			READ_BITS(coded_denom, SUPERRES_DENOM_BITS);
+			SuperresDenom = coded_denom + SUPERRES_DENOM_MIN;
+		} else {
+			SuperresDenom = SUPERRES_NUM;
+		}
+		UpscaledWidth = FrameWidth;
+		FrameWidth = (UpscaledWidth * SUPERRES_NUM +
+			(SuperresDenom / 2)) / SuperresDenom;
+		return true;
+	}
+
+	bool FrameHeader::parseRenderSize(BitReader& br)
+	{
+		bool render_and_frame_size_different;
+		READ(render_and_frame_size_different);
+		if (render_and_frame_size_different) {
+			uint16_t render_width_minus_1, render_height_minus_1;
+			READ(render_width_minus_1);
+			READ(render_height_minus_1);
+			RenderWidth = render_width_minus_1 + 1;
+			RenderHeight = render_height_minus_1 + 1;
+		} else {
+			RenderWidth = UpscaledWidth;
+			RenderHeight = FrameHeight;
+		}
+		return true;
+	}
+
+	bool Parser::parseFrame(BitReader& br)
+	{
+		if (!parseFrameHeader(br))
+			return false;
+		skipTrailingBits(br);
+
+		return true;
+
+	}
 	bool Parser::praseReserved(BitReader& br)
 	{
 		return true;
@@ -402,9 +598,6 @@ namespace Av1 {
 			br.skip(1);
 		return;
 	}
-
-
-
 
 }
 }

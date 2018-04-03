@@ -69,11 +69,14 @@ namespace YamiParser {
 			CSP_RESERVED = 3,
 		};
 
+		const static uint8_t SELECT_SCREEN_CONTENT_TOOLS = 2;
+		const static uint8_t SELECT_INTEGER_MV = 2;
+
 		struct SequenceHeader
 		{
 			uint8_t seq_profile;
-			//uint8_t frame_width_bits_minus_1;
-			//uint8_t frame_height_bits_minus_1;
+			uint8_t frame_width_bits_minus_1;
+			uint8_t frame_height_bits_minus_1;
 			uint32_t max_frame_width_minus_1;
 			uint32_t max_frame_height_minus_1;
 
@@ -97,7 +100,7 @@ namespace YamiParser {
 			//bool seq_choose_screen_content_tools;
 			uint8_t seq_force_screen_content_tools;
 			bool seq_choose_integer_mv;
-			bool seq_force_integer_mv;
+			uint8_t seq_force_integer_mv;
 
 			//uint8_t order_hint_bits_minus1;
 			uint8_t OrderHintBits;
@@ -120,8 +123,14 @@ namespace YamiParser {
 			uint8_t chroma_sample_position;
 			bool  separate_uv_delta_q;
 
-			const uint8_t SELECT_SCREEN_CONTENT_TOOLS = 2;
-			const uint8_t SELECT_INTEGER_MV = 2;
+			uint32_t num_units_in_tick;
+			uint32_t time_scale;
+			bool equal_picture_interval;
+			uint32_t num_ticks_per_picture_minus1;
+			
+			bool film_grain_params_present;
+
+
 			struct OperatingPoint
 			{
 				OperatingPoint()
@@ -141,6 +150,71 @@ namespace YamiParser {
 			bool parse(BitReader& br);
 		private:
 			bool parseColorConfig(BitReader& br);
+			bool parseTimingInfo(BitReader& br);
+		};
+
+		class Parser;
+		enum FrameType
+		{
+			KEY_FRAME = 0,
+			INTER_FRAME = 1,
+			INTRA_ONLY_FRAME = 2,
+			SWITCH_FRAME = 3,
+		};
+		const static uint8_t NUM_REF_FRAMES = 8;
+		const static uint8_t PRIMARY_REF_NONE = 7;
+
+		struct FrameHeader
+		{
+			bool show_existing_frame;
+			uint8_t frame_to_show_map_idx;
+			uint8_t refresh_frame_flags;
+			uint8_t frame_type;
+			bool FrameIsIntra;
+			bool show_frame;
+			bool showable_frame;
+			bool RefValid[NUM_REF_FRAMES];
+			bool error_resilient_mode;
+			bool disable_cdf_update;
+			bool allow_screen_content_tools;
+			bool force_integer_mv;
+			uint32_t PrevFrameID;
+			uint32_t current_frame_id;
+			uint32_t RefFrameId[NUM_REF_FRAMES];
+			bool frame_size_override_flag;
+			uint8_t order_hint;
+			uint8_t primary_ref_frame;
+			bool allow_high_precision_mv;
+			bool use_ref_frame_mvs;
+			bool allow_intrabc;
+
+			//frame_size()
+			uint32_t FrameWidth;
+			uint32_t FrameHeight;
+
+			//compute_image_size()
+			uint32_t MiCols;
+			uint32_t MiRows;
+
+			//superres_params()
+			bool use_superres;
+			uint8_t SuperresDenom;
+			uint32_t UpscaledWidth;
+
+			//render_size()
+			uint32_t RenderWidth;
+			uint32_t RenderHeight;
+
+			FrameHeader();
+			bool parse(BitReader& br, const SequenceHeader& sequence);
+		private:
+			void mark_ref_frames(const SequenceHeader& sequence, uint8_t idLen);
+			bool parseFrameSize(BitReader& br, const SequenceHeader& sequence);
+			bool parseSuperresParams(BitReader& br, const SequenceHeader& sequence);
+			bool parseRenderSize(BitReader& br);
+			const static uint8_t SUPERRES_DENOM_MIN = 9;
+			const static uint8_t SUPERRES_NUM = 8;
+			const static uint8_t SUPERRES_DENOM_BITS = 3;
 		};
 		class Parser
 		{
@@ -154,10 +228,12 @@ namespace YamiParser {
 			bool praseTileGroup(BitReader& br);
 			bool parseMetadata(BitReader& br);
 			bool parsePadding(BitReader& br);
+			bool parseFrame(BitReader& br);
 			bool praseReserved(BitReader& br);
 			void skipTrailingBits(BitReader& br);
 			bool m_seenFrameHeader;
 			SequenceHeader m_sequence;
+			FrameHeader m_frameHeader;
 
 
 
