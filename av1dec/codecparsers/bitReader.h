@@ -44,6 +44,13 @@ public:
 
     inline bool readT(bool& v);
 
+	bool readNs(uint32_t& v, uint32_t n);
+	bool readSu(int8_t& v, uint32_t n);
+	bool readSu(int16_t& v, uint32_t n);
+
+	bool readLe(uint32_t& v, uint32_t nBits);
+
+
     /*read the next nbits bits from the bitstream but not advance the bitstream pointer*/
     uint32_t peek(uint32_t nbits) const;
 
@@ -53,6 +60,12 @@ public:
 
     bool skip(uint32_t nbits);
 
+	const uint8_t* getCurrent()
+	{
+		uint32_t  left = (uint32_t)(getRemainingBitsCount() >> 3);
+
+		return m_stream + (m_size - left);
+	}
     /* Get the total bits that had been read from bitstream, and the return
      * value also is the position of the next bit to be read. */
     uint64_t getPos() const

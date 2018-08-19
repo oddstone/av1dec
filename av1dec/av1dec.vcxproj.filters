@@ -24,7 +24,22 @@
     <ClCompile Include="tests\decodeinput.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="aom\entropymode.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="decoder\Av1Decoder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="codecparsers\Av1Tile.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="codecparsers\SymbolDecoder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="codecparsers\Av1Parser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="codecparsers\EntropyDecoder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -57,6 +72,33 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="codecparsers\Av1Parser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SymbolDecoder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Av1Decoder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Av1Tile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="aom\prob.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="aom\entropymode.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="aom\aom_codec.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="aom\filter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="aom\seg_common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="aom\entropy.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

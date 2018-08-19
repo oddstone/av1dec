@@ -224,7 +224,7 @@ bool DecodeInputVPX::init()
 		m_mimeType = YAMI_MIME_VP8;
 	else if (header.fourcc == YAMI_FOURCC('V', 'P', '9', '0'))
 		m_mimeType = YAMI_MIME_VP9;
-	else if (header.fourcc == YAMI_FOURCC('V', 'P', '9', '0'))
+	else if (header.fourcc == YAMI_FOURCC('A', 'V', '0', '1'))
 		m_mimeType = YAMI_MIME_AV1;
 
     setResolution(header.width, header.height);

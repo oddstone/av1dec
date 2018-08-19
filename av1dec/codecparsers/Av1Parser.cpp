@@ -2,9 +2,12 @@
 #include "config.h"
 #endif
 
+#include <algorithm>
 #include <string.h>
+
 #include "Av1Parser.h"
 #include "common/log.h"
+#include "SymbolDecoder.h"
 
 #define READ(f)                             \
     do {                                    \
@@ -22,6 +25,48 @@
         }                                               \
     } while (0)
 
+#define READ_NS(f, n) \
+	do {              \
+		if (!br.readNs(f, n)) { \
+			ERROR("failed to readNs(%d) to %s", n, #f); \
+			return false; \
+		} \
+	} while (0)
+
+#define READ_DELTA_Q(f) \
+	do { \
+		bool delta_coded; \
+		if (!br.readT(delta_coded)) { \
+			ERROR("read delta_coded failed for %s", #f); \
+			return false; \
+		} \
+		if (delta_coded) { \
+			if (!br.readSu(f, 7)) { \
+				ERROR("read %s failed", #f); \
+				return false; \
+			} \
+		} else { \
+			f = 0; \
+		} \
+	} while (0)
+
+#define READ_SU(f, n) \
+	do {              \
+		if (!br.readSu(f, n)) { \
+			ERROR("failed to readSu(%d) to %s", n, #f); \
+			return false; \
+		} \
+	} while (0)
+
+
+#define READ_LE(f, n) \
+	do {              \
+		if (!br.readLe(f, n)) { \
+			ERROR("failed to readLe(%d) to %s", n, #f); \
+			return false; \
+		} \
+	} while (0)
+
 #define CHECK_EQ(f, v)									\
 	do {												\
 		if (f != v) {									\
@@ -33,32 +78,17 @@
 
 namespace YamiParser {
 namespace Av1 {
-	struct obu_extension_header
+	bool obu_extension_header::parse(BitReader& br)
 	{
-		uint8_t temporal_id;
-		uint8_t spatial_id;
-		uint8_t quality_id;
-		bool parse(BitReader& br)
-		{
-			READ_BITS(temporal_id, 3);
-			READ_BITS(spatial_id, 2);
-			READ_BITS(quality_id, 2);
+		READ_BITS(temporal_id, 3);
+		READ_BITS(spatial_id, 2);
+		READ_BITS(quality_id, 2);
 
-			bool reserved_flag;
-			READ(reserved_flag);
-			return true;
-		}
-	};
-	enum {
-		OBU_SEQUENCE_HEADER = 1,
-		OBU_TD = 2,
-		OBU_FRAME_HEADER = 3,
-		OBU_TILE_GROUP = 4,
-		OBU_METADATA = 5,
-		OBU_FRAME = 6,
-		OBU_REDUNDANT_FRAME_HEADER = 7,
-		OBU_PADDING = 15,
-	};
+		bool reserved_flag;
+		READ(reserved_flag);
+		return true;
+	}
+	
 	const char* obuType2String(uint8_t type)
 	{
 		switch (type) {
@@ -81,78 +111,72 @@ namespace Av1 {
 		}
 	}
 
-	struct obu_header
+	bool obu_header::parse(BitReader& br)
 	{
-		bool parse(BitReader& br)
-		{
-			memset(this, 0, sizeof(*this));
-			bool obu_forbidden_bit;
-			READ(obu_forbidden_bit);
-			CHECK_EQ(obu_forbidden_bit, 0);
+		memset(this, 0, sizeof(*this));
+		bool obu_forbidden_bit;
+		READ(obu_forbidden_bit);
+		CHECK_EQ(obu_forbidden_bit, 0);
 
-			READ_BITS(obu_type, 4);
+		uint8_t type;
+		READ_BITS(type, 4);
+		obu_type = (ObuType)type;
+		///READ_BITS(obu_type, 4);
 
-			
 
-			READ(obu_extension_flag);
 
-			bool obu_has_size_field;
-			READ(obu_has_size_field);
+		READ(obu_extension_flag);
 
-			bool obu_reserved_1bits;
-			READ(obu_reserved_1bits);
+		bool obu_has_size_field;
+		READ(obu_has_size_field);
 
-			if (obu_extension_flag) {
-				if (!extension.parse(br))
-					return false;
-			}
-			//obu_has_size_field = true;
-			if (obu_has_size_field) {
-				if (!parseLeb128(br, obu_size)) {
-					ERROR("parse Leb 128 failed");
-					return false;
-				}
+		bool obu_reserved_1bits;
+		READ(obu_reserved_1bits);
 
-			}
-			else {
-				obu_size = br.getRemainingBitsCount() >> 3;
-			}
-			uint64_t left = br.getRemainingBitsCount() >> 3;
-			if (obu_size > left) {
-				ERROR("obu_size(%d) > left (%d)", (int)obu_size, (int)left);
+		if (obu_extension_flag) {
+			if (!extension.parse(br))
+				return false;
+		}
+		//obu_has_size_field = true;
+		if (obu_has_size_field) {
+			if (!parseLeb128(br, obu_size)) {
+				ERROR("parse Leb 128 failed");
 				return false;
 			}
 
-
-			return true;
+		} else {
+			obu_size = br.getRemainingBitsCount() >> 3;
 		}
-		uint8_t obu_type;
-		bool obu_extension_flag;
-		bool obu_has_size_field;
-		obu_extension_header extension;
-		uint64_t obu_size;
-	private:
-		bool parseLeb128(BitReader& br, uint64_t& v)
+		uint64_t left = br.getRemainingBitsCount() >> 3;
+		if (obu_size > left) {
+			ERROR("obu_size(%d) > left (%d)", (int)obu_size, (int)left);
+			return false;
+		}
+
+
+		return true;
+	}
+	
+	bool obu_header::parseLeb128(BitReader& br, uint64_t& v)
+	{
+		const int kMaxSize = 8;
+		v = 0;
+		uint8_t leb128_byte;
+		for (int i = 0; i < kMaxSize; i++)
 		{
-			const int kMaxSize = 8;
-			v = 0;
-			uint8_t leb128_byte;
-			for (int i = 0; i < kMaxSize; i++)
+			READ(leb128_byte);
+			v |= ((leb128_byte & 0x7f) << (i * 7));
+			if (!(leb128_byte & 0x80))
 			{
-				READ(leb128_byte);
-				v |= ((leb128_byte & 0x7f) << (i * 7));
-				if (!(leb128_byte & 0x80))
-				{
-					break;
-				}
-				
+				break;
 			}
-			return true;
-
 
 		}
-	};
+		return true;
 
+
+	}
+	
 	bool SequenceHeader::parseColorConfig(BitReader& br)
 	{
 		//color_config()
@@ -174,7 +198,7 @@ namespace Av1 {
 		} else {
 			READ(mono_chrome);
 		}
-
+		NumPlanes = mono_chrome ? 1 : 3;
 		bool color_description_present_flag;
 		READ(color_description_present_flag);
 		if (color_description_present_flag) {
@@ -335,6 +359,9 @@ namespace Av1 {
 		READ(film_grain_params_present);
 		return true;
 	}
+
+	
+
 	Parser::Parser()
 		: m_seenFrameHeader(false)
 	{
@@ -342,46 +369,7 @@ namespace Av1 {
 	}
 
 
-	bool Parser::parse(uint8_t* data, size_t size)
-
-	{
-		BitReader reader(data, size);
-		while (reader.getRemainingBitsCount() > 0) {
-			obu_header header;
-			if (!header.parse(reader))
-				return false;
-			bool ret;
-			uint8_t type = header.obu_type;
-			uint64_t sz = header.obu_size;
-			printf("type = %s, extension = %d, obu_size = %d\r\n", obuType2String(type), header.obu_extension_flag, (int)sz);
-
-			BitReader br(data + (reader.getPos() >> 3), sz);
-			if (type == OBU_SEQUENCE_HEADER) {
-				ret = parseSequenceHeader(br);
-			} else if (type == OBU_TD) {
-				ret = parseTemporalDelimiter(br);
-			} else if (type == OBU_FRAME_HEADER) {
-				ret = parseFrameHeader(br);
-			} else if (type == OBU_TILE_GROUP) {
-				ret = praseTileGroup(br);
-			} else if (type == OBU_METADATA) {
-				ret = parseMetadata(br);
-			} else if (type == OBU_PADDING) {
-				ret = parsePadding(br);
-			} else if (type == OBU_FRAME) {
-				ret = parseFrame(br);
-			}
-			else {
-				ret = praseReserved(br);
-			}
-			if (!ret) {
-				return false;
-			}
-			reader.skip(sz<<3);
-		}
-		return true;
-
-	}
+	
 	bool Parser::parseSequenceHeader(BitReader& br)
 	{
 		return m_sequence.parse(br);
@@ -400,11 +388,45 @@ namespace Av1 {
 			m_seenFrameHeader = true;
 			if (!m_frameHeader.parse(br, m_sequence))
 				return false;
+			/* if (show_existing_frame) */
 		}
 		return true;
 	}
-	bool Parser::praseTileGroup(BitReader& br)
+	bool Parser::parseTileGroup(BitReader& br, TileGroupPtr& group)
 	{
+		bool tile_start_and_end_present_flag = false;;
+		if (m_frameHeader.NumTiles > 1)
+			READ(tile_start_and_end_present_flag);
+		uint32_t tg_start, tg_end;
+		if (m_frameHeader.NumTiles == 1 || !tile_start_and_end_present_flag) {
+			tg_start = 0;
+			tg_end = m_frameHeader.NumTiles - 1;
+		} else {
+			ASSERT(0);
+		}
+		skipTrailingBits(br);
+
+		group.reset(new TileGroup);
+
+		for (uint32_t TileNum = tg_start; TileNum <= tg_end; TileNum++) {
+			
+			bool lastTile = (TileNum == tg_end);
+			uint32_t tileSize;
+			if (lastTile) {
+				tileSize = br.getRemainingBitsCount() / 8;
+			} else {
+				uint32_t tile_size_minus_1;
+				READ_LE(tile_size_minus_1, m_frameHeader.TileSizeBytes);
+				tileSize = tile_size_minus_1 + 1;
+			}
+			Tile tile(m_sequence, m_frameHeader, TileNum);
+			if (!tile.decode(br.getCurrent(), br.getRemainingBitsCount() >> 3)) {
+				ERROR("decode tile failed");
+				return false;
+			}
+			//group->m_group.push_back(tile);
+		}
+		//br.
 		return true;
 	}
 	bool Parser::parseMetadata(BitReader& br)
@@ -418,7 +440,7 @@ namespace Av1 {
 
 	FrameHeader::FrameHeader()
 	{
-		memset(this, 0, sizeof(*this));		
+		memset(this, 0, offsetof(FrameHeader, MiColStarts));
 	}
 
 	bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
@@ -477,7 +499,7 @@ namespace Av1 {
 		} else {
 			READ(frame_size_override_flag);
 		}
-		READ(order_hint);
+		READ_BITS(order_hint, sequence.OrderHintBits);
 		if (FrameIsIntra || error_resilient_mode) {
 			primary_ref_frame = PRIMARY_REF_NONE;
 		} else {
@@ -502,7 +524,51 @@ namespace Av1 {
 			}
 	
 		} else {
-
+			ASSERT(0);
+		}
+		if (!FrameIsIntra) {
+			ASSERT(0);
+		}
+		if (disable_cdf_update) {
+			disable_frame_end_update_cdf = false;
+		} else {
+			READ(disable_frame_end_update_cdf);
+		}
+		if (primary_ref_frame == PRIMARY_REF_NONE) {
+			//init_non_coeff_cdfs()
+			//setup_past_independence()
+		} else {
+			ASSERT(0);
+		}
+		if (use_ref_frame_mvs)
+			ASSERT(0);
+		if (!parseTileInfo(br, sequence))
+			return false;
+		if (!m_quant.parse(br, sequence)) {
+			return false;
+		}
+		if (!m_segmentation.parse(br))
+			return false;
+		if (!m_deltaQ.parse(br, m_quant))
+			return false;
+		if (!m_deltaLf.parse(br, m_deltaQ))
+			return false;
+		/*
+		TODO: init_coeff_cdfs
+		*/
+		CodedLossless = true;
+		AllLossless = true;
+		if (!m_loopFilter.parse(br, sequence, *this))
+			return false;
+		/* lr_params() */
+		/* frame_reference_mode() */
+		/* skip_mode_params() */
+		/* if ( FrameIsIntra || */
+		bool reduced_tx_set;
+		READ(reduced_tx_set);
+		/* global_motion_params() */
+		if (show_frame || showable_frame) {
+			/* film_grain_params()*/
 		}
 		return true;
 
@@ -579,14 +645,194 @@ namespace Av1 {
 		return true;
 	}
 
-	bool Parser::parseFrame(BitReader& br)
+	uint32_t tile_log2(uint32_t blkSize, uint32_t target)
+	{
+		uint32_t k;
+		for (k = 0; (blkSize << k) < target; k++) {
+		}
+		return k;		
+	}
+
+	bool parseTileLog2(BitReader& br, uint32_t& tileLog2, uint32_t min, uint32_t max)
+	{
+		tileLog2 = min;
+		bool increment;
+		while (tileLog2 < max) {
+			READ(increment);
+			if (increment)
+				tileLog2++;
+			else
+				break;
+		}
+		return true;		
+	}
+
+	void getMiStarts(std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t tileLog2)
+	{
+		starts.clear();
+		uint32_t step = (sbMax + (1 << tileLog2)) >> tileLog2;
+		for (uint32_t start = 0; start < sbMax; start += step) {
+			starts.push_back(start << sbShift);
+		}
+		starts.push_back(sbMax);
+	}
+
+	bool FrameHeader::parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)
+	{
+		starts.clear();
+		uint32_t widestTileSb = 0;
+		uint32_t startSb = 0;
+		for (uint32_t i = 0; startSb < sbMax && i < MAX_TILE_COLS; i++) {
+			starts.push_back(startSb << sbShift);
+			uint32_t n = std::min(sbMax - startSb, maxTileSb);
+			uint32_t size_minus_1;
+			READ_NS(size_minus_1, n);
+			uint32_t sizeSb = size_minus_1 + 1;
+			widestTileSb = std::max(sizeSb, widestTileSb);
+			startSb += sizeSb;
+		}
+		starts.push_back(sbMax);
+		return true;
+	}
+
+	bool FrameHeader::parseTxMode(BitReader& br, const FrameHeader& frame)
+	{
+		if (frame.CodedLossless) {
+			TxMode = ONLY_4X4;
+		} else {
+			bool tx_mode_select;
+			READ(tx_mode_select);
+			if (tx_mode_select) {
+				TxMode = TX_MODE_SELECT;
+			} else {
+				TxMode = TX_MODE_LARGEST;
+			}
+		}
+		return true;
+	}
+	
+	bool FrameHeader::parseTileInfo(BitReader& br, const SequenceHeader& sequence)
+	{
+		uint32_t sbCols = sequence.use_128x128_superblock ? ((MiCols + 31) >> 5) : ((MiCols + 15) >> 4);
+		uint32_t sbRows = sequence.use_128x128_superblock ? ((MiRows + 31) >> 5) : ((MiRows + 15) >> 4);
+		uint8_t sbShift = sequence.use_128x128_superblock ? 5 : 4;
+		uint8_t sbSize = sbShift + 2;
+		uint32_t maxTileWidthSb = MAX_TILE_WIDTH >> sbSize;
+		uint32_t maxTileAreaSb = MAX_TILE_AREA >> (2 * sbSize);
+		uint32_t minLog2TileCols = tile_log2(maxTileWidthSb, sbCols);
+		uint32_t maxLog2TileCols = tile_log2(1, std::min(sbCols, MAX_TILE_COLS));
+		uint32_t maxLog2TileRows = tile_log2(1, std::min(sbRows, MAX_TILE_ROWS));
+		uint32_t minLog2Tiles = std::max(minLog2TileCols,
+			tile_log2(maxTileAreaSb, sbRows * sbCols));
+
+		bool uniform_tile_spacing_flag;
+		READ(uniform_tile_spacing_flag);
+		if (uniform_tile_spacing_flag) {
+			if (!parseTileLog2(br, TileColsLog2, minLog2TileCols, maxLog2TileCols)) {
+				return false;
+			}
+			getMiStarts(MiColStarts, sbCols, sbShift, TileColsLog2);
+			
+			uint32_t minLog2TileRows = std::max(minLog2Tiles - TileColsLog2, (uint32_t)0);
+			uint32_t maxTileHeightSb = sbRows >> minLog2TileRows;
+
+			if (!parseTileLog2(br, TileRowsLog2, minLog2TileRows, maxLog2TileRows)) {
+				return false;
+			}
+			getMiStarts(MiRowStarts, sbRows, sbShift, TileRowsLog2);
+			TileCols = 1 << TileColsLog2;
+			TileRows = 1 << TileRowsLog2;
+
+		} else {
+			uint32_t widestTileSb = 0;
+			uint32_t startSb = 0;
+			uint32_t i;
+			for (i = 0; startSb < sbCols && i < MAX_TILE_COLS; i++) {
+				MiColStarts.push_back(startSb << sbShift);
+				uint32_t maxWidth = std::min(sbCols - startSb, maxTileWidthSb);
+				uint32_t width_in_sbs_minus_1;
+				READ_NS(width_in_sbs_minus_1, maxWidth);
+				uint32_t sizeSb = width_in_sbs_minus_1 + 1;
+				widestTileSb = std::max(sizeSb, widestTileSb);
+				startSb += sizeSb;
+			}
+			MiColStarts.push_back(MiCols);
+			TileCols = i;
+			TileColsLog2 = tile_log2(1, TileCols);
+			if (minLog2Tiles > 0)
+				maxTileAreaSb = (sbRows * sbCols) >> (minLog2Tiles + 1);
+			else
+				maxTileAreaSb = sbRows * sbCols;
+			uint32_t one = 1;
+			uint32_t maxTileHeightSb = std::max(maxTileAreaSb / widestTileSb, one);
+			startSb = 0;
+			for (i = 0; startSb < sbRows && i < MAX_TILE_ROWS; i++) {
+				MiRowStarts.push_back(startSb << sbShift);
+				uint32_t maxHeight = std::min(sbRows - startSb, maxTileHeightSb);
+				uint32_t height_in_sbs_minus_1;
+				READ_NS(height_in_sbs_minus_1, maxHeight);
+				uint8_t sizeSb = height_in_sbs_minus_1 + 1;
+				startSb += sizeSb;
+			}
+			MiRowStarts.push_back(MiRows);
+			TileRows = i;
+			TileRowsLog2 = tile_log2(1, TileRows);
+
+		}
+		NumTiles = TileCols * TileRows;
+		if (TileColsLog2 > 0 || TileRowsLog2 > 0) {
+			uint8_t tile_size_bytes_minus_1;
+			READ_BITS(tile_size_bytes_minus_1, 2);
+			TileSizeBytes = tile_size_bytes_minus_1 + 1;
+		}
+		return true;
+	}
+	
+	bool Quantization::parse(BitReader& br, const SequenceHeader& seq)
+	{
+		uint8_t base_q_idx;
+		READ(base_q_idx);
+		READ_DELTA_Q(DeltaQYDc);
+		if (seq.NumPlanes > 1) {
+			bool diff_uv_delta;
+			if (seq.separate_uv_delta_q) {
+				READ(diff_uv_delta);
+			} else {
+				diff_uv_delta = false;
+			}
+			READ_DELTA_Q(DeltaQUDc);
+			READ_DELTA_Q(DeltaQUAc);
+			if (diff_uv_delta) {
+				READ_DELTA_Q(DeltaQVDc);
+				READ_DELTA_Q(DeltaQVAc);
+			} else {
+				DeltaQVDc = DeltaQUDc;
+				DeltaQVAc = DeltaQUAc;
+			}
+		} else {
+			DeltaQUDc = 0;
+			DeltaQUDc = 0;
+			DeltaQVAc = 0;
+			DeltaQVAc = 0;
+		}
+		READ(using_qmatrix);
+		if (using_qmatrix) {
+			READ_BITS(qm_y, 4);
+			READ_BITS(qm_u, 4);
+			if (!seq.separate_uv_delta_q)
+				qm_v = qm_u;
+			else
+				READ_BITS(qm_v, 4);
+		}
+		return true;
+	}
+
+	bool Parser::parseFrame(BitReader& br, TileGroupPtr& group)
 	{
 		if (!parseFrameHeader(br))
 			return false;
 		skipTrailingBits(br);
-
-		return true;
-
+		return parseTileGroup(br, group);
 	}
 	bool Parser::praseReserved(BitReader& br)
 	{
@@ -597,6 +843,107 @@ namespace Av1 {
 		while (br.getPos() & 7)
 			br.skip(1);
 		return;
+	}
+
+	bool Segmentation::parse(BitReader & br)
+	{
+		READ(segmentation_enabled);
+		if (!segmentation_enabled)
+			return true;
+		else
+			ASSERT(0);
+		return true;
+	}
+
+	bool DeltaQ::parse(BitReader & br, const Quantization & quant)
+	{
+		delta_q_res = 0;
+		delta_q_present = 0;
+		if (quant.base_q_idx > 0) {
+			READ(delta_q_present);
+		}
+		if (delta_q_present) {
+			READ_BITS(delta_q_res, 2);
+		}
+		return true;
+	}
+
+	bool DeltaLf::parse(BitReader & br, const DeltaQ& deltaQ)
+	{
+		delta_lf_present = 0;
+		delta_lf_res = 0;
+		delta_lf_multi = 0;
+		if (deltaQ.delta_q_present) {
+			READ(delta_lf_present);
+			if (delta_lf_present) {
+				READ_BITS(delta_lf_res, 2);
+				READ(delta_lf_multi);
+			}
+		}
+		return true;
+	}
+
+	bool LoopFilter::parse(BitReader & br,const SequenceHeader& seq, const FrameHeader & frame)
+	{
+		if (frame.CodedLossless || frame.allow_intrabc) {
+			loop_filter_level[0] = 0;
+			loop_filter_level[1] = 0;
+			loop_filter_ref_deltas[INTRA_FRAME] = 1;
+			loop_filter_ref_deltas[LAST_FRAME] = 0;
+			loop_filter_ref_deltas[LAST2_FRAME] = 0;
+			loop_filter_ref_deltas[LAST3_FRAME] = 0;
+			loop_filter_ref_deltas[BWDREF_FRAME] = 0;
+			loop_filter_ref_deltas[GOLDEN_FRAME] = -1;
+			loop_filter_ref_deltas[ALTREF_FRAME] = -1;
+			loop_filter_ref_deltas[ALTREF2_FRAME] = -1;
+	
+			for (uint8_t i = 0; i < 2; i++) {
+				loop_filter_mode_deltas[i] = 0;
+			}
+			return true;
+		}
+		ASSERT(0);
+		READ_BITS(loop_filter_level[0], 6);
+		READ_BITS(loop_filter_level[1], 6);
+		if (seq.NumPlanes > 1) {
+			if (loop_filter_level[0] || loop_filter_level[1]) {
+				READ_BITS(loop_filter_level[2], 6);
+				READ_BITS(loop_filter_level[3], 6);
+			}
+		}
+		READ_BITS(loop_filter_sharpness, 3);
+		bool loop_filter_delta_enabled;
+		READ(loop_filter_delta_enabled);
+		if (loop_filter_delta_enabled) {
+			bool loop_filter_delta_update;
+			READ(loop_filter_delta_update);
+			if (loop_filter_delta_update) {
+				for (uint8_t i = 0; i < TOTAL_REFS_PER_FRAME; i++) {
+					bool update_ref_delta;
+					READ(update_ref_delta);
+					if (update_ref_delta)
+						READ_SU(loop_filter_ref_deltas[i], 7);
+				}
+				for (uint8_t i = 0; i < 2; i++) {
+					bool update_mode_delta;
+					READ(update_mode_delta);
+					if (update_mode_delta)
+						READ_SU(loop_filter_mode_deltas[i], 7);
+				}
+			}
+		}
+
+		return true;
+	}
+
+	bool Cdef::parse(BitReader & br, const SequenceHeader & seq, const FrameHeader & frame)
+	{
+		if (frame.CodedLossless || frame.allow_intrabc || !seq.enable_cdef) {
+			/* TODO*/
+			return true;
+		}
+		ASSERT(0);
+		return false;
 	}
 
 }

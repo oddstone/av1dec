@@ -3,10 +3,47 @@
 
 #include <stdint.h>
 #include <vector>
+#include <list>
+#include <memory>
 #include "bitReader.h"
+#include "Av1Tile.h"
 
 namespace YamiParser {
 	namespace Av1 {
+
+		struct obu_extension_header
+		{
+			uint8_t temporal_id;
+			uint8_t spatial_id;
+			uint8_t quality_id;
+			bool parse(BitReader& br);
+		};
+
+		enum ObuType {
+			OBU_SEQUENCE_HEADER = 1,
+			OBU_TD = 2,
+			OBU_FRAME_HEADER = 3,
+			OBU_TILE_GROUP = 4,
+			OBU_METADATA = 5,
+			OBU_FRAME = 6,
+			OBU_REDUNDANT_FRAME_HEADER = 7,
+			OBU_PADDING = 15,
+		};
+		const char* obuType2String(uint8_t type);
+		
+		struct obu_header
+		{
+			bool parse(BitReader& br);
+			ObuType obu_type;
+			bool obu_extension_flag;
+			bool obu_has_size_field;
+			obu_extension_header extension;
+			uint64_t obu_size;
+		private:
+			bool parseLeb128(BitReader& br, uint64_t& v);
+		};
+
+
 		enum ColorPrimaries {
 			CP_BT_709 = 1,
 			CP_UNSPECIFIED = 2,
@@ -111,6 +148,7 @@ namespace YamiParser {
 			//clolor_config()
 			uint8_t BitDepth;
 			bool mono_chrome;
+			uint8_t NumPlanes;
 			uint8_t color_primaries;
 			uint8_t transfer_characteristics;
 			uint8_t matrix_coefficients;
@@ -154,6 +192,7 @@ namespace YamiParser {
 		};
 
 		class Parser;
+		struct FrameHeader;
 		enum FrameType
 		{
 			KEY_FRAME = 0,
@@ -161,8 +200,80 @@ namespace YamiParser {
 			INTRA_ONLY_FRAME = 2,
 			SWITCH_FRAME = 3,
 		};
+		enum RefFrame {
+			INTRA_FRAME = 0,
+			LAST_FRAME = 1,
+			LAST2_FRAME = 2,
+			LAST3_FRAME = 3,
+			GOLDEN_FRAME = 4,
+			BWDREF_FRAME = 5,
+			ALTREF2_FRAME = 6,
+			ALTREF_FRAME = 7,
+			TOTAL_REFS_PER_FRAME = 8,
+		};
+		enum TXMode {
+			ONLY_4X4 = 0,
+			TX_MODE_LARGEST = 1,
+			TX_MODE_SELECT = 2,
+		};
 		const static uint8_t NUM_REF_FRAMES = 8;
 		const static uint8_t PRIMARY_REF_NONE = 7;
+		const static uint16_t MAX_TILE_WIDTH = 4096;
+		const static uint32_t MAX_TILE_AREA = 4906 * 2304;
+		const static uint32_t MAX_TILE_COLS = 64;
+		const static uint32_t MAX_TILE_ROWS = 64;
+
+		struct Quantization
+		{
+			uint32_t base_q_idx;
+			int8_t DeltaQYDc;
+			int8_t DeltaQUDc;
+			int8_t DeltaQUAc;
+			int8_t DeltaQVDc;
+			int8_t DeltaQVAc;
+			bool using_qmatrix;
+			uint8_t qm_y;
+			uint8_t qm_u;
+			uint8_t qm_v;
+			bool parse(BitReader& br, const SequenceHeader& seq);
+		};
+
+		struct Segmentation
+		{
+			bool segmentation_enabled;
+			bool parse(BitReader& br);
+		};
+
+		struct DeltaQ
+		{
+			bool delta_q_present;
+			uint8_t delta_q_res;
+			bool parse(BitReader& br, const Quantization& quant);
+		};
+
+		struct DeltaLf
+		{
+			bool delta_lf_present;
+			uint8_t delta_lf_res;
+			bool delta_lf_multi;
+			bool parse(BitReader& br, const DeltaQ& deltaQ);
+		};
+
+		struct LoopFilter
+		{
+			const static int LOOP_FILTER_LEVEL_COUNT = 4;
+			const static int LOOP_FILTER_MODE_DELTA_COUNT = 2;
+			uint8_t loop_filter_level[LOOP_FILTER_LEVEL_COUNT];
+			int8_t loop_filter_ref_deltas[TOTAL_REFS_PER_FRAME];
+			uint8_t loop_filter_sharpness;
+			int8_t loop_filter_mode_deltas[LOOP_FILTER_MODE_DELTA_COUNT];
+			bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+
+		};
+		struct Cdef
+		{
+			bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+		};
 
 		struct FrameHeader
 		{
@@ -205,6 +316,31 @@ namespace YamiParser {
 			uint32_t RenderWidth;
 			uint32_t RenderHeight;
 
+			bool disable_frame_end_update_cdf;
+
+			//tile_info()
+			uint32_t TileCols;
+			uint32_t TileRows;
+			uint32_t NumTiles;
+			uint32_t TileColsLog2;
+			uint32_t TileRowsLog2;
+			uint8_t TileSizeBytes;
+
+			Quantization m_quant;
+			Segmentation m_segmentation;
+			DeltaQ m_deltaQ;
+			DeltaLf m_deltaLf;
+			LoopFilter m_loopFilter;
+
+			bool CodedLossless;
+			bool AllLossless;
+
+			TXMode TxMode;
+
+			std::vector<uint32_t> MiColStarts;
+			std::vector<uint32_t> MiRowStarts;
+
+
 			FrameHeader();
 			bool parse(BitReader& br, const SequenceHeader& sequence);
 		private:
@@ -212,31 +348,42 @@ namespace YamiParser {
 			bool parseFrameSize(BitReader& br, const SequenceHeader& sequence);
 			bool parseSuperresParams(BitReader& br, const SequenceHeader& sequence);
 			bool parseRenderSize(BitReader& br);
+			bool parseTileInfo(BitReader& br, const SequenceHeader& sequence);
+			bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
+			bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
+			bool parseTxMode(BitReader& br, const FrameHeader& frame);
 			const static uint8_t SUPERRES_DENOM_MIN = 9;
 			const static uint8_t SUPERRES_NUM = 8;
 			const static uint8_t SUPERRES_DENOM_BITS = 3;
+			const static uint8_t TX_MODES = 3;
+
 		};
+
+		
+		struct TileGroup {
+			//std::list<Tile> m_group;
+		};
+		typedef std::shared_ptr<TileGroup> TileGroupPtr;
 		class Parser
 		{
 		public:
-			bool parse(uint8_t* data, size_t size);
+
 			Parser();
-		private:
 			bool parseSequenceHeader(BitReader& br);
 			bool parseTemporalDelimiter(BitReader& br);
 			bool parseFrameHeader(BitReader& br);
-			bool praseTileGroup(BitReader& br);
+			bool parseTileGroup(BitReader& br, TileGroupPtr& group);
 			bool parseMetadata(BitReader& br);
 			bool parsePadding(BitReader& br);
-			bool parseFrame(BitReader& br);
+			bool parseFrame(BitReader& br, TileGroupPtr& group);
 			bool praseReserved(BitReader& br);
+		private:
 			void skipTrailingBits(BitReader& br);
 			bool m_seenFrameHeader;
 			SequenceHeader m_sequence;
 			FrameHeader m_frameHeader;
-
-
-
+			TileGroup m_group;
+			
 		};
 
 
