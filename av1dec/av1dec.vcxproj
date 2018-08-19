@@ -165,22 +165,16 @@
     <ClInclude Include="aom\aom_codec.h" />
     <ClInclude Include="aom\entropy.h" />
     <ClInclude Include="aom\entropymode.h" />
+    <ClInclude Include="aom\enums.h" />
     <ClInclude Include="aom\filter.h" />
     <ClInclude Include="aom\prob.h" />
     <ClInclude Include="aom\seg_common.h" />
-    <ClInclude Include="Av1Decoder.h" />
-    <ClInclude Include="Av1Tile.h" />
+    <ClInclude Include="aom\token_cdfs.h" />
     <ClInclude Include="codecparsers\Av1Parser.h" />
+    <ClInclude Include="codecparsers\Av1Tile.h" />
     <ClInclude Include="codecparsers\bitReader.h" />
-    <ClInclude Include="common\log.h" />
-    <ClInclude Include="common\NonCopyable.h" />
-    <ClInclude Include="interface\videocommondefs.h" />
-    <ClInclude Include="interface\videodecoderdefs.h" />
-    <ClInclude Include="interface\videodecoderhost.h" />
-    <ClInclude Include="interface\videodecoderinterface.h" />
-    <ClInclude Include="interface\yami.h" />
-    <ClInclude Include="SymbolDecoder.h" />
-    <ClInclude Include="tests\decodeinput.h" />
+    <ClInclude Include="codecparsers\EntropyDecoder.h" />
+    <ClInclude Include="codecparsers\SymbolDecoder.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

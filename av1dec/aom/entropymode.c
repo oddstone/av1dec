@@ -983,61 +983,61 @@ int av1_get_palette_color_index_context(const uint8_t *color_map, int stride,
 #undef MAX_COLOR_CONTEXT_HASH
 
 static void init_mode_probs(FRAME_CONTEXT *fc) {
-  av1_copy(fc->palette_y_size_cdf, default_palette_y_size_cdf);
-  av1_copy(fc->palette_uv_size_cdf, default_palette_uv_size_cdf);
-  av1_copy(fc->palette_y_color_index_cdf, default_palette_y_color_index_cdf);
-  av1_copy(fc->palette_uv_color_index_cdf, default_palette_uv_color_index_cdf);
-  av1_copy(fc->kf_y_cdf, default_kf_y_mode_cdf);
-  av1_copy(fc->angle_delta_cdf, default_angle_delta_cdf);
-  av1_copy(fc->comp_inter_cdf, default_comp_inter_cdf);
-  av1_copy(fc->comp_ref_type_cdf, default_comp_ref_type_cdf);
-  av1_copy(fc->uni_comp_ref_cdf, default_uni_comp_ref_cdf);
-  av1_copy(fc->palette_y_mode_cdf, default_palette_y_mode_cdf);
-  av1_copy(fc->palette_uv_mode_cdf, default_palette_uv_mode_cdf);
-  av1_copy(fc->comp_ref_cdf, default_comp_ref_cdf);
-  av1_copy(fc->comp_bwdref_cdf, default_comp_bwdref_cdf);
-  av1_copy(fc->single_ref_cdf, default_single_ref_cdf);
-  av1_copy(fc->txfm_partition_cdf, default_txfm_partition_cdf);
-  av1_copy(fc->compound_index_cdf, default_compound_idx_cdfs);
-  av1_copy(fc->comp_group_idx_cdf, default_comp_group_idx_cdfs);
-  av1_copy(fc->newmv_cdf, default_newmv_cdf);
-  av1_copy(fc->zeromv_cdf, default_zeromv_cdf);
-  av1_copy(fc->refmv_cdf, default_refmv_cdf);
-  av1_copy(fc->drl_cdf, default_drl_cdf);
-  av1_copy(fc->motion_mode_cdf, default_motion_mode_cdf);
-  av1_copy(fc->obmc_cdf, default_obmc_cdf);
-  av1_copy(fc->inter_compound_mode_cdf, default_inter_compound_mode_cdf);
-  av1_copy(fc->compound_type_cdf, default_compound_type_cdf);
-  av1_copy(fc->wedge_idx_cdf, default_wedge_idx_cdf);
-  av1_copy(fc->interintra_cdf, default_interintra_cdf);
-  av1_copy(fc->wedge_interintra_cdf, default_wedge_interintra_cdf);
-  av1_copy(fc->interintra_mode_cdf, default_interintra_mode_cdf);
-  av1_copy(fc->seg.pred_cdf, default_segment_pred_cdf);
-  av1_copy(fc->seg.tree_cdf, default_seg_tree_cdf);
-  av1_copy(fc->filter_intra_cdfs, default_filter_intra_cdfs);
-  av1_copy(fc->filter_intra_mode_cdf, default_filter_intra_mode_cdf);
-  av1_copy(fc->switchable_restore_cdf, default_switchable_restore_cdf);
-  av1_copy(fc->wiener_restore_cdf, default_wiener_restore_cdf);
-  av1_copy(fc->sgrproj_restore_cdf, default_sgrproj_restore_cdf);
-  av1_copy(fc->y_mode_cdf, default_if_y_mode_cdf);
-  av1_copy(fc->uv_mode_cdf, default_uv_mode_cdf);
-  av1_copy(fc->switchable_interp_cdf, default_switchable_interp_cdf);
-  av1_copy(fc->partition_cdf, default_partition_cdf);
-  av1_copy(fc->intra_ext_tx_cdf, default_intra_ext_tx_cdf);
-  av1_copy(fc->inter_ext_tx_cdf, default_inter_ext_tx_cdf);
-  av1_copy(fc->skip_mode_cdfs, default_skip_mode_cdfs);
-  av1_copy(fc->skip_cdfs, default_skip_cdfs);
-  av1_copy(fc->intra_inter_cdf, default_intra_inter_cdf);
+  av1_copy(palette_y_size_cdf, default_palette_y_size_cdf);
+  av1_copy(palette_uv_size_cdf, default_palette_uv_size_cdf);
+  av1_copy(palette_y_color_index_cdf, default_palette_y_color_index_cdf);
+  av1_copy(palette_uv_color_index_cdf, default_palette_uv_color_index_cdf);
+  av1_copy(kf_y_cdf, default_kf_y_mode_cdf);
+  av1_copy(angle_delta_cdf, default_angle_delta_cdf);
+  av1_copy(comp_inter_cdf, default_comp_inter_cdf);
+  av1_copy(comp_ref_type_cdf, default_comp_ref_type_cdf);
+  av1_copy(uni_comp_ref_cdf, default_uni_comp_ref_cdf);
+  av1_copy(palette_y_mode_cdf, default_palette_y_mode_cdf);
+  av1_copy(palette_uv_mode_cdf, default_palette_uv_mode_cdf);
+  av1_copy(comp_ref_cdf, default_comp_ref_cdf);
+  av1_copy(comp_bwdref_cdf, default_comp_bwdref_cdf);
+  av1_copy(single_ref_cdf, default_single_ref_cdf);
+  av1_copy(txfm_partition_cdf, default_txfm_partition_cdf);
+  av1_copy(compound_index_cdf, default_compound_idx_cdfs);
+  av1_copy(comp_group_idx_cdf, default_comp_group_idx_cdfs);
+  av1_copy(newmv_cdf, default_newmv_cdf);
+  av1_copy(zeromv_cdf, default_zeromv_cdf);
+  av1_copy(refmv_cdf, default_refmv_cdf);
+  av1_copy(drl_cdf, default_drl_cdf);
+  av1_copy(motion_mode_cdf, default_motion_mode_cdf);
+  av1_copy(obmc_cdf, default_obmc_cdf);
+  av1_copy(inter_compound_mode_cdf, default_inter_compound_mode_cdf);
+  av1_copy(compound_type_cdf, default_compound_type_cdf);
+  av1_copy(wedge_idx_cdf, default_wedge_idx_cdf);
+  av1_copy(interintra_cdf, default_interintra_cdf);
+  av1_copy(wedge_interintra_cdf, default_wedge_interintra_cdf);
+  av1_copy(interintra_mode_cdf, default_interintra_mode_cdf);
+  av1_copy(seg.pred_cdf, default_segment_pred_cdf);
+  av1_copy(seg.tree_cdf, default_seg_tree_cdf);
+  av1_copy(filter_intra_cdfs, default_filter_intra_cdfs);
+  av1_copy(filter_intra_mode_cdf, default_filter_intra_mode_cdf);
+  av1_copy(switchable_restore_cdf, default_switchable_restore_cdf);
+  av1_copy(wiener_restore_cdf, default_wiener_restore_cdf);
+  av1_copy(sgrproj_restore_cdf, default_sgrproj_restore_cdf);
+  av1_copy(y_mode_cdf, default_if_y_mode_cdf);
+  av1_copy(uv_mode_cdf, default_uv_mode_cdf);
+  av1_copy(switchable_interp_cdf, default_switchable_interp_cdf);
+  av1_copy(partition_cdf, default_partition_cdf);
+  av1_copy(intra_ext_tx_cdf, default_intra_ext_tx_cdf);
+  av1_copy(inter_ext_tx_cdf, default_inter_ext_tx_cdf);
+  av1_copy(skip_mode_cdfs, default_skip_mode_cdfs);
+  av1_copy(skip_cdfs, default_skip_cdfs);
+  av1_copy(intra_inter_cdf, default_intra_inter_cdf);
   for (int i = 0; i < SPATIAL_PREDICTION_PROBS; i++)
-    av1_copy(fc->seg.spatial_pred_seg_cdf[i],
+    av1_copy(seg.spatial_pred_seg_cdf[i],
              default_spatial_pred_seg_tree_cdf[i]);
-  av1_copy(fc->tx_size_cdf, default_tx_size_cdf);
-  av1_copy(fc->delta_q_cdf, default_delta_q_cdf);
-  av1_copy(fc->delta_lf_cdf, default_delta_lf_cdf);
-  av1_copy(fc->delta_lf_multi_cdf, default_delta_lf_multi_cdf);
-  av1_copy(fc->cfl_sign_cdf, default_cfl_sign_cdf);
-  av1_copy(fc->cfl_alpha_cdf, default_cfl_alpha_cdf);
-  av1_copy(fc->intrabc_cdf, default_intrabc_cdf);
+  av1_copy(tx_size_cdf, default_tx_size_cdf);
+  av1_copy(delta_q_cdf, default_delta_q_cdf);
+  av1_copy(delta_lf_cdf, default_delta_lf_cdf);
+  av1_copy(delta_lf_multi_cdf, default_delta_lf_multi_cdf);
+  av1_copy(cfl_sign_cdf, default_cfl_sign_cdf);
+  av1_copy(cfl_alpha_cdf, default_cfl_alpha_cdf);
+  av1_copy(intrabc_cdf, default_intrabc_cdf);
 }
 
 void av1_set_default_ref_deltas(int8_t *ref_deltas) {
@@ -1099,7 +1099,7 @@ void av1_setup_past_independence(AV1_COMMON *cm) {
   init_mode_probs(cm->fc);
   av1_init_mv_probs(cm);
   av1_init_lv_map(cm);
-  cm->fc->initialized = 1;
+  cm->initialized = 1;
   av1_setup_frame_contexts(cm);
 
   // prev_mip will only be allocated in encoder.

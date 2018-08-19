@@ -37,7 +37,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\av1dec\codecparsers\bitReader.cpp" />
-    <ClCompile Include="..\av1dec\SymbolDecoder.cpp" />
+    <ClCompile Include="..\av1dec\codecparsers\EntropyDecoder.cpp" />
+    <ClCompile Include="..\av1dec\codecparsers\SymbolDecoder.cpp" />
     <ClCompile Include="test.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

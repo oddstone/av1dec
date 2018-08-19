@@ -1,6 +1,6 @@
 #include "SymbolDecoder.h"
 #include <algorithm>
-#include "codecparsers/bitReader.h"
+#include "bitReader.h"
 
 namespace YamiParser {
 	namespace Av1 {

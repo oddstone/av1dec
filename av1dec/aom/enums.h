@@ -43,8 +43,8 @@ extern "C" {
 #define MAX_MIB_MASK (MAX_MIB_SIZE - 1)
 
 // Maximum number of tile rows and tile columns
-#define MAX_TILE_ROWS 1024
-#define MAX_TILE_COLS 1024
+//#define MAX_TILE_ROWS 1024
+//#define MAX_TILE_COLS 1024
 
 #define MAX_VARTX_DEPTH 2
 
@@ -557,6 +557,7 @@ typedef uint8_t TXFM_CONTEXT;
 #define BWDREF_FRAME 5
 #define ALTREF2_FRAME 6
 #define ALTREF_FRAME 7
+#define TOTAL_REFS_PER_FRAME 8
 #define LAST_REF_FRAMES (LAST3_FRAME - LAST_FRAME + 1)
 
 #define INTER_REFS_PER_FRAME (ALTREF_FRAME - LAST_FRAME + 1)

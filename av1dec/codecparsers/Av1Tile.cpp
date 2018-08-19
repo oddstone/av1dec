@@ -8,12 +8,12 @@ namespace YamiParser {
 	namespace Av1 {
 		
 
-		const int Num_4x4_Blocks_Wide[BLOCK_SIZES] = {
+		const int Num_4x4_Blocks_Wide[BLOCK_SIZES_ALL] = {
 			1, 1, 2, 2, 2, 4, 4, 4, 8, 8, 8,
 			16, 16, 16, 32, 32, 1, 4, 2, 8, 4, 16
 		};
 
-		BlockType Partition_Subsize[10][BLOCK_SIZES] = {
+		BLOCK_SIZE Partition_Subsize[10][BLOCK_SIZES_ALL] = {
 			{
 				BLOCK_4X4,
 				BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X8,
@@ -156,7 +156,7 @@ namespace YamiParser {
 		bool Tile::readSkip()
 		{
 			uint8_t ctx = getSkipCtx();
-			return (bool)m_symbol->read(m_skipCdf[ctx], 2);
+			return m_entropy->readSkip(ctx);
 		}
 
 		void Tile::readCdef()
@@ -185,7 +185,7 @@ namespace YamiParser {
 			PREDICTION_MODE	left = DC_PRED;
 			uint8_t aboveCtx = Intra_Mode_Context[above];
 			uint8_t leftCtx = Intra_Mode_Context[left];
-			return (PREDICTION_MODE)m_symbol->read(m_intraFrameYModeCdf[aboveCtx][leftCtx], INTRA_MODES);
+			return m_entropy->readIntraFrameYMode(aboveCtx, leftCtx);
 		}
 
 		void Tile::intraAngleInfoY()
@@ -193,7 +193,32 @@ namespace YamiParser {
 
 		}
 
-		void Tile::readIntraFrameModeInfo()
+		UV_PREDICTION_MODE Tile::readUvMode(PREDICTION_MODE yMode)
+		{
+
+			CFL_ALLOWED_TYPE cflAllowed = CFL_ALLOWED;
+			/* TODO: get right allowed type*/
+			return m_entropy->readUvMode(cflAllowed, yMode);
+
+		}
+
+		void Tile::intra_angle_info_uv(UV_PREDICTION_MODE uvMode)
+		{
+			uint8_t angle_delta_uv = m_entropy->readAngleDeltaUV(uvMode);
+
+
+		}
+
+		void Tile::filter_intra_mode_info(BLOCK_SIZE bSize)
+		{
+			bool use_filter_intra = m_entropy->readUseFilterIntra(bSize);
+			if (use_filter_intra) {
+				///todo
+			}
+
+		}
+
+		void Tile::readIntraFrameModeInfo(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 		{
 			bool SegIdPreSkip = false;
 			if (SegIdPreSkip)
@@ -219,8 +244,25 @@ namespace YamiParser {
 				intraAngleInfoY();
 				bool HasChroma = true;
 				if (HasChroma) {
+					UV_PREDICTION_MODE uvMode = readUvMode(intra_frame_y_mode);
+					if (uvMode == UV_CFL_PRED) {
+						//TODO
+						//read_cfl_alphas()
+					}
+					intra_angle_info_uv(uvMode);
 
 				}
+				/*
+				PaletteSizeY = 0
+				PaletteSizeUV = 0
+				if ( MiSize >= BLOCK_8X8 &&
+				Block_Width[ MiSize ] <= 64 &&
+				Block_Height[ MiSize ] <= 64 &&
+				allow_screen_content_tools ) {
+					palette_mode_info( )
+				}
+				*/
+				filter_intra_mode_info(bSize);
 			}
 
 		}
@@ -230,16 +272,16 @@ namespace YamiParser {
 
 		}
 
-		void Tile::readModeInfo()
+		void Tile::readModeInfo(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 		{
 			if (m_frame.FrameIsIntra)
-				readIntraFrameModeInfo();
+				readIntraFrameModeInfo(r, c, bSize);
 			else
 				readInterFrameModeInfo();
 			
 		}
 
-		bool Tile::decodeBlock(uint32_t r, uint32_t c, BlockType bSize)
+		bool Tile::decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 		{
 			/* MiRow = r
 				MiCol = c
@@ -266,12 +308,12 @@ namespace YamiParser {
 				AvailLChroma = 0
 				}
 				*/
-			readModeInfo();
+			readModeInfo(r, c, bSize);
 
 			return true;
 		}
 
-		bool Tile::decodePartition(uint32_t r, uint32_t c, BlockType bSize)
+		bool Tile::decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 		{
 			uint32_t MiRows = m_frame.MiRows;
 			uint32_t MiCols = m_frame.MiCols;
@@ -285,7 +327,7 @@ namespace YamiParser {
 			bool hasRows = (r + halfBlock4x4) < MiRows;
 			bool hasCols = (c + halfBlock4x4) < MiCols;
 
-			PartitionType partition;
+			PARTITION_TYPE partition;
 			if (bSize < BLOCK_8X8) {
 				partition = PARTITION_NONE;
 			} else if (hasRows && hasCols) {
@@ -301,8 +343,8 @@ namespace YamiParser {
 			} else {
 				partition = PARTITION_SPLIT;
 			}
-			BlockType subSize = Partition_Subsize[partition][bSize];
-			BlockType splitSize = Partition_Subsize[PARTITION_SPLIT][bSize];
+			BLOCK_SIZE subSize = Partition_Subsize[partition][bSize];
+			BLOCK_SIZE splitSize = Partition_Subsize[PARTITION_SPLIT][bSize];
 
 			if (partition == PARTITION_NONE) {
 				decodeBlock(r, c, subSize);
@@ -355,7 +397,7 @@ namespace YamiParser {
 
 		bool Tile::decode(const uint8_t* data, uint32_t size)
 		{
-			m_symbol.reset(new SymbolDecoder(data, size, m_frame.disable_cdf_update));
+			m_entropy.reset(new EntropyDecoder(data, size, m_frame.disable_cdf_update, m_frame.m_quant.base_q_idx));
 			/*
 			clear_above_context( )
 			for ( i = 0; i < FRAME_LF_COUNT; i++ )
@@ -369,7 +411,7 @@ namespace YamiParser {
 			}
 			}
 			*/
-			BlockType sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
+			BLOCK_SIZE sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
 			int sbSize4 = Num_4x4_Blocks_Wide[sbSize];
 			for (uint32_t r = MiRowStart; r < MiRowEnd; r += sbSize4) {
 				//clear_left_context()
@@ -385,30 +427,22 @@ namespace YamiParser {
 			return true;
 		}
 
-		uint8_t Mi_Width_Log2[BLOCK_SIZES] = {
+		uint8_t Mi_Width_Log2[BLOCK_SIZES_ALL] = {
 			0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3,
 			4, 4, 4, 5, 5, 0, 2, 1, 3, 2, 4
 		};
 
-		uint8_t Mi_Height_Log2[BLOCK_SIZES] = {
+		uint8_t Mi_Height_Log2[BLOCK_SIZES_ALL] = {
 			0, 1, 0, 1, 2, 1, 2, 3, 2, 3, 4,
 			3, 4, 5, 4, 5, 2, 0, 3, 1, 4, 2
 		};
 
-		uint8_t getPartitionCdfCount(uint8_t bsl)
-		{
-			if (bsl == 1)
-				return PARTITION_TYPES;
-			if (bsl == 5)
-				return EXT_PARTITION_TYPES - 2;;
-			ASSERT(bsl > 1 && bsl < 5);
-			return EXT_PARTITION_TYPES;
-		}
+		
 
 		
 
 
-		PartitionType Tile::readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BlockType bSize)
+		PARTITION_TYPE Tile::readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize)
 		{	
 			uint8_t bsl = Mi_Width_Log2[bSize];
 			/*
@@ -417,9 +451,7 @@ namespace YamiParser {
 			uint8_t ctx = left * 2 + above;
 			*/
 			uint8_t ctx = 0;
-			return (PartitionType)m_symbol->read(m_partitionCdf[bsl][ctx], getPartitionCdfCount(bsl));
-
-
+			return m_entropy->readPartition(ctx, bsl);
 		}
 	}
 }

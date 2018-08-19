@@ -200,17 +200,7 @@ namespace YamiParser {
 			INTRA_ONLY_FRAME = 2,
 			SWITCH_FRAME = 3,
 		};
-		enum RefFrame {
-			INTRA_FRAME = 0,
-			LAST_FRAME = 1,
-			LAST2_FRAME = 2,
-			LAST3_FRAME = 3,
-			GOLDEN_FRAME = 4,
-			BWDREF_FRAME = 5,
-			ALTREF2_FRAME = 6,
-			ALTREF_FRAME = 7,
-			TOTAL_REFS_PER_FRAME = 8,
-		};
+		
 		enum TXMode {
 			ONLY_4X4 = 0,
 			TX_MODE_LARGEST = 1,

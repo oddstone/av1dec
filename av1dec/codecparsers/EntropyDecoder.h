@@ -6,13 +6,27 @@
 #include "../aom/filter.h"
 #include "../aom/seg_common.h"
 #include "../aom/entropy.h"
+#include "SymbolDecoder.h"
+#include <memory>
+
 
 class EntropyDecoder
 {
 public:
-	EntropyDecoder();
+	EntropyDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update, uint32_t baseQ);
 	~EntropyDecoder();
+	PREDICTION_MODE readIntraFrameYMode(uint8_t aboveCtx, uint8_t leftCtx);
+	bool readSkip(uint8_t ctx);
+	PARTITION_TYPE readPartition(uint8_t ctx, uint8_t bsl);
+	UV_PREDICTION_MODE readUvMode(CFL_ALLOWED_TYPE cfl_allowed, PREDICTION_MODE y_mode);
+	uint8_t readAngleDeltaUV(UV_PREDICTION_MODE uvMode);
+	bool readUseFilterIntra(BLOCK_SIZE bSize);
+	bool readAllZero(uint8_t txSzCtx, uint8_t ctx);
 private:
+	void initCoefCdf(uint32_t baseQ);
+	uint8_t getPartitionCdfCount(uint8_t bsl);
+	std::unique_ptr<YamiParser::Av1::SymbolDecoder> m_symbol;
+
 	aom_cdf_prob txb_skip_cdf[TX_SIZES][TXB_SKIP_CONTEXTS][CDF_SIZE(2)];
 	aom_cdf_prob eob_extra_cdf[TX_SIZES][PLANE_TYPES][EOB_COEF_CONTEXTS]
 		[CDF_SIZE(2)];

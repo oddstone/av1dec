@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 #include <memory>
+#include "EntropyDecoder.h"
+#include "../aom/enums.h"
 
 namespace YamiParser {
 	namespace Av1 {
@@ -8,6 +10,7 @@ namespace YamiParser {
 		struct FrameHeader;
 		struct SequenceHeader;
 
+		/*
 		enum BlockType {
 			BLOCK_4X4,
 			BLOCK_4X8,
@@ -35,7 +38,7 @@ namespace YamiParser {
 			BLOCK_INVALID = BLOCK_SIZES,
 		};
 
-		enum PartitionType {
+		enum PARTITION_TYPE {
 			PARTITION_NONE,
 			PARTITION_HORZ,
 			PARTITION_VERT,
@@ -108,6 +111,7 @@ namespace YamiParser {
 			UV_INTRA_MODES,
 			UV_MODE_INVALID,  // For uv_mode in inter blocks
 		} ;
+		*/
 
 
 		struct Tile {
@@ -119,15 +123,16 @@ namespace YamiParser {
 			Tile(const SequenceHeader& sequence, const FrameHeader& frame, uint32_t TileNum);
 
 			bool decode(const uint8_t* data, uint32_t size);
-			bool decodePartition(uint32_t r, uint32_t c, BlockType sbSize);
-			bool decodeBlock(uint32_t r, uint32_t c, BlockType bSize);
-			PartitionType readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BlockType bSize);
-			void readModeInfo();
-			void readIntraFrameModeInfo();
+			bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
+			bool decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
+			PARTITION_TYPE readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize);
+			void readModeInfo(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
+			void readIntraFrameModeInfo(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
 			void readInterFrameModeInfo();
 
-			bool readSkip();
 			uint8_t getSkipCtx();
+			bool readSkip();
+			
 
 			void readCdef();
 			void readDeltaQindex();
@@ -135,15 +140,18 @@ namespace YamiParser {
 
 			PREDICTION_MODE readIntraFrameYMode();
 			void intraAngleInfoY();
+			UV_PREDICTION_MODE readUvMode(PREDICTION_MODE yMode);
+			void intra_angle_info_uv(UV_PREDICTION_MODE uvMode);
+			void filter_intra_mode_info(BLOCK_SIZE bSize);
 		private:
 			bool isInside(uint32_t r, uint32_t c);
 			const FrameHeader& m_frame;
 			const SequenceHeader& m_sequence;
-			std::unique_ptr<SymbolDecoder> m_symbol;
+			std::unique_ptr<EntropyDecoder> m_entropy;
 
-			uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
-			uint16_t m_skipCdf[SKIP_CONTEXTS][3];
-			uint16_t m_intraFrameYModeCdf[INTRA_MODE_CONTEXTS][INTRA_MODE_CONTEXTS][INTRA_MODES + 1];
+			//uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
+			//uint16_t m_skipCdf[SKIP_CONTEXTS][3];
+			//uint16_t m_intraFrameYModeCdf[INTRA_MODE_CONTEXTS][INTRA_MODE_CONTEXTS][INTRA_MODES + 1];
 
 		};
 	}
