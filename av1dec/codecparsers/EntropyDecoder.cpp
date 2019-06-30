@@ -1,7 +1,9 @@
 #include "EntropyDecoder.h"
 #include "../aom/entropymode.c"
 #include "../aom/token_cdfs.h"
+#include "../common/log.h"
 #include <string.h>
+#include <iostream>
 
 #define av1_copy(a, b) memcpy(a, b, sizeof(b))
 
@@ -150,4 +152,65 @@ bool EntropyDecoder::readUseFilterIntra(BLOCK_SIZE bSize)
 bool EntropyDecoder::readAllZero(uint8_t txSzCtx, uint8_t ctx)
 {
 	return (bool)m_symbol->read(txb_skip_cdf[txSzCtx][ctx], 2);
+}
+
+uint8_t EntropyDecoder::readEobPt(uint8_t eobMultisize, PLANE_TYPE planeType, uint8_t ctx)
+{
+	aom_cdf_prob* cdf;
+	if (eobMultisize == 0) {
+		cdf = eob_flag_cdf16[planeType][ctx];
+	} else if (eobMultisize == 1) {
+		cdf = eob_flag_cdf32[planeType][ctx];
+	} else if (eobMultisize == 2) {
+		cdf = eob_flag_cdf64[planeType][ctx];
+	} else if (eobMultisize == 3) {
+		cdf = eob_flag_cdf128[planeType][ctx];
+	} else if (eobMultisize == 4) {
+		cdf = eob_flag_cdf256[planeType][ctx];
+	} else if (eobMultisize == 5) {
+		cdf = eob_flag_cdf512[planeType][ctx];
+	} else if (eobMultisize == 6) {
+		cdf = eob_flag_cdf1024[planeType][ctx];
+	} else {
+		return 0;
+	}
+	return m_symbol->read(cdf, eobMultisize + 5) + 1;
+
+}
+
+uint8_t EntropyDecoder::readCoeffBaseEob(uint8_t txSzCtx, PLANE_TYPE planeType, uint8_t ctx)
+{
+	return m_symbol->read(coeff_base_eob_cdf[txSzCtx][planeType][ctx], 3);
+}
+
+uint8_t EntropyDecoder::readCoeffBr(uint8_t minTx, PLANE_TYPE planeType, uint8_t ctx)
+{
+	return m_symbol->read(coeff_br_cdf[minTx][planeType][ctx], BR_CDF_SIZE);
+}
+
+bool EntropyDecoder::readDcSign(PLANE_TYPE planeType, uint8_t ctx)
+{
+	return  (bool)m_symbol->read(dc_sign_cdf[planeType][ctx], 2);
+}
+
+bool EntropyDecoder::readUe(uint32_t& v)
+{
+	uint8_t len = 0;
+	uint8_t bit = 0;
+	do {
+		len++;
+		if (len >= 32) {
+			ERROR("invalid lenth");
+			return false;
+		}
+		bit = m_symbol->readBool();
+	} while (!bit);
+	std::cout << len;
+	v = 1;
+	for (int i = len - 2; i >= 0; i--) {
+		bit = m_symbol->readBool();
+		v = (v << 1) | bit;
+	}
+	return true;
+
 }

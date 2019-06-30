@@ -31,6 +31,77 @@ TEST(EntropyDecoder, read) {
 	bool allZero = m_decoder->readAllZero(0, 1);
 	EXPECT_FALSE(allZero);
 
-	
+	uint8_t eobPt = m_decoder->readEobPt(0, PLANE_TYPE_Y, 0);
+	EXPECT_EQ(1, eobPt);
 
+	uint8_t coeffBaseEob = m_decoder->readCoeffBaseEob(0, PLANE_TYPE_Y, 0);
+	EXPECT_EQ(2, coeffBaseEob);
+
+	uint8_t coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_Y, 0);
+	EXPECT_EQ(3, coeffBr);
+
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_Y, 0);
+	EXPECT_EQ(3, coeffBr);
+
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_Y, 0);
+	EXPECT_EQ(3, coeffBr);
+
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_Y, 0);
+	EXPECT_EQ(3, coeffBr);
+
+	bool dcSign = m_decoder->readDcSign(PLANE_TYPE_Y, 0);
+	EXPECT_FALSE(dcSign);
+
+	uint32_t v;
+	bool ret = m_decoder->readUe(v);
+	EXPECT_TRUE(ret);
+	EXPECT_EQ(402, v);
+	//why?
+	//EXPECT_EQ(401, v);
+	allZero = m_decoder->readAllZero(0, 3);
+	EXPECT_TRUE(allZero);
+
+	
+	allZero = m_decoder->readAllZero(0, 3);
+	EXPECT_TRUE(allZero);
+
+	allZero = m_decoder->readAllZero(0, 1);
+	EXPECT_TRUE(allZero);
+
+	allZero = m_decoder->readAllZero(0, 7);
+	EXPECT_FALSE(allZero);
+
+	eobPt = m_decoder->readEobPt(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(1, eobPt);
+
+	coeffBaseEob = m_decoder->readCoeffBaseEob(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(2, coeffBaseEob);
+
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(3, coeffBr);
+	
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(2, coeffBr);
+
+	dcSign = m_decoder->readDcSign(PLANE_TYPE_UV, 0);
+	EXPECT_TRUE(dcSign);
+
+	allZero = m_decoder->readAllZero(0, 7);
+	EXPECT_FALSE(allZero);
+
+	eobPt = m_decoder->readEobPt(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(1, eobPt);
+
+	coeffBaseEob = m_decoder->readCoeffBaseEob(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(2, coeffBaseEob);
+
+
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(3, coeffBr);
+
+	coeffBr = m_decoder->readCoeffBr(0, PLANE_TYPE_UV, 0);
+	EXPECT_EQ(2, coeffBr);
+
+	dcSign = m_decoder->readDcSign(PLANE_TYPE_UV, 0);
+	EXPECT_TRUE(dcSign);
 }

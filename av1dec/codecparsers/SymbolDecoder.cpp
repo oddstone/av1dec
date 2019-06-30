@@ -1,6 +1,7 @@
 #include "SymbolDecoder.h"
 #include <algorithm>
 #include "bitReader.h"
+#include "../aom/prob.h"
 
 namespace YamiParser {
 	namespace Av1 {
@@ -35,7 +36,19 @@ namespace YamiParser {
 			}
 			return ret;
 		}
+
+		uint8_t SymbolDecoder::readBool()
+		{
+			static uint16_t icdf[] = { AOM_CDF2(1 << 14) };
+			return read(icdf, 2, true);
+		}
+		
 		uint8_t SymbolDecoder::read(uint16_t * icdf, uint8_t nicdf)
+		{
+			return read(icdf, nicdf, DisableCdfUpdate);
+		}
+
+		uint8_t SymbolDecoder::read(uint16_t * icdf, uint8_t nicdf, bool disableUpdate)
 		{
 			uint16_t cur = SymbolRange;
 			uint8_t symbol = -1;
@@ -52,7 +65,7 @@ namespace YamiParser {
 			SymbolRange = prev - cur;
 			SymbolValue -= cur;
 			renormalize();
-			if (!DisableCdfUpdate)
+			if (!disableUpdate)
 				updateCdf(icdf, nicdf, symbol);
 			return symbol;
 
@@ -86,5 +99,6 @@ namespace YamiParser {
 			SymbolValue = paddedData ^ (((SymbolValue + 1) << bits) - 1);
 			SymbolMaxBits = SymbolMaxBits - bits;
 		}
+
 	}
 }

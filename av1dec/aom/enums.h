@@ -225,13 +225,7 @@ typedef enum ATTRIBUTE_PACKED {
 #define MAX_TX_BLOCKS_IN_MAX_SB_LOG2 ((MAX_SB_SIZE_LOG2 - MAX_TX_SIZE_LOG2) * 2)
 #define MAX_TX_BLOCKS_IN_MAX_SB (1 << MAX_TX_BLOCKS_IN_MAX_SB_LOG2)
 
-// frame transform mode
-typedef enum ATTRIBUTE_PACKED {
-  ONLY_4X4,         // use only 4x4 transform
-  TX_MODE_LARGEST,  // transform size is the largest possible for pu size
-  TX_MODE_SELECT,   // transform specified for each block
-  TX_MODES,
-} TX_MODE;
+
 
 // 1D tx types
 typedef enum ATTRIBUTE_PACKED {

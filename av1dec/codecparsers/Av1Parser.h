@@ -112,6 +112,12 @@ namespace YamiParser {
 		struct SequenceHeader
 		{
 			uint8_t seq_profile;
+			bool still_picture;
+			bool reduced_still_picture_header;
+			bool timing_info_present_flag;
+			bool decoder_model_info_present_flag;
+			bool initial_display_delay_present_flag;
+
 			uint8_t frame_width_bits_minus_1;
 			uint8_t frame_height_bits_minus_1;
 			uint32_t max_frame_width_minus_1;
@@ -130,7 +136,7 @@ namespace YamiParser {
 			bool enable_warped_motion;
 			bool enable_dual_filter;
 
-			//bool enable_order_hint;
+			bool enable_order_hint;
 			bool enable_jnt_comp;
 			bool enable_ref_frame_mvs;
 
@@ -176,12 +182,14 @@ namespace YamiParser {
 					memset(this, 0, sizeof(*this));
 				}
 				uint16_t operating_point_idc;
-				uint8_t level;
-				bool decoder_rate_model_param_present_flag;
+				uint8_t seq_level_idx;
+				bool seq_tier;
+				bool decoder_model_present_for_this_op;
+				bool initial_display_delay_present_for_this_op;
 				//depends on decoder_rate_model_param_present_flag;
-				uint16_t decode_to_display_rate_ratio;
-				uint32_t initial_display_delay;
-				uint8_t extra_frame_buffers;
+				//uint16_t decode_to_display_rate_ratio;
+				//uint32_t initial_display_delay;
+				//uint8_t extra_frame_buffers;
 			};
 			std::vector<OperatingPoint> operating_points;
 
@@ -227,11 +235,37 @@ namespace YamiParser {
 			uint8_t qm_v;
 			bool parse(BitReader& br, const SequenceHeader& seq);
 		};
+		enum SEG_LVL_FEATURE {
+			SEG_LVL_ALT_Q,
+			SEG_LVL_ALT_LF_Y_V,
+			SEG_LVL_REF_FRAME = 5,
+			SEG_LVL_SKIP,
+			SEG_LVL_GLOBALMV,
+			SEG_LVL_MAX,
+		};
+		static const int MAX_LOOP_FILTER = 63;
+		static const int Segmentation_Feature_Bits[SEG_LVL_MAX] = { 8, 6, 6, 6, 6, 3, 0, 0 };
+		static const int Segmentation_Feature_Signed[SEG_LVL_MAX] = { 1, 1, 1, 1, 1, 0, 0, 0 };
+		static const int Segmentation_Feature_Max[SEG_LVL_MAX] = {
+			255, MAX_LOOP_FILTER, MAX_LOOP_FILTER,
+			MAX_LOOP_FILTER, MAX_LOOP_FILTER, 7,
+			0, 0 };
 
 		struct Segmentation
 		{
-			bool segmentation_enabled;
+
 			bool parse(BitReader& br);
+
+			bool segmentation_enabled;
+			bool FeatureEnabled[MAX_SEGMENTS][SEG_LVL_MAX];
+			int16_t FeatureData[MAX_SEGMENTS][SEG_LVL_MAX];
+			bool 	SegIdPreSkip;
+			uint8_t LastActiveSegId;
+
+
+;
+			bool seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE);
+		private:
 		};
 
 		struct DeltaQ
@@ -275,6 +309,7 @@ namespace YamiParser {
 			bool show_frame;
 			bool showable_frame;
 			bool RefValid[NUM_REF_FRAMES];
+			uint8_t RefOrderHint[NUM_REF_FRAMES];
 			bool error_resilient_mode;
 			bool disable_cdf_update;
 			bool allow_screen_content_tools;
@@ -322,8 +357,13 @@ namespace YamiParser {
 			DeltaLf m_deltaLf;
 			LoopFilter m_loopFilter;
 
+			bool enable_warped_motion;
+			bool allow_warped_motion;
+
 			bool CodedLossless;
 			bool AllLossless;
+			bool LosslessArray[MAX_SEGMENTS];
+			uint8_t SegQMLevel[3][MAX_SEGMENTS];
 
 			TXMode TxMode;
 
@@ -342,6 +382,7 @@ namespace YamiParser {
 			bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
 			bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
 			bool parseTxMode(BitReader& br, const FrameHeader& frame);
+			int16_t get_qindex(bool ignoreDeltaQ, int segmentId);
 			const static uint8_t SUPERRES_DENOM_MIN = 9;
 			const static uint8_t SUPERRES_NUM = 8;
 			const static uint8_t SUPERRES_DENOM_BITS = 3;

@@ -44,6 +44,8 @@ public:
 
     inline bool readT(bool& v);
 
+	bool readUe(uint32_t& v);
+
 	bool readNs(uint32_t& v, uint32_t n);
 	bool readSu(int8_t& v, uint32_t n);
 	bool readSu(int16_t& v, uint32_t n);

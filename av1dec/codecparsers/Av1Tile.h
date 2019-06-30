@@ -1,6 +1,8 @@
-#pragma once
+#ifndef Av1Tile_h
+#define Av1Tile_h
 #include <stdint.h>
 #include <memory>
+#include <vector>
 #include "EntropyDecoder.h"
 #include "../aom/enums.h"
 
@@ -9,8 +11,21 @@ namespace YamiParser {
 		class SymbolDecoder;
 		struct FrameHeader;
 		struct SequenceHeader;
+	}	
+}
+using namespace YamiParser::Av1;
 
-		/*
+const static uint8_t Mi_Width_Log2[BLOCK_SIZES_ALL] = {
+	0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3,
+	4, 4, 4, 5, 5, 0, 2, 1, 3, 2, 4
+};
+
+const static uint8_t Mi_Height_Log2[BLOCK_SIZES_ALL] = {
+	0, 1, 0, 1, 2, 1, 2, 3, 2, 3, 4,
+	3, 4, 5, 4, 5, 2, 0, 3, 1, 4, 2
+};
+
+/*
 		enum BlockType {
 			BLOCK_4X4,
 			BLOCK_4X8,
@@ -112,47 +127,64 @@ namespace YamiParser {
 			UV_MODE_INVALID,  // For uv_mode in inter blocks
 		} ;
 		*/
+class Tile;
 
+class BlockDecoded {
+public:
+	BlockDecoded();
+	void init(Tile& tile);
+	void clearFlags(int r, int c, int sbSize4);
+	void setFlag(int plane, int r, int c);
+	bool getFlag(int plane, int r, int c);
+private:
+	static const int SIZE = 128 / 4 + 2;
+	static const int OFFSET = 1;
+	bool m_decoded[3][SIZE][SIZE];
+	bool subsampling_x;
+	bool subsampling_y;
+	int  NumPlanes;
+	int  MiColEnd;
+	int  MiRowEnd;
+};
 
-		struct Tile {
-			uint32_t MiRowStart;
-			uint32_t MiRowEnd;
-			uint32_t MiColStart;
-			uint32_t MiColEnd;
-			uint32_t CurrentQIndex;
-			Tile(const SequenceHeader& sequence, const FrameHeader& frame, uint32_t TileNum);
+struct BlockContext {
+	std::vector<std::vector<uint8_t>> LevelContext;
+	std::vector<std::vector<uint8_t>> DcContext;
+	std::vector<bool> SegPredContext;
+	void clear(uint32_t size);
+	void reset(uint32_t plane, uint32_t start, uint32_t count);
+};
+class Tile {
+	uint32_t MiRowStart;
+	uint32_t MiRowEnd;
+	uint32_t MiColStart;
+	uint32_t MiColEnd;
+	uint32_t CurrentQIndex;
+	friend class Block;
+	friend class BlockDecoded;
+public:
+	Tile(const SequenceHeader& sequence, const FrameHeader& frame, uint32_t TileNum);
+	bool decode(const uint8_t* data, uint32_t size);
+private:
+	bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
+	bool decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
+	PARTITION_TYPE readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize);
+private:
+	bool is_inside(uint32_t r, uint32_t c);
+	void clear_above_context();
+	void clear_left_context();
 
-			bool decode(const uint8_t* data, uint32_t size);
-			bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
-			bool decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
-			PARTITION_TYPE readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize);
-			void readModeInfo(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
-			void readIntraFrameModeInfo(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
-			void readInterFrameModeInfo();
+	const FrameHeader& m_frame;
+	const SequenceHeader& m_sequence;
+	std::unique_ptr<EntropyDecoder> m_entropy;
+	BlockDecoded m_decoded;
 
-			uint8_t getSkipCtx();
-			bool readSkip();
-			
+	BlockContext m_above;
+	BlockContext m_left;
 
-			void readCdef();
-			void readDeltaQindex();
-			void readDeltaLf();
+	//uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
+	//uint16_t m_skipCdf[SKIP_CONTEXTS][3];
+	//uint16_t m_intraFrameYModeCdf[INTRA_MODE_CONTEXTS][INTRA_MODE_CONTEXTS][INTRA_MODES + 1];
 
-			PREDICTION_MODE readIntraFrameYMode();
-			void intraAngleInfoY();
-			UV_PREDICTION_MODE readUvMode(PREDICTION_MODE yMode);
-			void intra_angle_info_uv(UV_PREDICTION_MODE uvMode);
-			void filter_intra_mode_info(BLOCK_SIZE bSize);
-		private:
-			bool isInside(uint32_t r, uint32_t c);
-			const FrameHeader& m_frame;
-			const SequenceHeader& m_sequence;
-			std::unique_ptr<EntropyDecoder> m_entropy;
-
-			//uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
-			//uint16_t m_skipCdf[SKIP_CONTEXTS][3];
-			//uint16_t m_intraFrameYModeCdf[INTRA_MODE_CONTEXTS][INTRA_MODE_CONTEXTS][INTRA_MODES + 1];
-
-		};
-	}
-}
+};
+#endif

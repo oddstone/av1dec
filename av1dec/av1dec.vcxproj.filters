@@ -42,6 +42,9 @@
     <ClCompile Include="codecparsers\EntropyDecoder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="codecparsers\Block.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aom\entropymode.h">
@@ -81,6 +84,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="aom\token_cdfs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="codecparsers\Block.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

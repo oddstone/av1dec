@@ -75,7 +75,7 @@
 		}												\
 	} while(0)
 
-
+#define CLIP3(min, max, v) (v>max?max:((v < min)?min:v))
 namespace YamiParser {
 namespace Av1 {
 	bool obu_extension_header::parse(BitReader& br)
@@ -258,7 +258,6 @@ namespace Av1 {
 
 	bool SequenceHeader::parseTimingInfo(BitReader& br)
 	{
-		bool timing_info_present_flag;
 		READ(timing_info_present_flag);
 		if (timing_info_present_flag) {
 			READ(num_units_in_tick);
@@ -277,28 +276,58 @@ namespace Av1 {
 
 	bool SequenceHeader::parse(BitReader& br)
 	{
-		READ_BITS(seq_profile, 2);
-		uint8_t operating_points_minus1_cnt;
-		READ_BITS(operating_points_minus1_cnt, 5);
-		operating_points.resize(operating_points_minus1_cnt + 1);
-		for (int i = 0; i <= operating_points_minus1_cnt; i++) {
-			OperatingPoint& p = operating_points[i];
-			READ_BITS(p.operating_point_idc, 12);
-			READ_BITS(p.level, 4);
-			READ(p.decoder_rate_model_param_present_flag);
-			if (p.decoder_rate_model_param_present_flag) {
-				READ_BITS(p.decode_to_display_rate_ratio, 12);
-				READ_BITS(p.initial_display_delay, 24);
-				READ_BITS(p.extra_frame_buffers, 4);
+		READ_BITS(seq_profile, 3);
+		READ(still_picture);
+		READ(reduced_still_picture_header);
+		if (reduced_still_picture_header) {
+			timing_info_present_flag = false;
+			decoder_model_info_present_flag = false;
+			initial_display_delay_present_flag = false;
+			operating_points.resize(1);
+			OperatingPoint& p = operating_points[0];
+			READ_BITS(p.seq_level_idx, 5);
+			p.seq_tier = false;
+			p.decoder_model_present_for_this_op = false;
+			p.initial_display_delay_present_for_this_op = false;
+		} else {
+			READ(timing_info_present_flag);
+			if (timing_info_present_flag) {
+				parseTimingInfo(br);
+				READ(decoder_model_info_present_flag);
+				if (decoder_model_info_present_flag) {
+					ASSERT(0 && "decoder_model_info");
+				}
 			}
+			READ(initial_display_delay_present_flag);
+			uint8_t operating_points_minus1_cnt;
+			READ_BITS(operating_points_minus1_cnt, 5);
+			operating_points.resize(operating_points_minus1_cnt + 1);
+			for (int i = 0; i <= operating_points_minus1_cnt; i++) {
+				OperatingPoint& p = operating_points[i];
+				READ_BITS(p.operating_point_idc, 12);
+				READ_BITS(p.seq_level_idx, 5);
+				if (p.seq_level_idx > 7)
+					READ(p.seq_tier);
+				if (decoder_model_info_present_flag) {
+					READ(p.decoder_model_present_for_this_op);
+					if (p.decoder_model_present_for_this_op) {
+						ASSERT(0 && "decoder_model_present_for_this_op");
+					}
+					if (initial_display_delay_present_flag) {
+						ASSERT(0 && "initial_display_delay_present_flag");
+					}
+				}
 
+			}
 		}
-
 		READ_BITS(frame_width_bits_minus_1, 4);
 		READ_BITS(frame_height_bits_minus_1, 4);
 		READ_BITS(max_frame_width_minus_1, frame_width_bits_minus_1 + 1);
 		READ_BITS(max_frame_height_minus_1, frame_height_bits_minus_1 + 1);
-		READ(frame_id_numbers_present_flag);
+		if (reduced_still_picture_header)
+			frame_id_numbers_present_flag = false;
+		else
+			READ(frame_id_numbers_present_flag);
 		if (frame_id_numbers_present_flag) {
 			READ_BITS(delta_frame_id_length_minus2, 4);
 			READ_BITS(additional_frame_id_length_minus1, 3);
@@ -307,54 +336,64 @@ namespace Av1 {
 		READ(use_128x128_superblock);
 		READ(enable_filter_intra);
 		READ(enable_intra_edge_filter);
-		READ(enable_interintra_compound);
-		READ(enable_masked_compound);
-		READ(enable_warped_motion);
-		READ(enable_dual_filter);
-
-		bool enable_order_hint;
-		READ(enable_order_hint);
-
-		if (enable_order_hint) {
-			READ(enable_jnt_comp);
-			READ(enable_ref_frame_mvs);
-		}
-		else {
+		if (reduced_still_picture_header) {
+			enable_interintra_compound = false;
+			enable_interintra_compound = false;
+			enable_masked_compound = false;
+			enable_warped_motion = false;
+			enable_dual_filter = false;
+			enable_order_hint = false;
 			enable_jnt_comp = false;
 			enable_ref_frame_mvs = false;
-		}
-		bool seq_choose_screen_content_tools;
-		READ(seq_choose_screen_content_tools);
-		if (seq_choose_screen_content_tools) {
 			seq_force_screen_content_tools = SELECT_SCREEN_CONTENT_TOOLS;
-		} else {
-			READ_BITS(seq_force_screen_content_tools, 1);
-		}
-		if (seq_force_screen_content_tools > 0) {
-			bool seq_choose_integer_mv;
-			READ(seq_choose_integer_mv);
-			if (seq_choose_integer_mv) {
-				seq_force_integer_mv = SELECT_INTEGER_MV;
-			} else {
-				READ_BITS(seq_force_integer_mv, 1);
-			}
-		} else {
 			seq_force_integer_mv = SELECT_INTEGER_MV;
-		}
-
-		if (enable_order_hint) {
-			uint8_t order_hint_bits_minus1;
-			READ_BITS(order_hint_bits_minus1, 3);
-			OrderHintBits = order_hint_bits_minus1 + 1;
-		} else {
 			OrderHintBits = 0;
+		} else {
+			READ(enable_interintra_compound);
+			READ(enable_masked_compound);
+			READ(enable_warped_motion);
+			READ(enable_dual_filter);
+
+			READ(enable_order_hint);
+
+			if (enable_order_hint) {
+				READ(enable_jnt_comp);
+				READ(enable_ref_frame_mvs);
+			} else {
+				enable_jnt_comp = false;
+				enable_ref_frame_mvs = false;
+			}
+			bool seq_choose_screen_content_tools;
+			READ(seq_choose_screen_content_tools);
+			if (seq_choose_screen_content_tools) {
+				seq_force_screen_content_tools = SELECT_SCREEN_CONTENT_TOOLS;
+			} else {
+				READ_BITS(seq_force_screen_content_tools, 1);
+			}
+			if (seq_force_screen_content_tools > 0) {
+				bool seq_choose_integer_mv;
+				READ(seq_choose_integer_mv);
+				if (seq_choose_integer_mv) {
+					seq_force_integer_mv = SELECT_INTEGER_MV;
+				} else {
+					READ_BITS(seq_force_integer_mv, 1);
+				}
+			} else {
+				seq_force_integer_mv = SELECT_INTEGER_MV;
+			}
+
+			if (enable_order_hint) {
+				uint8_t order_hint_bits_minus1;
+				READ_BITS(order_hint_bits_minus1, 3);
+				OrderHintBits = order_hint_bits_minus1 + 1;
+			} else {
+				OrderHintBits = 0;
+			}
 		}
 		READ(enable_superres);
 		READ(enable_cdef);
 		READ(enable_restoration);
 		if (!parseColorConfig(br))
-			return false;
-		if (!parseTimingInfo(br))
 			return false;
 		READ(film_grain_params_present);
 		return true;
@@ -445,33 +484,50 @@ namespace Av1 {
 
 	bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
 	{
+		const static uint8_t allFrames = (1 << NUM_REF_FRAMES) - 1;
+		uint32_t idLen = 0;
+		if (sequence.frame_id_numbers_present_flag)
+			idLen = (sequence.additional_frame_id_length_minus1 + sequence.delta_frame_id_length_minus2 + 3);
 
-		uint32_t idLen = (sequence.additional_frame_id_length_minus1 + sequence.delta_frame_id_length_minus2 + 3);
-		READ(show_existing_frame);
-		if (show_existing_frame == 1) {
-			READ_BITS(frame_to_show_map_idx, 3);
-			refresh_frame_flags = 0;
-			/*if (sequence.frame_id_numbers_present_flag) {
-				READ_BITS(display_frame_id, idLen);
-			}*/
-			ASSERT(0);
-			return true;
-		}
-		READ_BITS(frame_type, 2);
-		FrameIsIntra = (frame_type == INTRA_ONLY_FRAME || frame_type == KEY_FRAME);
-		READ(show_frame);
-		if (show_frame) {
+		if (sequence.reduced_still_picture_header) {
+			show_existing_frame = false;
+			frame_type = KEY_FRAME;
+			FrameIsIntra = true;
+			show_frame = true;
 			showable_frame = false;
 		} else {
-			READ(showable_frame);
+			READ(show_existing_frame);
+			if (show_existing_frame == 1) {
+				READ_BITS(frame_to_show_map_idx, 3);
+				refresh_frame_flags = 0;
+				/*if (sequence.frame_id_numbers_present_flag) {
+					READ_BITS(display_frame_id, idLen);
+				}*/
+				ASSERT(0);
+				return true;
+			}
+			READ_BITS(frame_type, 2);
+			FrameIsIntra = (frame_type == INTRA_ONLY_FRAME || frame_type == KEY_FRAME);
+			READ(show_frame);
+			if (show_frame) {
+				showable_frame = false;
+			} else {
+				READ(showable_frame);
+			}
+			if (frame_type == KEY_FRAME && show_frame) {
+				memset(RefValid, 0, sizeof(RefValid));
+			}
+			if (frame_type == SWITCH_FRAME) {
+				error_resilient_mode = true;
+			} else {
+				READ(error_resilient_mode);
+			}
 		}
 		if (frame_type == KEY_FRAME && show_frame) {
-			memset(RefValid, 0, sizeof(RefValid));
-		}
-		if (frame_type == SWITCH_FRAME) {
-			error_resilient_mode = true;
-		} else {
-			READ(error_resilient_mode);
+			for (int i = 0; i < NUM_REF_FRAMES; i++) {
+				RefValid[i] = false;
+				RefOrderHint[i] = 0;
+			}
 		}
 		READ(disable_cdf_update);
 		if (sequence.seq_force_screen_content_tools == SELECT_SCREEN_CONTENT_TOOLS) {
@@ -489,6 +545,9 @@ namespace Av1 {
 		} else {
 			force_integer_mv = false;
 		}
+		if (FrameIsIntra)
+			force_integer_mv = true;
+
 		if (sequence.frame_id_numbers_present_flag) {
 			PrevFrameID = current_frame_id;
 			READ_BITS(current_frame_id, idLen);
@@ -496,6 +555,8 @@ namespace Av1 {
 		}
 		if (frame_type == SWITCH_FRAME) {
 			frame_size_override_flag = true;
+		} else if (sequence.reduced_still_picture_header) {
+			frame_size_override_flag = false;
 		} else {
 			READ(frame_size_override_flag);
 		}
@@ -505,16 +566,19 @@ namespace Av1 {
 		} else {
 			READ_BITS(primary_ref_frame, 3);
 		}
+		if (sequence.decoder_model_info_present_flag) {
+			ASSERT(0 && "decoder_model_info_present_flag");
+		}
 		allow_high_precision_mv = false;
 		use_ref_frame_mvs = false;
 		allow_intrabc = false;
-		if (frame_type == KEY_FRAME) {
-			if (show_frame) {
-				refresh_frame_flags = (1 << NUM_REF_FRAMES) - 1;
-			}
-			else {
-				READ(refresh_frame_flags);
-			}
+		if (frame_type == SWITCH_FRAME ||
+			(frame_type == KEY_FRAME && show_frame)) {
+			refresh_frame_flags = allFrames;
+		} else {
+			READ(refresh_frame_flags);
+		}
+		if (FrameIsIntra) {
 			if (!parseFrameSize(br, sequence))
 				return false;
 			if (!parseRenderSize(br))
@@ -522,15 +586,11 @@ namespace Av1 {
 			if (allow_screen_content_tools && UpscaledWidth == FrameWidth) {
 				READ(allow_intrabc);
 			}
-	
 		} else {
 			ASSERT(0);
 		}
-		if (!FrameIsIntra) {
-			ASSERT(0);
-		}
-		if (disable_cdf_update) {
-			disable_frame_end_update_cdf = false;
+		if (sequence.reduced_still_picture_header || disable_cdf_update) {
+			disable_frame_end_update_cdf = true;
 		} else {
 			READ(disable_frame_end_update_cdf);
 		}
@@ -553,17 +613,46 @@ namespace Av1 {
 			return false;
 		if (!m_deltaLf.parse(br, m_deltaQ))
 			return false;
-		/*
-		TODO: init_coeff_cdfs
-		*/
-		CodedLossless = true;
-		AllLossless = true;
+		if (primary_ref_frame == PRIMARY_REF_NONE) {
+			//init_coeff_cdfs()
+		} else {
+			//load_previous_segment_ids()
+		}
+		{
+			CodedLossless = true;
+			for (int segmentId = 0; segmentId < MAX_SEGMENTS; segmentId++) {
+				int16_t qindex = get_qindex(1, segmentId);
+				LosslessArray[segmentId] = qindex == 0 && m_quant.DeltaQYDc == 0 &&
+					m_quant.DeltaQUAc == 0 && m_quant.DeltaQUDc == 0 &&
+					m_quant.DeltaQVAc == 0 && m_quant.DeltaQVDc == 0;
+				if (!LosslessArray[segmentId])
+					CodedLossless = 0;
+				if (m_quant.using_qmatrix) {
+					if (LosslessArray[segmentId]) {
+						SegQMLevel[0][segmentId] = 15;
+						SegQMLevel[1][segmentId] = 15;
+						SegQMLevel[2][segmentId] = 15;
+					} else {
+						SegQMLevel[0][segmentId] = m_quant.qm_y;
+						SegQMLevel[1][segmentId] = m_quant.qm_u;
+						SegQMLevel[2][segmentId] = m_quant.qm_v;
+					}
+				}
+			}
+			AllLossless = CodedLossless && (FrameWidth == UpscaledWidth);
+		}
+		
 		if (!m_loopFilter.parse(br, sequence, *this))
 			return false;
 		/* lr_params() */
 		/* frame_reference_mode() */
 		/* skip_mode_params() */
-		/* if ( FrameIsIntra || */
+		if (FrameIsIntra ||
+			error_resilient_mode ||
+			!enable_warped_motion)
+			allow_warped_motion = false;
+		else
+			READ(allow_warped_motion);
 		bool reduced_tx_set;
 		READ(reduced_tx_set);
 		/* global_motion_params() */
@@ -787,6 +876,16 @@ namespace Av1 {
 		}
 		return true;
 	}
+
+	int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int segmentId)
+	{
+		int16_t data = m_segmentation.FeatureData[segmentId][SEG_LVL_ALT_Q];
+		int16_t qindex = m_quant.base_q_idx + data;
+		if (!ignoreDeltaQ && m_deltaQ.delta_q_present) {
+			ASSERT(0);
+		}
+		return CLIP3(0, 255, qindex);
+	}
 	
 	bool Quantization::parse(BitReader& br, const SequenceHeader& seq)
 	{
@@ -848,11 +947,33 @@ namespace Av1 {
 	bool Segmentation::parse(BitReader & br)
 	{
 		READ(segmentation_enabled);
-		if (!segmentation_enabled)
-			return true;
-		else
+		if (segmentation_enabled)
 			ASSERT(0);
+		else {
+			for (int i = 0; i < MAX_SEGMENTS; i++) {
+				for (int j = 0; j < SEG_LVL_MAX; j++) {
+					FeatureEnabled[i][j] = 0;
+					FeatureData[i][j] = 0;
+				}
+			}
+		}
+		SegIdPreSkip = false;
+		LastActiveSegId = 0;
+		for (int i = 0; i < MAX_SEGMENTS; i++) {
+			for (int j = 0; j < SEG_LVL_MAX; j++) {
+				if (FeatureEnabled[i][j]) {
+					LastActiveSegId = i;
+					if (j >= SEG_LVL_REF_FRAME) {
+						SegIdPreSkip = 1;
+					}
+				}
+			}
+		}
 		return true;
+	}
+	bool Segmentation::seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE feature)
+	{
+		return segmentation_enabled && FeatureEnabled[segmentId][feature];
 	}
 
 	bool DeltaQ::parse(BitReader & br, const Quantization & quant)

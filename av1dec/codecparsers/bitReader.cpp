@@ -189,4 +189,19 @@ bool BitReader::readLe(uint32_t& v, uint32_t nBits)
 	return t;
 }
 
+bool BitReader::readUe(uint32_t& v)
+{
+	int32_t leadingZeroBits = -1;
+
+	for (uint32_t b = 0; !b; leadingZeroBits++) {
+		if (!read(b, 1))
+			return false;
+	}
+	
+	if (!read(v, leadingZeroBits))
+		return false;
+	v = (1 << leadingZeroBits) - 1 + v;
+	return true;
+}
+
 } /*namespace YamiParser*/

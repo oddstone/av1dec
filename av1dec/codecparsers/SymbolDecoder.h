@@ -13,7 +13,9 @@ namespace YamiParser {
 			SymbolDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update);
 			~SymbolDecoder();
 			uint8_t read(uint16_t *icdf, uint8_t nicdf);
+			uint8_t readBool();
 		private:
+			uint8_t read(uint16_t * icdf, uint8_t nicdf, bool disableUpdate);
 			void renormalize();
 			void updateCdf(uint16_t * cdf, uint8_t ncdf, uint8_t symbol);
 			//bool UpdateCdfs;
