@@ -162,7 +162,7 @@ void BlockDecoded::setFlag(int plane, int r, int c)
 }
 
 
-Tile::Tile(const SequenceHeader& sequence, const FrameHeader& frame, uint32_t TileNum)
+Tile::Tile(const SequenceHeader& sequence, FrameHeader& frame, uint32_t TileNum)
 	: m_sequence(sequence)
 	, m_frame(frame)
 {

@@ -162,8 +162,9 @@ class Tile {
 	uint32_t CurrentQIndex;
 	friend class Block;
 	friend class BlockDecoded;
+	friend class TransformBlock;
 public:
-	Tile(const SequenceHeader& sequence, const FrameHeader& frame, uint32_t TileNum);
+	Tile(const SequenceHeader& sequence, FrameHeader& frame, uint32_t TileNum);
 	bool decode(const uint8_t* data, uint32_t size);
 private:
 	bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
@@ -174,13 +175,14 @@ private:
 	void clear_above_context();
 	void clear_left_context();
 
-	const FrameHeader& m_frame;
+	FrameHeader& m_frame;
 	const SequenceHeader& m_sequence;
 	std::unique_ptr<EntropyDecoder> m_entropy;
 	BlockDecoded m_decoded;
 
 	BlockContext m_above;
 	BlockContext m_left;
+	std::vector<std::vector<uint8_t>> TxTypes;
 
 	//uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
 	//uint16_t m_skipCdf[SKIP_CONTEXTS][3];

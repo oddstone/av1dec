@@ -482,6 +482,11 @@ namespace Av1 {
 		memset(this, 0, offsetof(FrameHeader, MiColStarts));
 	}
 
+	void FrameHeader::initGeometry()
+	{
+		TxTypes.assign(TileCols, std::vector<TX_TYPE>(TileRows));
+	}
+
 	bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
 	{
 		const static uint8_t allFrames = (1 << NUM_REF_FRAMES) - 1;
@@ -653,12 +658,12 @@ namespace Av1 {
 			allow_warped_motion = false;
 		else
 			READ(allow_warped_motion);
-		bool reduced_tx_set;
 		READ(reduced_tx_set);
 		/* global_motion_params() */
 		if (show_frame || showable_frame) {
 			/* film_grain_params()*/
 		}
+		initGeometry();
 		return true;
 
 	}
@@ -877,7 +882,7 @@ namespace Av1 {
 		return true;
 	}
 
-	int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int segmentId)
+	int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int segmentId) const
 	{
 		int16_t data = m_segmentation.FeatureData[segmentId][SEG_LVL_ALT_Q];
 		int16_t qindex = m_quant.base_q_idx + data;

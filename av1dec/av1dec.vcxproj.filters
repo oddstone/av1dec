@@ -45,6 +45,9 @@
     <ClCompile Include="codecparsers\Block.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="codecparsers\TransformBlock.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aom\entropymode.h">
@@ -87,6 +90,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="codecparsers\Block.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="codecparsers\TransformBlock.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

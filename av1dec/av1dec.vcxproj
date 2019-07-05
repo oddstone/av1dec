@@ -159,6 +159,7 @@
     <ClCompile Include="codecparsers\Block.cpp" />
     <ClCompile Include="codecparsers\EntropyDecoder.cpp" />
     <ClCompile Include="codecparsers\SymbolDecoder.cpp" />
+    <ClCompile Include="codecparsers\TransformBlock.cpp" />
     <ClCompile Include="decoder\Av1Decoder.cpp" />
     <ClCompile Include="tests\decodeinput.cpp" />
   </ItemGroup>
@@ -177,6 +178,7 @@
     <ClInclude Include="codecparsers\Block.h" />
     <ClInclude Include="codecparsers\EntropyDecoder.h" />
     <ClInclude Include="codecparsers\SymbolDecoder.h" />
+    <ClInclude Include="codecparsers\TransformBlock.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

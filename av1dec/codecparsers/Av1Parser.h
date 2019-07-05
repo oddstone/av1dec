@@ -301,6 +301,7 @@ namespace YamiParser {
 
 		struct FrameHeader
 		{
+			friend class Block;
 			bool show_existing_frame;
 			uint8_t frame_to_show_map_idx;
 			uint8_t refresh_frame_flags;
@@ -365,10 +366,13 @@ namespace YamiParser {
 			bool LosslessArray[MAX_SEGMENTS];
 			uint8_t SegQMLevel[3][MAX_SEGMENTS];
 
+			bool reduced_tx_set;
+
 			TXMode TxMode;
 
 			std::vector<uint32_t> MiColStarts;
 			std::vector<uint32_t> MiRowStarts;
+			std::vector<std::vector<TX_TYPE>> TxTypes;
 
 
 			FrameHeader();
@@ -382,7 +386,8 @@ namespace YamiParser {
 			bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
 			bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
 			bool parseTxMode(BitReader& br, const FrameHeader& frame);
-			int16_t get_qindex(bool ignoreDeltaQ, int segmentId);
+			int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
+			void initGeometry();
 			const static uint8_t SUPERRES_DENOM_MIN = 9;
 			const static uint8_t SUPERRES_NUM = 8;
 			const static uint8_t SUPERRES_DENOM_BITS = 3;
