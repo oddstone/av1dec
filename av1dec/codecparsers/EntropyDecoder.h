@@ -23,10 +23,13 @@ public:
 	bool readUseFilterIntra(BLOCK_SIZE bSize);
 	bool readAllZero(uint8_t txSzCtx, uint8_t ctx);
 	uint8_t readEobPt(uint8_t eobMultisize, PLANE_TYPE planeType, uint8_t ctx);
+	bool readEobExtra(TX_SIZE txSzCtx, PLANE_TYPE ptype, int eobPt);
 	uint8_t readCoeffBaseEob(uint8_t txSzCtx, PLANE_TYPE planeType, uint8_t ctx);
+	uint8_t readCoeffBase(uint8_t txSzCtx, PLANE_TYPE planeType, uint8_t ctx);
 	uint8_t readCoeffBr(uint8_t minTx, PLANE_TYPE planeType, uint8_t ctx);
 	bool readDcSign(PLANE_TYPE planeType, uint8_t ctx);
 	bool readUe(uint32_t& v);
+	uint32_t readLiteral(uint32_t n);
 private:
 	void initCoefCdf(uint32_t baseQ);
 	uint8_t getPartitionCdfCount(uint8_t bsl);

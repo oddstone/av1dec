@@ -162,8 +162,8 @@ namespace YamiParser {
 			uint8_t color_space;
 			uint8_t transfer_function;
 			bool color_range;
-			bool subsampling_x;
-			bool subsampling_y;
+			int subsampling_x;
+			int subsampling_y;
 			uint8_t chroma_sample_position;
 			bool  separate_uv_delta_q;
 

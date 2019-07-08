@@ -177,10 +177,19 @@ uint8_t EntropyDecoder::readEobPt(uint8_t eobMultisize, PLANE_TYPE planeType, ui
 	return m_symbol->read(cdf, eobMultisize + 5) + 1;
 
 }
+bool EntropyDecoder::readEobExtra(TX_SIZE txSzCtx, PLANE_TYPE ptype, int eobPt)
+{
+	return (bool)m_symbol->read(eob_extra_cdf[txSzCtx][ptype][eobPt-3], 2);
+}
 
 uint8_t EntropyDecoder::readCoeffBaseEob(uint8_t txSzCtx, PLANE_TYPE planeType, uint8_t ctx)
 {
 	return m_symbol->read(coeff_base_eob_cdf[txSzCtx][planeType][ctx], 3);
+}
+
+uint8_t EntropyDecoder::readCoeffBase(uint8_t txSzCtx, PLANE_TYPE planeType, uint8_t ctx)
+{
+	return m_symbol->read(coeff_base_cdf[txSzCtx][planeType][ctx], 4);
 }
 
 uint8_t EntropyDecoder::readCoeffBr(uint8_t minTx, PLANE_TYPE planeType, uint8_t ctx)
@@ -213,4 +222,13 @@ bool EntropyDecoder::readUe(uint32_t& v)
 	}
 	return true;
 
+}
+
+uint32_t EntropyDecoder::readLiteral(uint32_t n)
+{
+	uint32_t x = 0;
+	for (uint32_t i = 0 ; i < n; i++ ) {
+		x = 2 * x + m_symbol->readBool();
+	}
+	return x;
 }

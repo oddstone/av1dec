@@ -148,11 +148,12 @@ private:
 };
 
 struct BlockContext {
-	std::vector<std::vector<uint8_t>> LevelContext;
+	std::vector<std::vector<int16_t>> LevelContext;
 	std::vector<std::vector<uint8_t>> DcContext;
 	std::vector<bool> SegPredContext;
 	void clear(uint32_t size);
 	void reset(uint32_t plane, uint32_t start, uint32_t count);
+	void set(uint32_t plane, uint32_t start, uint32_t count, int16_t culLevel, uint8_t dcCategory);
 };
 class Tile {
 	uint32_t MiRowStart;

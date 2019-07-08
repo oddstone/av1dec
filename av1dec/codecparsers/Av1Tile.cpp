@@ -355,3 +355,9 @@ void BlockContext::reset(uint32_t plane, uint32_t start, uint32_t count)
 	std::fill_n(&LevelContext[plane][start], count, 0);
 	std::fill_n(&DcContext[plane][start], count, 0);
 }
+
+void BlockContext::set(uint32_t plane, uint32_t start, uint32_t count, int16_t culLevel, uint8_t dcCategory)
+{
+	std::fill_n(&LevelContext[plane][start], count, culLevel);
+	std::fill_n(&DcContext[plane][start], count, dcCategory);
+}
