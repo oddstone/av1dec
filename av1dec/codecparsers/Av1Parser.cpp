@@ -75,7 +75,6 @@
 		}												\
 	} while(0)
 
-#define CLIP3(min, max, v) (v>max?max:((v < min)?min:v))
 namespace YamiParser {
 namespace Av1 {
 	bool obu_extension_header::parse(BitReader& br)

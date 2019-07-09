@@ -8,6 +8,8 @@
 #include "bitReader.h"
 #include "Av1Tile.h"
 
+#define CLIP3(min, max, v) (v>max?max:((v < min)?min:v))
+
 namespace YamiParser {
 	namespace Av1 {
 
@@ -302,6 +304,7 @@ namespace YamiParser {
 		struct FrameHeader
 		{
 			friend class Block;
+			friend class TransformBlock;
 			bool show_existing_frame;
 			uint8_t frame_to_show_map_idx;
 			uint8_t refresh_frame_flags;
