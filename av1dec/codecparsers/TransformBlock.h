@@ -40,6 +40,7 @@ private:
 	int get_dc_quant() const;
 	int get_ac_quant() const;
 	int getQ2(int i, int j) const;
+	void inverseTransform();
 	void reconstruct();
 
 	EntropyDecoder& m_entropy;
@@ -67,6 +68,7 @@ private:
 	TX_TYPE PlaneTxType;
 	int Quant[1024];
 	int Dequant[64][64];
+	int Residual[64][64];
 
 	//for reconstruction
 	int dqDenom;

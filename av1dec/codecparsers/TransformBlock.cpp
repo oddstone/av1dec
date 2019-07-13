@@ -1237,6 +1237,7 @@ static const int Ac_Qlookup[ 3 ][ 256 ] = {
 	}
 };
 
+#define ROUND2(x, n) ((n == 0) ? x : (( x + ( 1 << (n - 1) ) ) >> n))
 
 TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_SIZE txSize)
 	: m_entropy(block.m_entropy)
@@ -1252,6 +1253,7 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
 	, txSzSqr(Tx_Size_Sqr[txSz])
 	, txSzSqrUp(Tx_Size_Sqr_Up[txSz])
 	, txSzCtx((TX_SIZE)(( txSzSqr + txSzSqrUp + 1 ) >> 1))
+	, PlaneTxType(compute_tx_type())
 	, txClass(get_tx_class())
 	, log2W(Tx_Width_Log2[txSz])
 	, log2H(Tx_Height_Log2[txSz])
@@ -1818,6 +1820,198 @@ int TransformBlock::getQ2(int i, int j) const
 	return q2;
 }
 
+int brev(int numBits, int x)
+{
+	int t = 0;
+	for (int i = 0; i < numBits; i++) {
+		int bit = (x >> i) & 1;
+		t += bit << (numBits - 1 - i);
+	}
+	return t;
+}
+
+static void iDctPermutation(int *T, int n)
+{
+	int copyT[1<<6];
+	int count = 1 << n;
+	memcpy(copyT, T, sizeof(*T) * count);
+	for (int i = 0; i < count; i++) {
+		T[i] = copyT[brev(n, i)];
+	}
+}
+
+int Cos128_Lookup[ 65 ] = {
+	4096, 4095, 4091, 4085, 4076, 4065, 4052, 4036,
+	4017, 3996, 3973, 3948, 3920, 3889, 3857, 3822,
+	3784, 3745, 3703, 3659, 3612, 3564, 3513, 3461,
+	3406, 3349, 3290, 3229, 3166, 3102, 3035, 2967,
+	2896, 2824, 2751, 2675, 2598, 2520, 2440, 2359,
+	2276, 2191, 2106, 2019, 1931, 1842, 1751, 1660,
+	1567, 1474, 1380, 1285, 1189, 1092, 995, 897,
+	799, 700, 601, 501, 401, 301, 201, 101, 0
+};
+
+int cos128(int angle)
+{
+	int angle2 = angle & 255;
+	if (angle2 >= 0 && angle2 <= 64)
+		return Cos128_Lookup[angle2];
+	if (angle2 >= 64 && angle2 <= 128)
+		return Cos128_Lookup[128 - angle2] * -1;
+	if (angle2 >= 128 && angle2 <= 192)
+		return Cos128_Lookup[angle2 - 128] * -1;
+	return Cos128_Lookup[256 - angle2];
+}
+
+int sin128(int angle)
+{
+	return cos128(angle - 64);
+}
+
+static void B(int& Ta, int& Tb, int angle, bool flip)
+{
+	printf("Ta = %d, Tb = %d, sin = %d, cos = %d, angle = %d", Ta, Tb, sin128(angle), cos128(angle), angle);
+	int x = Ta * cos128(angle) - Tb * sin128(angle);
+	int y = Ta * sin128(angle) + Tb * cos128(angle);
+	Ta = ROUND2(x, 12);
+	Tb = ROUND2(y, 12);
+	if (flip)
+		std::swap(Ta, Tb);
+}
+
+static void H(int& Ta, int& Tb, bool flip, int r)
+{
+	if (flip)
+		std::swap(Ta, Tb);
+	int min = - ( 1 << ( r - 1 ) );
+	int max = ( 1 << ( r - 1 ) ) - 1;
+	int x = Ta;
+	int y = Tb;
+	Ta = CLIP3(min, max, x + y);
+	Tb = CLIP3(min, max, x - y);
+}
+
+static void iDct(int *T, int n, int r)
+{
+	iDctPermutation(T, n);
+	if (n > 2) {
+		ASSERT(0 && "n > 2");
+	}
+	for (int i = 0; i < 2; i++) {
+		B(T[2 * i], T[2 * i + 1], 32 + 16 * i, 1 - i );
+	}
+	for (int i = 0; i < 2; i++) {
+		H(T[i], T[3-i], false, r);
+	}
+		
+}
+
+static void inverseWalshHadamardTransform(int *T, int shift)
+{
+	int a = T[0] >> shift;
+	int c = T[1] >> shift;
+	int d = T[2] >> shift;
+	int b = T[3] >> shift;
+	a += c;
+	d -= b;
+	int e = (a - d) >> 1;
+	b = e - b;
+	c = e - c;
+	a -= b;
+	d += c;
+	T[0] = a;
+	T[1] = b;
+	T[2] = c;
+	T[3] = d;
+}
+
+const static int Transform_Row_Shift[ TX_SIZES_ALL ] = {
+	0, 1, 2, 2, 2, 0, 0, 1, 1,
+	1, 1, 1, 1, 1, 1, 2, 2, 2, 2
+};
+
+void TransformBlock::inverseTransform()
+{
+	int rowShift = m_block.Lossless ? 0 : Transform_Row_Shift[txSz];
+	int colShift = m_block.Lossless ? 0 : 4;
+	int rowClampRange = m_sequence.BitDepth + 8;
+	int colClampRange = std::max(m_sequence.BitDepth + 6, 16);
+	int min = - ( 1 << ( colClampRange - 1 ) );
+	int max = ( 1 << (colClampRange - 1 ) ) - 1;
+	int T[64];
+	for (int i = 0; i < h; i++) {
+		for (int j = 0; j < w; j++) {
+			T[j] = (i < 32  && j < 32) ? Dequant[i][j] : 0;				
+		}
+		if (std::abs(log2W - log2H) == 1) {
+			for (int j = 0; j < w; j++) {
+				T[j] = ROUND2(T[j]*2896, 12);
+			}
+		}
+		if (m_block.Lossless) {
+			inverseWalshHadamardTransform(T, 2);
+		} else {
+			switch (PlaneTxType) {
+				case DCT_DCT:
+				case ADST_DCT:
+				case FLIPADST_DCT:
+				case H_DCT:
+					iDct(T, log2W, rowClampRange);
+					break;
+				case DCT_ADST:
+				case ADST_ADST:
+				case DCT_FLIPADST:
+				case FLIPADST_FLIPADST:
+				case ADST_FLIPADST:
+				case FLIPADST_ADST:
+				case H_ADST:
+				case H_FLIPADST:
+					ASSERT(0 && "iAdst");
+					break;
+				default:
+					ASSERT(0 && "iIdentity");
+					break;
+			}
+		}
+		for (int j = 0; j < w; j++) {
+			Residual[i][j] = CLIP3(min, max, ROUND2(T[j], rowShift));
+		}
+	}
+
+	for (int j = 0; j < w; j++) {
+		for (int i = 0; i < h; i++) {
+			T[i] = Residual[ i ][ j ];
+		}
+		if (m_block.Lossless) {
+			inverseWalshHadamardTransform(T, 0);
+		} else {
+			switch (PlaneTxType) {
+				case DCT_DCT:
+				case DCT_ADST:
+				case DCT_FLIPADST:
+				case V_DCT:
+					iDct(T, log2H, colClampRange);
+					break;
+				case ADST_DCT:
+				case ADST_ADST:
+				case FLIPADST_DCT:
+				case FLIPADST_FLIPADST:
+				case ADST_FLIPADST:
+				case FLIPADST_ADST:
+				case V_ADST:
+				case V_FLIPADST:
+					ASSERT(0 && "iAdst");
+					break;
+				default:
+					ASSERT(0 && "iIdentity");
+					break;
+			}
+		}
+		for (int i = 0; i < h; i++ )
+			Residual[ i ][ j ] = ROUND2(T[i], colShift);
+	}
+	printf("ok");
+}
 
 void TransformBlock::reconstruct()
 {
@@ -1833,6 +2027,7 @@ void TransformBlock::reconstruct()
 			Dequant[i][j] = CLIP3(min, max, dq2 );
 		}
 	}
+	inverseTransform();
 	ASSERT(!flipLR && !flipUD);
 }
 int TransformBlock::decode()
