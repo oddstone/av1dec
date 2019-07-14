@@ -1,7 +1,7 @@
 #include "Av1Tile.h"
-#include "codecparsers/Av1Parser.h"
+#include "Av1Parser.h"
 #include "SymbolDecoder.h"
-#include "common/log.h"
+#include "log.h"
 #include "Block.h"
 
 BLOCK_SIZE Partition_Subsize[10][BLOCK_SIZES_ALL] = {

@@ -1,6 +1,6 @@
 #include "Av1Decoder.h"
-#include "codecparsers/bitReader.h"
-#include "codecparsers/Av1Parser.h"
+#include "bitReader.h"
+#include "Av1Parser.h"
 
 
 namespace YamiParser {

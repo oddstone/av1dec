@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "Av1Parser.h"
-#include "common/log.h"
+#include "log.h"
 #include "SymbolDecoder.h"
 
 #define READ(f)                             \

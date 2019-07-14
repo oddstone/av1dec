@@ -26,8 +26,8 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "decodeinput.h"
-#include "common/NonCopyable.h"
-#include "common/log.h"
+#include "NonCopyable.h"
+#include "log.h"
 
 #ifdef __ENABLE_AVFORMAT__
 #include "decodeinputavformat.h"

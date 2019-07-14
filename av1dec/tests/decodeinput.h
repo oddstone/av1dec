@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 #include <string>
-#include <Yami.h>
+#include "Yami.h"
 
 using std::string;
 class DecodeInput {
