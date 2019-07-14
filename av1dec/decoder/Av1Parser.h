@@ -2,6 +2,7 @@
 #define Av1Parser_h
 
 #include <stdint.h>
+#include <string.h>
 #include <vector>
 #include <list>
 #include <memory>
@@ -9,6 +10,8 @@
 #include "Av1Tile.h"
 
 #define CLIP3(min, max, v) (v>max?max:((v < min)?min:v))
+class Block;
+class TransformBlock;
 
 namespace YamiParser {
 	namespace Av1 {
@@ -380,6 +383,7 @@ namespace YamiParser {
 
 			FrameHeader();
 			bool parse(BitReader& br, const SequenceHeader& sequence);
+			int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
 		private:
 			void mark_ref_frames(const SequenceHeader& sequence, uint8_t idLen);
 			bool parseFrameSize(BitReader& br, const SequenceHeader& sequence);
@@ -389,7 +393,6 @@ namespace YamiParser {
 			bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
 			bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
 			bool parseTxMode(BitReader& br, const FrameHeader& frame);
-			int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
 			void initGeometry();
 			const static uint8_t SUPERRES_DENOM_MIN = 9;
 			const static uint8_t SUPERRES_NUM = 8;

@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
-#ifndef _WIN32
+#if 0
 #include <unistd.h>
 #include <sys/syscall.h>
 #define GETTID()    syscall(__NR_gettid)

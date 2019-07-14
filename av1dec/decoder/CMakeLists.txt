@@ -9,4 +9,4 @@ include_directories(${PROJECT_SOURCE_DIR}/aom/
 
 add_library(libav1dec
     ${all_files}
-    $<TARGET_OBJECTS:aom>)
+    $<TARGET_OBJECTS:libaom>)
