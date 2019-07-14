@@ -431,8 +431,8 @@ void Block::intra_frame_mode_info()
 		YMode = intra_frame_y_mode();
 		intra_angle_info_y();
 		if (HasChroma) {
-			UV_PREDICTION_MODE uvMode = uv_mode();
-			if (uvMode == UV_CFL_PRED) {
+			UVMode = uv_mode();
+			if (UVMode == UV_CFL_PRED) {
 				ASSERT(0);
 				//read_cfl_alphas()
 			}

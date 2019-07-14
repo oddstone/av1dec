@@ -483,7 +483,7 @@ namespace Av1 {
 
 	void FrameHeader::initGeometry()
 	{
-		TxTypes.assign(TileCols, std::vector<TX_TYPE>(TileRows));
+		TxTypes.assign(MiCols, std::vector<TX_TYPE>(MiRows));
 	}
 
 	bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
