@@ -380,7 +380,7 @@ namespace Av1 {
         bool parseTileInfo(BitReader& br, const SequenceHeader& sequence);
         bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
         bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
-        bool parseTxMode(BitReader& br, const FrameHeader& frame);
+        bool parseTxMode(BitReader& br);
         void initGeometry();
         const static uint8_t SUPERRES_DENOM_MIN = 9;
         const static uint8_t SUPERRES_NUM = 8;
@@ -388,28 +388,23 @@ namespace Av1 {
         const static uint8_t TX_MODES = 3;
     };
 
-    struct TileGroup {
-        //std::list<Tile> m_group;
-    };
-    typedef std::shared_ptr<TileGroup> TileGroupPtr;
+    typedef std::vector<std::shared_ptr<Tile>> TileGroup;
     class Parser {
     public:
         Parser();
         bool parseSequenceHeader(BitReader& br);
         bool parseTemporalDelimiter(BitReader& br);
         bool parseFrameHeader(BitReader& br);
-        bool parseTileGroup(BitReader& br, TileGroupPtr& group);
+        bool parseTileGroup(BitReader& br, TileGroup& group);
         bool parseMetadata(BitReader& br);
         bool parsePadding(BitReader& br);
-        bool parseFrame(BitReader& br, TileGroupPtr& group);
+        bool parseFrame(BitReader& br, TileGroup& group);
         bool praseReserved(BitReader& br);
-
+        std::shared_ptr<SequenceHeader> m_sequence;
+        std::shared_ptr<FrameHeader> m_frame;
     private:
         void skipTrailingBits(BitReader& br);
         bool m_seenFrameHeader;
-        SequenceHeader m_sequence;
-        FrameHeader m_frameHeader;
-        TileGroup m_group;
     };
 }
 }

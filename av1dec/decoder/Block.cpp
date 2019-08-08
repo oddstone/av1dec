@@ -8,8 +8,8 @@
 #include <limits>
 
 Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
-    : m_frame(tile.m_frame)
-    , m_sequence(tile.m_sequence)
+    : m_frame(*tile.m_frame)
+    , m_sequence(*tile.m_sequence)
     , m_entropy(*tile.m_entropy)
     , m_tile(tile)
     , m_decoded(tile.m_decoded)
@@ -165,9 +165,9 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
         }
     }
     if (!skip) {
-        TransformBlock tb(*this, plane, startX, startY, txSz);
-
-        tb.decode();
+        std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, startX, startY, txSz));
+        tb->parse();
+        m_transformBlocks.push_back(tb);
     }
     for (int i = 0; i < stepY; i++) {
         for (int j = 0; j < stepX; j++) {
@@ -246,7 +246,7 @@ void Block::reset_block_context()
     }
 }
 
-bool Block::decode()
+void Block::parse()
 {
     mode_info();
     palette_tokens();
@@ -279,8 +279,6 @@ bool Block::decode()
 	*/
     compute_prediction();
     residual();
-
-    return true;
 }
 
 uint8_t Block::getSkipCtx()
@@ -485,4 +483,13 @@ void Block::read_block_tx_size()
                 InterTxSizes[row][col] = TxSize;
         }
     }
+}
+
+bool Block::decode(std::shared_ptr<YuvFrame>& frame)
+{
+    for (auto& t : m_transformBlocks) {
+        if (!t->decode(frame))
+            return false;
+    }
+    return true;
 }

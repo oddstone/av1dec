@@ -2,6 +2,7 @@
 #include "Av1Tile.h"
 #include "Block.h"
 #include "SymbolDecoder.h"
+#include "VideoFrame.h"
 #include "log.h"
 
 #include "TransformBlock.h"
@@ -290,7 +291,7 @@ static const int16_t Mrow_Scan_8x16[128] = {
     60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
     75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
     90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
-    105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119 120, 121, 122, 123, 124, 125, 126, 127
+    105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127
 };
 
 static const int16_t Mrow_Scan_16x8[128] = {
@@ -301,7 +302,7 @@ static const int16_t Mrow_Scan_16x8[128] = {
     60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
     75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
     90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
-    105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119 120, 121, 122, 123, 124, 125, 126, 127
+    105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127
 };
 
 static const int16_t Default_Scan_16x32[512] = {
@@ -1185,6 +1186,8 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
     , m_sequence(block.m_sequence)
     , plane(p)
     , ptype(p > 0 ? PLANE_TYPE_UV : PLANE_TYPE_Y)
+    , x(startX)
+    , y(startY)
     , x4(startX >> 2)
     , y4(startY >> 2)
     , txSz(txSize)
@@ -1201,6 +1204,7 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
     , h4(h >> 2)
     , tw(std::min(w, 32))
     , th(std::min(h, 32))
+    , m_needReconstruct(false)
 {
     switch (txSz) {
     case TX_32X32:
@@ -1942,14 +1946,16 @@ void TransformBlock::reconstruct()
     inverseTransform();
     ASSERT(!flipLR && !flipUD);
 }
-int TransformBlock::decode()
+
+void TransformBlock::parse()
 {
     int eob = coeffs();
     if (eob > 0)
-        reconstruct();
+        m_needReconstruct = true;
 
-    return eob;
+    //return;// eob;
 }
+
 uint8_t TransformBlock::getAllZeroCtx()
 {
     uint8_t ctx;
@@ -2034,4 +2040,22 @@ TxSet TransformBlock::get_tx_set() const
     else if (txSzSqr == TX_16X16)
         return TX_SET_INTRA_2;
     return TX_SET_INTRA_1;
+}
+
+bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
+{
+    if (m_needReconstruct) {
+        reconstruct();
+    }
+
+    //copy to frame
+    uint8_t* d = frame->data[plane];
+    int s = frame->strides[plane];
+    uint8_t* p = d + y * s + x;
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            *(p+j) = (uint8_t)Residual[i][j];
+        }
+    }
+    return true;
 }

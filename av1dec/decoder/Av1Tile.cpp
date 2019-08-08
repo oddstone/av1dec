@@ -1,91 +1,10 @@
 #include "Av1Tile.h"
 #include "Av1Parser.h"
 #include "Block.h"
+#include "Partition.h"
 #include "SymbolDecoder.h"
+#include "VideoFrame.h"
 #include "log.h"
-
-BLOCK_SIZE Partition_Subsize[10][BLOCK_SIZES_ALL] = {
-    { BLOCK_4X4,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_128X128,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X4,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_128X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X128,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X4,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X4,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_128X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X4,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_128X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X128,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X128,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X4,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_32X8,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_64X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID },
-    { BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_4X16,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_8X32,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_16X64,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID,
-        BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID }
-};
 
 static void CopyAndReverse(void* dest, const void* src, uint32_t size)
 {
@@ -106,7 +25,7 @@ BlockDecoded::BlockDecoded()
 
 void BlockDecoded::init(Tile& tile)
 {
-    const SequenceHeader& s = tile.m_sequence;
+    const SequenceHeader& s = *tile.m_sequence;
     NumPlanes = s.NumPlanes;
     subsampling_x = s.subsampling_x;
     subsampling_y = s.subsampling_y;
@@ -145,17 +64,17 @@ void BlockDecoded::setFlag(int plane, int r, int c)
     m_decoded[plane][r + OFFSET][c + OFFSET] = true;
 }
 
-Tile::Tile(const SequenceHeader& sequence, FrameHeader& frame, uint32_t TileNum)
+Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum)
     : m_sequence(sequence)
     , m_frame(frame)
 {
-    uint32_t TileRow = TileNum / frame.TileCols;
-    uint32_t TileCol = TileNum % frame.TileCols;
-    MiRowStart = frame.MiRowStarts[TileRow];
-    MiRowEnd = frame.MiRowStarts[TileRow + 1];
-    MiColStart = frame.MiColStarts[TileCol];
-    MiColEnd = frame.MiColStarts[TileCol + 1];
-    CurrentQIndex = frame.m_quant.base_q_idx;
+    uint32_t TileRow = TileNum / frame->TileCols;
+    uint32_t TileCol = TileNum % frame->TileCols;
+    MiRowStart = frame->MiRowStarts[TileRow];
+    MiRowEnd = frame->MiRowStarts[TileRow + 1];
+    MiColStart = frame->MiColStarts[TileCol];
+    MiColEnd = frame->MiColStarts[TileCol + 1];
+    CurrentQIndex = frame->m_quant.base_q_idx;
     m_decoded.init(*this);
 
     //CopyAndReverse(m_partitionCdf, Default_Partition_Cdf, sizeof(Default_Partition_Cdf));
@@ -171,17 +90,17 @@ bool Tile::is_inside(uint32_t r, uint32_t c)
 bool Tile::decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 {
     Block b(*this, r, c, bSize);
-    return b.decode();
+    b.parse();
     //b->decode()
     //readModeInfo(r, c, bSize);
 
-    //return true;
+    return true;
 }
-
+/*
 bool Tile::decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 {
-    uint32_t MiRows = m_frame.MiRows;
-    uint32_t MiCols = m_frame.MiCols;
+    uint32_t MiRows = m_frame->MiRows;
+    uint32_t MiCols = m_frame->MiCols;
     if (r >= MiRows || c >= MiCols)
         return true;
     bool AvailU = is_inside(r - 1, c);
@@ -257,10 +176,10 @@ bool Tile::decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
     }
     return true;
 }
-
-bool Tile::decode(const uint8_t* data, uint32_t size)
+*/
+bool Tile::parse(const uint8_t* data, uint32_t size)
 {
-    m_entropy.reset(new EntropyDecoder(data, size, m_frame.disable_cdf_update, m_frame.m_quant.base_q_idx));
+    m_entropy.reset(new EntropyDecoder(data, size, m_frame->disable_cdf_update, m_frame->m_quant.base_q_idx));
     clear_above_context();
     /*
 	for ( i = 0; i < FRAME_LF_COUNT; i++ )
@@ -274,7 +193,7 @@ bool Tile::decode(const uint8_t* data, uint32_t size)
 	}
 	}
 	*/
-    BLOCK_SIZE sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
+    BLOCK_SIZE sbSize = m_sequence->use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
     int sbSize4 = Num_4x4_Blocks_Wide[sbSize];
     for (uint32_t r = MiRowStart; r < MiRowEnd; r += sbSize4) {
         clear_left_context();
@@ -285,32 +204,33 @@ bool Tile::decode(const uint8_t* data, uint32_t size)
             m_decoded.clearFlags(r, c, sbSize4);
             //read_lr(r, c, sbSize)
             //decode_partition(r, c, sbSize)
-            decodePartition(r, c, sbSize);
+            //decodePartition(r, c, sbSize);
+            std::shared_ptr<Partition> p(new Partition(*this, r, c, sbSize));
+            p->parse();
+            m_partitions.push_back(p);
+        
         }
     }
     return true;
 }
 
-PARTITION_TYPE Tile::readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize)
-{
-    uint8_t bsl = Mi_Width_Log2[bSize];
-    /*
-	uint8_t above = AvailU && (Mi_Width_Log2[MiSizes[r - 1][c]] < bsl);
-	uint8_t left = AvailL && (Mi_Height_Log2[MiSizes[r][c - 1]] < bsl);
-	uint8_t ctx = left * 2 + above;
-	*/
-    uint8_t ctx = 0;
-    return m_entropy->readPartition(ctx, bsl);
-}
-
 void Tile::clear_above_context()
 {
-    m_above.clear(m_frame.MiCols);
+    m_above.clear(m_frame->MiCols);
 }
 
 void Tile::clear_left_context()
 {
-    m_left.clear(m_frame.MiRows);
+    m_left.clear(m_frame->MiRows);
+}
+
+bool Tile::decode(std::shared_ptr<YuvFrame>& frame)
+{
+    for (auto& p : m_partitions) {
+        if (!p->decode(frame))
+            return false;
+    }
+    return true;
 }
 
 const static int kMaxPlanes = 3;

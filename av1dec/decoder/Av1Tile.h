@@ -5,6 +5,9 @@
 #include <memory>
 #include <stdint.h>
 #include <vector>
+#include <deque>
+
+class Partition;
 
 namespace YamiParser {
 namespace Av1 {
@@ -14,6 +17,8 @@ namespace Av1 {
 }
 }
 using namespace YamiParser::Av1;
+
+struct YuvFrame;
 
 const static uint8_t Mi_Width_Log2[BLOCK_SIZES_ALL] = {
     0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3,
@@ -156,6 +161,7 @@ struct BlockContext {
     void reset(uint32_t plane, uint32_t start, uint32_t count);
     void set(uint32_t plane, uint32_t start, uint32_t count, int16_t culLevel, uint8_t dcCategory);
 };
+
 class Tile {
     uint32_t MiRowStart;
     uint32_t MiRowEnd;
@@ -165,29 +171,32 @@ class Tile {
     friend class Block;
     friend class BlockDecoded;
     friend class TransformBlock;
+    friend class Partition;
 
 public:
-    Tile(const SequenceHeader& sequence, FrameHeader& frame, uint32_t TileNum);
-    bool decode(const uint8_t* data, uint32_t size);
+    Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum);
+    bool parse(const uint8_t* data, uint32_t size);
+    bool decode(std::shared_ptr<YuvFrame>& frame);
 
 private:
-    bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
+    //bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     bool decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
-    PARTITION_TYPE readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize);
+//    PARTITION_TYPE readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize);
 
 private:
     bool is_inside(uint32_t r, uint32_t c);
     void clear_above_context();
     void clear_left_context();
 
-    FrameHeader& m_frame;
-    const SequenceHeader& m_sequence;
+    std::shared_ptr<FrameHeader> m_frame;
+    std::shared_ptr<const SequenceHeader> m_sequence;
     std::unique_ptr<EntropyDecoder> m_entropy;
     BlockDecoded m_decoded;
 
     BlockContext m_above;
     BlockContext m_left;
     std::vector<std::vector<uint8_t>> TxTypes;
+    std::deque<std::shared_ptr<Partition>> m_partitions;
 
     //uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
     //uint16_t m_skipCdf[SKIP_CONTEXTS][3];

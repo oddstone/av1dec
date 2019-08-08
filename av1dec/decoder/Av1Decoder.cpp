@@ -1,6 +1,8 @@
 #include "Av1Decoder.h"
 #include "Av1Parser.h"
 #include "bitReader.h"
+#include "VideoFrame.h"
+#include "log.h"
 
 namespace YamiParser {
 namespace Av1 {
@@ -33,15 +35,28 @@ namespace Av1 {
             } else if (type == OBU_FRAME_HEADER) {
                 ret = m_parser->parseFrameHeader(br);
             } else if (type == OBU_TILE_GROUP) {
-                TileGroupPtr group;
+                if (!m_parser->m_frame) {
+                    ASSERT(0 && "no frame header");
+                }
+                TileGroup group;
                 ret = m_parser->parseTileGroup(br, group);
+                if (ret) {
+                    m_tiles.insert(m_tiles.end(), group.begin(), group.end());
+                    if (m_tiles.size() == m_parser->m_frame->NumTiles) {
+                        ret = decodeFrame(m_tiles);
+                        m_tiles.clear();
+                    }
+                }
             } else if (type == OBU_METADATA) {
                 ret = m_parser->parseMetadata(br);
             } else if (type == OBU_PADDING) {
                 ret = m_parser->parsePadding(br);
             } else if (type == OBU_FRAME) {
-                TileGroupPtr group;
+                TileGroup group;
                 ret = m_parser->parseFrame(br, group);
+                if (ret) {
+                    ret = decodeFrame(group);
+                }
             } else {
                 ret = m_parser->praseReserved(br);
             }
@@ -52,5 +67,28 @@ namespace Av1 {
         }
         return true;
     }
+    bool Decoder::decodeFrame(TileGroup tiles)
+    {
+        FrameHeader& h = *m_parser->m_frame;
+        std::shared_ptr<YuvFrame> frame = YuvFrame::create(h.FrameWidth, h.FrameHeight);
+        if (!frame)
+            return false;
+        for (auto& t : tiles) {
+            if (!t->decode(frame)) {
+                return false;
+            }
+        }
+        m_output.push_back(frame);
+    }
+    std::shared_ptr<YuvFrame> Decoder::getOutput()
+    {
+        std::shared_ptr<YuvFrame> f;
+        if (!m_output.empty()) {
+            f = m_output.front();
+            m_output.pop_front();
+        }
+        return f;
+    }
+        
 };
 };

@@ -386,7 +386,8 @@ namespace Av1 {
 
     bool Parser::parseSequenceHeader(BitReader& br)
     {
-        return m_sequence.parse(br);
+        m_sequence = std::make_shared<SequenceHeader>();
+        return m_sequence->parse(br);
     }
     bool Parser::parseTemporalDelimiter(BitReader&)
     {
@@ -400,28 +401,29 @@ namespace Av1 {
             ASSERT(0);
         } else {
             m_seenFrameHeader = true;
-            if (!m_frameHeader.parse(br, m_sequence))
+            m_frame.reset(new FrameHeader);
+            if (!m_frame->parse(br, *m_sequence))
                 return false;
             /* if (show_existing_frame) */
         }
         return true;
     }
-    bool Parser::parseTileGroup(BitReader& br, TileGroupPtr& group)
+    bool Parser::parseTileGroup(BitReader& br, TileGroup& group)
     {
         bool tile_start_and_end_present_flag = false;
         ;
-        if (m_frameHeader.NumTiles > 1)
+        if (m_frame->NumTiles > 1)
             READ(tile_start_and_end_present_flag);
         uint32_t tg_start, tg_end;
-        if (m_frameHeader.NumTiles == 1 || !tile_start_and_end_present_flag) {
+        if (m_frame->NumTiles == 1 || !tile_start_and_end_present_flag) {
             tg_start = 0;
-            tg_end = m_frameHeader.NumTiles - 1;
+            tg_end = m_frame->NumTiles - 1;
         } else {
             ASSERT(0);
         }
         skipTrailingBits(br);
 
-        group.reset(new TileGroup);
+        //group.reset(new TileGroup);
 
         for (uint32_t TileNum = tg_start; TileNum <= tg_end; TileNum++) {
 
@@ -431,15 +433,15 @@ namespace Av1 {
                 tileSize = br.getRemainingBitsCount() / 8;
             } else {
                 uint32_t tile_size_minus_1;
-                READ_LE(tile_size_minus_1, m_frameHeader.TileSizeBytes);
+                READ_LE(tile_size_minus_1, m_frame->TileSizeBytes);
                 tileSize = tile_size_minus_1 + 1;
             }
-            Tile tile(m_sequence, m_frameHeader, TileNum);
-            if (!tile.decode(br.getCurrent(), br.getRemainingBitsCount() >> 3)) {
+            std::shared_ptr<Tile> tile(new Tile(m_sequence, m_frame, TileNum));
+            if (!tile->parse(br.getCurrent(), br.getRemainingBitsCount() >> 3)) {
                 ERROR("decode tile failed");
                 return false;
             }
-            //group->m_group.push_back(tile);
+            group.push_back(tile);
         }
         //br.
         return true;
@@ -753,9 +755,9 @@ namespace Av1 {
         return true;
     }
 
-    bool FrameHeader::parseTxMode(BitReader& br, const FrameHeader& frame)
+    bool FrameHeader::parseTxMode(BitReader& br)
     {
-        if (frame.CodedLossless) {
+        if (CodedLossless) {
             TxMode = ONLY_4X4;
         } else {
             bool tx_mode_select;
@@ -894,7 +896,7 @@ namespace Av1 {
         return true;
     }
 
-    bool Parser::parseFrame(BitReader& br, TileGroupPtr& group)
+    bool Parser::parseFrame(BitReader& br, TileGroup& group)
     {
         if (!parseFrameHeader(br))
             return false;

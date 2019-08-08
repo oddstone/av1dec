@@ -6,10 +6,13 @@ enum TxClass {
     TX_CLASS_VERT
 };
 
+struct YuvFrame;
+
 class TransformBlock {
 public:
     TransformBlock(Block& block, int plane, int startX, int startY, TX_SIZE txSz);
-    int decode();
+    void parse();
+    bool decode(std::shared_ptr<YuvFrame>& frame);
 
 private:
     TX_TYPE compute_tx_type() const;
@@ -52,6 +55,8 @@ private:
 
     int plane;
     PLANE_TYPE ptype;
+    int x;
+    int y;
     int x4;
     int y4;
     TX_SIZE txSz;
@@ -77,4 +82,5 @@ private:
     int th;
     bool flipUD;
     bool flipLR;
+    bool m_needReconstruct;
 };

@@ -538,7 +538,7 @@ typedef enum ATTRIBUTE_PACKED {
 #define UNI_COMP_REF_CONTEXTS 3
 
 #define TXFM_PARTITION_CONTEXTS ((TX_SIZES - TX_8X8) * 6 - 3)
-typedef uint8_t TXFM_CONTEXT;
+//typedef uint8_t TXFM_CONTEXT;
 
 #define NONE_FRAME -1
 #define INTRA_FRAME 0
