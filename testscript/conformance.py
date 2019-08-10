@@ -95,12 +95,15 @@ def print_summary(name, files):
         for f in files:
             print("    " + f)
 
-
-if len(sys.argv)!=2:
+argc = len(sys.argv)
+if argc != 2 and argc != 1:
     print("usage: " + sys.argv[0] + " directory/file")
     sys.exit(1)
 
-path = sys.argv[1]
+if argc == 2:
+    path = sys.argv[1]
+else:
+    path = av1dec = join(dirname(realpath(__file__)), "..", "bits")
 #test file
 if os.path.isfile(path):
     pss = test(path, True)
@@ -120,8 +123,9 @@ for root, dirs, files in os.walk(path):
             summary[s].append(f)
 print("")
 print("+++++++++")
-print("total = "+ str(status[PASSED] + status[FAILED] + status[SKIPPED]) +", failed = "+ str(status[FAILED]) + ", skipped = " + str(status[SKIPPED]))
 print_summary("failed", summary[FAILED])
 print_summary("skipped", summary[SKIPPED])
 print_summary("passed", summary[PASSED])
+print("")
+print("total = "+ str(status[PASSED] + status[FAILED] + status[SKIPPED]) +", failed = "+ str(status[FAILED]) + ", skipped = " + str(status[SKIPPED]))
 print("+++++++++")
