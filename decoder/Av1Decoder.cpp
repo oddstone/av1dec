@@ -79,6 +79,7 @@ namespace Av1 {
             }
         }
         m_output.push_back(frame);
+        return true;
     }
     std::shared_ptr<YuvFrame> Decoder::getOutput()
     {
