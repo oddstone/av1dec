@@ -49,6 +49,8 @@ private:
     void predict_intra(int plane, int startX, int startY,
         int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
         int mode, int log2W, int log2H, const std::shared_ptr<YuvFrame>& frame);
+    void paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
+        const std::shared_ptr<YuvFrame>& frame);
 
     EntropyDecoder& m_entropy;
     Block& m_block;

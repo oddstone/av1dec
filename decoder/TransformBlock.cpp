@@ -2042,11 +2042,86 @@ TxSet TransformBlock::get_tx_set() const
     return TX_SET_INTRA_1;
 }
 
+void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
+    const std::shared_ptr<YuvFrame>& frame)
+{
+    uint8_t* d = frame->data[plane];
+    int s = frame->strides[plane];
+    uint8_t* p = d + y * s + x;
+
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            uint8_t base = AboveRow[ j ] + LeftCol[i] - AboveRow[-1];
+            uint8_t pLeft = std::abs(base - LeftCol[i]);
+            uint8_t pTop = std::abs(base - AboveRow[j]);
+            uint8_t pTopLeft = std::abs(base - AboveRow[-1]);
+            uint8_t pred;
+            if (pLeft <= pTop && pLeft <= pTopLeft) {
+                pred = LeftCol[i];
+            } else if (pTop <= pTopLeft) {
+                pred = AboveRow[j];
+            } else {
+                pred = AboveRow[-1];
+            }
+            *(p + j) = pred;
+        }
+        p += s;
+   }
+    
+}
+
 void TransformBlock::predict_intra(int plane, int startX, int startY,
-    int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
+    int haveLeft, int haveAbove, bool haveAboveRight, bool haveBelowLeft,
     int mode, int log2W, int log2H, const std::shared_ptr<YuvFrame>& frame)
 {
-    if (mode != PAETH_PRED) {
+    int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
+    int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
+
+    uint8_t* AboveRow;
+    uint8_t* LeftCol;
+    std::vector<uint8_t> aboveRow;
+    aboveRow.resize(w + h + 1);
+    AboveRow = &aboveRow[1];
+        
+    std::vector<uint8_t> leftCol;
+    leftCol.resize(w + h + 1);
+    LeftCol = &leftCol[1];
+
+    uint8_t median = ( 1 << ( m_sequence.BitDepth - 1 ));
+    if (!haveAbove && haveLeft) {
+        std::fill(aboveRow.begin() + 1, aboveRow.end(), frame->getPixel(plane, x - 1, y));
+    } else if (!haveAbove && !haveLeft) {
+        std::fill(aboveRow.begin() + 1, aboveRow.end(), median - 1);
+    } else {
+        int aboveLimit = std::min(maxX, x + (haveAboveRight ? 2 * w : w) - 1);
+        for (int i = 0; i < w + h; i++) {
+            AboveRow[i] = frame->getPixel(plane, std::min(aboveLimit, x + i), y - 1);
+        }
+    }
+    if (!haveLeft && haveAbove) {
+        std::fill(leftCol.begin() + 1, leftCol.end(), frame->getPixel(plane, x, y - 1));
+    } else if (!haveAbove && !haveLeft) {
+        std::fill(leftCol.begin() + 1, leftCol.end(), median + 1);
+    } else {
+        int leftLimit = std::min(maxY, y + ( haveBelowLeft ? 2 * h : h ) - 1 );
+        for (int i = 0; i < w + h; i++) {
+            LeftCol[i] = frame->getPixel(plane, x - 1, std::min(leftLimit, y + i));
+        }
+    }
+    if (haveAbove && haveLeft) {
+        AboveRow[-1] = frame->getPixel(plane, x - 1, y - 1);
+    } else if (haveAbove) {
+        AboveRow[-1] = frame->getPixel(plane, x, y - 1);
+    } else if (haveLeft) {
+        AboveRow[-1] = frame->getPixel(plane, x - 1, y);
+    } else {
+        AboveRow[-1] = median;
+    }
+    if (mode == PAETH_PRED) {
+        paethPredict(AboveRow, LeftCol, frame);
+    } else {
         ASSERT(0 && "not PAETH_PRED");
     }
 }
@@ -2066,6 +2141,9 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     int stepY = Tx_Height[txSz] >> MI_SIZE_LOG2;
     int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
     int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
+    if (startX >= maxX || startY >= maxY) {
+        return true;
+    }
     if (!m_block.is_inter) {
         if (((plane == 0) && m_block.PaletteSizeY) || ((plane != 0) && m_block.PaletteSizeUV)) {
             ASSERT(0 && "predict_palette");
@@ -2108,7 +2186,7 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     uint8_t* p = d + y * s + x;
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
-            *(p+j) = (uint8_t)(Residual[i][j]+128);
+            *(p+j) = (uint8_t)(Residual[i][j]+ *(p+j));
         }
         p += s;
     }
