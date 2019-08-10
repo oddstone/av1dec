@@ -133,6 +133,7 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
     if (startX >= maxX || startY >= maxY) {
         return;
     }
+#if 0
     if (!is_inter) {
         if (((plane == 0) && PaletteSizeY) || ((plane != 0) && PaletteSizeUV)) {
             ASSERT(0 && "predict_palette");
@@ -164,6 +165,7 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
             int MaxLumaH = startY + stepY * 4;
         }
     }
+#endif
     if (!skip) {
         std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, startX, startY, txSz));
         tb->parse();

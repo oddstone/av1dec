@@ -2042,8 +2042,62 @@ TxSet TransformBlock::get_tx_set() const
     return TX_SET_INTRA_1;
 }
 
+void TransformBlock::predict_intra(int plane, int startX, int startY,
+    int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
+    int mode, int log2W, int log2H, const std::shared_ptr<YuvFrame>& frame)
+{
+    if (mode != PAETH_PRED) {
+        ASSERT(0 && "not PAETH_PRED");
+    }
+}
+
+
 bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
 {
+    int startX = x;
+    int startY = y;
+    int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int row = (startY << subY) >> MI_SIZE_LOG2;
+    int col = (startX << subX) >> MI_SIZE_LOG2;
+    int subBlockMiRow = row & m_block.sbMask;
+    int subBlockMiCol = col & m_block.sbMask;
+    int stepX = Tx_Width[txSz] >> MI_SIZE_LOG2;
+    int stepY = Tx_Height[txSz] >> MI_SIZE_LOG2;
+    int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
+    int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
+    if (!m_block.is_inter) {
+        if (((plane == 0) && m_block.PaletteSizeY) || ((plane != 0) && m_block.PaletteSizeUV)) {
+            ASSERT(0 && "predict_palette");
+            //predict_palette( plane, startX, startY, x, y, txSz )
+        } else {
+            bool isCfl = (plane > 0 && m_block.UVMode == UV_CFL_PRED);
+            int mode;
+            if (plane == 0) {
+                mode = m_block.YMode;
+            } else {
+                mode = (isCfl) ? DC_PRED : m_block.UVMode;
+            }
+            int log2W = Tx_Width_Log2[txSz];
+            int log2H = Tx_Height_Log2[txSz];
+            predict_intra(plane, startX, startY,
+                (plane == 0 ? m_block.AvailL : m_block.AvailLChroma) || x > 0,
+                (plane == 0 ? m_block.AvailU : m_block.AvailUChroma) || y > 0,
+                m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) - 1, (subBlockMiCol >> subX) + stepX),
+                m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1),
+                mode,
+                log2W, log2H, frame);
+            if (isCfl) {
+                ASSERT(0 && "predict_chroma_from_luma");
+                //predict_chroma_from_luma( plane, startX, startY, txSz);
+            }
+        }
+        if (plane == 0) {
+            int MaxLumaW = startX + stepX * 4;
+            int MaxLumaH = startY + stepY * 4;
+        }
+    }
+
     if (m_needReconstruct) {
         reconstruct();
     }
@@ -2057,6 +2111,15 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             *(p+j) = (uint8_t)(Residual[i][j]+128);
         }
         p += s;
+    }
+
+    for (int i = 0; i < stepY; i++) {
+        for (int j = 0; j < stepX; j++) {
+            /*		LoopfilterTxSizes[ plane ]
+		[ (row >> subY) + i ]
+		[ (col >> subX) + j ] = txSz*/
+           m_block.m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
+        }
     }
     return true;
 }
