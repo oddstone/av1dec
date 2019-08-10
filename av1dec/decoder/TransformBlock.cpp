@@ -2054,8 +2054,9 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     uint8_t* p = d + y * s + x;
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
-            *(p+j) = (uint8_t)Residual[i][j];
+            *(p+j) = (uint8_t)(Residual[i][j]+128);
         }
+        p += s;
     }
     return true;
 }
