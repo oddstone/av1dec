@@ -47,11 +47,14 @@ def get_ref_md5(fn):
     if not os.path.exists(bits):
         return None
     with open(bits) as f:
-        text = f.read()
-    g = re.match("^([a-fA-F0-9]*) *" + name + "$", text)
-    if not g:
-        return False      
-    return g.group(1)
+        suffix = "  " + name
+        for line in f.readlines():
+            line = line.strip()
+            print("+" + line + "-")
+            if line.endswith(suffix):
+                line = line.replace(suffix, "")
+                return line
+    return None
 
 def decode(input, output):
     av1dec = join(dirname(realpath(__file__)), "../build/tests/Debug/av1dec.exe")
