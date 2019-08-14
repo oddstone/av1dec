@@ -38,7 +38,7 @@ private:
     int16_t getLevel();
     int16_t getLevel(int c, int eob, int pos);
 
-    int coeffs();
+    void coeffs();
     int dc_q(int16_t b) const;
     int ac_q(int16_t b) const;
     int get_dc_quant() const;
@@ -87,5 +87,5 @@ private:
     int th;
     bool flipUD;
     bool flipLR;
-    bool m_needReconstruct;
+    int eob;
 };

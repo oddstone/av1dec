@@ -1204,7 +1204,7 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
     , h4(h >> 2)
     , tw(std::min(w, 32))
     , th(std::min(h, 32))
-    , m_needReconstruct(false)
+    , eob(0)
 {
     switch (txSz) {
     case TX_32X32:
@@ -1642,7 +1642,7 @@ int16_t TransformBlock::getLevel()
     return (int16_t)x + COEFF_BASE_RANGE + NUM_BASE_LEVELS;
 }
 
-int TransformBlock::coeffs()
+void TransformBlock::coeffs()
 {
     int segEob = (txSz == TX_16X64 || txSz == TX_64X16) ? 512
                                                         : std::min(1024, w * h);
@@ -1650,7 +1650,6 @@ int TransformBlock::coeffs()
     memset(Quant, 0, segEob * sizeof(Quant[0]));
     memset(Dequant, 0, sizeof(Dequant));
 
-    int eob = 0;
     int culLevel = 0;
     int dcCategory = 0;
 
@@ -1689,7 +1688,6 @@ int TransformBlock::coeffs()
 
     m_tile.m_above.set(plane, x4, w4, culLevel, dcCategory);
     m_tile.m_left.set(plane, y4, h4, culLevel, dcCategory);
-    return eob;
 }
 
 int TransformBlock::dc_q(int16_t b) const
@@ -1931,6 +1929,12 @@ void TransformBlock::inverseTransform()
 
 void TransformBlock::reconstruct()
 {
+    if (!eob) {
+        for (int i = 0; i < h; i++) {
+            memset(Residual[i], 0, w * sizeof(Residual[0][0]));
+        }
+        return;
+    }
     int min = -(1 << (7 + m_sequence.BitDepth));
     int max = (1 << (7 + m_sequence.BitDepth)) - 1;
 
@@ -1949,9 +1953,8 @@ void TransformBlock::reconstruct()
 
 void TransformBlock::parse()
 {
-    int eob = coeffs();
-    if (eob > 0)
-        m_needReconstruct = true;
+    coeffs();
+
 
     //return;// eob;
 }
@@ -2176,9 +2179,7 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
         }
     }
 
-    if (m_needReconstruct) {
-        reconstruct();
-    }
+    reconstruct();
 
     //copy to frame
     uint8_t* d = frame->data[plane];
