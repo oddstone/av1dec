@@ -367,6 +367,16 @@ namespace Av1 {
         std::vector<uint32_t> MiColStarts;
         std::vector<uint32_t> MiRowStarts;
         std::vector<std::vector<TX_TYPE>> TxTypes;
+        std::vector<std::vector<bool>> IsInters;
+        //SkipModes[r + y][c + x] = skip_mode
+        std::vector<std::vector<bool>> Skips;
+        std::vector<std::vector<TX_SIZE>> TxSizes;
+        std::vector<std::vector<BLOCK_SIZE>> MiSizes;
+        std::vector<std::vector<uint8_t>> SegmentIds;
+        //std::vector<std::vector<uint32_t>> PaletteSizes[2];
+        //PaletteColors
+        //DeltaLFs
+
 
         FrameHeader();
         bool parse(BitReader& br, const SequenceHeader& sequence);

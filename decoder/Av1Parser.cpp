@@ -463,6 +463,11 @@ namespace Av1 {
     void FrameHeader::initGeometry()
     {
         TxTypes.assign(MiCols, std::vector<TX_TYPE>(MiRows));
+        IsInters.assign(MiCols, std::vector<bool>(MiRows));
+        TxSizes.assign(MiCols, std::vector<TX_SIZE>(MiRows));
+        MiSizes.assign(MiCols, std::vector<BLOCK_SIZE>(MiRows));
+        SegmentIds.assign(MiCols, std::vector<uint8_t>(MiRows));
+        Skips.assign(MiCols, std::vector<bool>(MiRows));
     }
 
     bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
@@ -732,9 +737,9 @@ namespace Av1 {
         starts.clear();
         uint32_t step = (sbMax + (1 << tileLog2)) >> tileLog2;
         for (uint32_t start = 0; start < sbMax; start += step) {
-            starts.push_back(start << sbShift);
+            starts.push_back(start << sbShift >> 2);
         }
-        starts.push_back(sbMax);
+        starts.push_back(sbMax<<sbShift >> 2);
     }
 
     bool FrameHeader::parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)

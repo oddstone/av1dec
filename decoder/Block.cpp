@@ -281,11 +281,37 @@ void Block::parse()
 	*/
     compute_prediction();
     residual();
+    uint32_t r = MiRow;
+    uint32_t c = MiCol;
+    for (int y = 0; y < bh4; y++) {
+        for (int x = 0; x < bw4; x++) {
+            m_frame.IsInters[r + y][c + x] = is_inter;
+            //SkipModes[r + y][c + x] = skip_mode
+            m_frame.Skips[r + y][c + x] = skip;
+            m_frame.TxSizes[r + y][c + x] = TxSize;
+            m_frame.MiSizes[r + y][c + x] = MiSize;
+            m_frame.SegmentIds[r + y][c + x] = segment_id;
+            /*PaletteSizes[0][r + y][c + x] = PaletteSizeY
+            PaletteSizes[1][r + y][c + x] = PaletteSizeUV
+                for (i = 0; i < PaletteSizeY; i++)
+                    PaletteColors[0][r + y][c + x][i] = palette_colors_y[i]
+                    for (i = 0; i < PaletteSizeUV; i++)
+                        PaletteColors[1][r + y][c + x][i] = palette_colors_u[i]
+                        for (i = 0; i < FRAME_LF_COUNT; i++)
+                            DeltaLFs[r + y][c + x][i] = DeltaLF[i]
+            */
+        }
+    }
 }
 
 uint8_t Block::getSkipCtx()
 {
-    return 0;
+    uint8_t ctx = 0;
+    if (AvailU)
+        ctx += m_frame.Skips[MiRow - 1][MiCol];
+    if (AvailL)
+        ctx += m_frame.Skips[MiRow][MiCol - 1];
+    return ctx;
 }
 
 bool Block::readSkip()
@@ -352,7 +378,14 @@ void Block::intra_angle_info_y()
 UV_PREDICTION_MODE Block::uv_mode()
 {
 
-    CFL_ALLOWED_TYPE cflAllowed = (std::max(bw4, bh4) <= 8) ? CFL_ALLOWED : CFL_DISALLOWED;
+    CFL_ALLOWED_TYPE cflAllowed;
+    if (Lossless && get_plane_residual_size(MiSize, 1) == BLOCK_4X4) {
+        cflAllowed = CFL_ALLOWED;
+    } else if (!Lossless && (std::max(bw4, bh4) <= 8)) {
+        cflAllowed = CFL_ALLOWED;
+    } else {
+        cflAllowed = CFL_DISALLOWED;
+    }
     return m_entropy.readUvMode(cflAllowed, YMode);
 }
 

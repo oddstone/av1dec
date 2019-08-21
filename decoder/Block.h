@@ -110,7 +110,6 @@ private:
     TX_SIZE InterTxSizes[BLOCK_SIZES][BLOCK_SIZES];
     int RefFrame[2];
     uint32_t sbMask;
-    std::vector<std::vector<uint8_t>> TxTypes;
 
     EntropyDecoder& m_entropy;
     std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;

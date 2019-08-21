@@ -209,12 +209,9 @@ PARTITION_TYPE Partition::readPartitionType()
     bool AvailU = m_tile.is_inside(m_r - 1, m_c);
     bool AvailL = m_tile.is_inside(m_r, m_c - 1);
     uint8_t bsl = Mi_Width_Log2[m_bSize];
-    /*
-	uint8_t above = AvailU && (Mi_Width_Log2[MiSizes[r - 1][c]] < bsl);
-	uint8_t left = AvailL && (Mi_Height_Log2[MiSizes[r][c - 1]] < bsl);
+  	uint8_t above = AvailU && (Mi_Width_Log2[m_frame.MiSizes[m_r - 1][m_c]] < bsl);
+	uint8_t left = AvailL && (Mi_Height_Log2[m_frame.MiSizes[m_r][m_c - 1]] < bsl);
 	uint8_t ctx = left * 2 + above;
-	*/
-    uint8_t ctx = 0;
     return m_entropy.readPartition(ctx, bsl);
 }
 

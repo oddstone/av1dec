@@ -1204,7 +1204,7 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
     , h4(h >> 2)
     , tw(std::min(w, 32))
     , th(std::min(h, 32))
-    , eob(0)
+    , m_eob(0)
 {
     switch (txSz) {
     case TX_32X32:
@@ -1455,7 +1455,7 @@ int TransformBlock::getEob(int eobMultisize)
     if (eobShift >= 0) {
         bool eob_extra = m_entropy.readEobExtra(txSzCtx, ptype, eobPt);
         if (eob_extra) {
-            ASSERT(0 && "readEobExtra");
+            eob += (1 << eobShift);
         }
         for (int i = 1; i < std::max(0, eobPt - 2); i++) {
             eobShift = std::max(0, eobPt - 2) - 1 - i;
@@ -1642,7 +1642,7 @@ int16_t TransformBlock::getLevel()
     return (int16_t)x + COEFF_BASE_RANGE + NUM_BASE_LEVELS;
 }
 
-void TransformBlock::coeffs()
+int TransformBlock::coeffs()
 {
     int segEob = (txSz == TX_16X64 || txSz == TX_64X16) ? 512
                                                         : std::min(1024, w * h);
@@ -1650,6 +1650,7 @@ void TransformBlock::coeffs()
     memset(Quant, 0, segEob * sizeof(Quant[0]));
     memset(Dequant, 0, sizeof(Dequant));
 
+    int eob = 0;
     int culLevel = 0;
     int dcCategory = 0;
 
@@ -1688,6 +1689,7 @@ void TransformBlock::coeffs()
 
     m_tile.m_above.set(plane, x4, w4, culLevel, dcCategory);
     m_tile.m_left.set(plane, y4, h4, culLevel, dcCategory);
+    return eob;
 }
 
 int TransformBlock::dc_q(int16_t b) const
@@ -1929,7 +1931,7 @@ void TransformBlock::inverseTransform()
 
 void TransformBlock::reconstruct()
 {
-    if (!eob) {
+    if (!m_eob) {
         for (int i = 0; i < h; i++) {
             memset(Residual[i], 0, w * sizeof(Residual[0][0]));
         }
@@ -1953,7 +1955,7 @@ void TransformBlock::reconstruct()
 
 void TransformBlock::parse()
 {
-    coeffs();
+    m_eob = coeffs();
 
 
     //return;// eob;

@@ -195,7 +195,6 @@ private:
 
     BlockContext m_above;
     BlockContext m_left;
-    std::vector<std::vector<uint8_t>> TxTypes;
     std::deque<std::shared_ptr<Partition>> m_partitions;
 
     //uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
