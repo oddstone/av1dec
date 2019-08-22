@@ -8,6 +8,7 @@
 #include "TransformBlock.h"
 
 #include <map>
+#include <numeric>
 
 static const int16_t Default_Scan_4x4[16] = {
     0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15
@@ -2075,6 +2076,32 @@ void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
     
 }
 
+#define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
+
+void TransformBlock::dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
+    const std::shared_ptr<YuvFrame>& frame)
+{
+    uint8_t avg;
+    int sum = 0;
+    if (haveLeft && haveAbove) {
+        sum = std::accumulate(LeftCol, LeftCol + h, sum);
+        sum = std::accumulate(AboveRow, AboveRow + w, sum);
+        avg = (uint8_t)((sum + ((w + h) >> 1)) / (w + h));
+    } else if (haveLeft) {
+        sum = std::accumulate(LeftCol, LeftCol + h, sum);
+        avg = CLIP1((sum + (h >> 1)) >> log2H);
+    } else if (haveAbove) {
+        sum = std::accumulate(AboveRow, AboveRow + w, sum);
+        avg = CLIP1((sum + (w >> 1)) >> log2W);
+    } else {
+        avg = (1 << (m_sequence.BitDepth - 1));
+    }
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            frame->setPixel(plane, x + j, y + i, avg);
+        }
+    }
+}
 void TransformBlock::predict_intra(int plane, int startX, int startY,
     int haveLeft, int haveAbove, bool haveAboveRight, bool haveBelowLeft,
     int mode, int log2W, int log2H, const std::shared_ptr<YuvFrame>& frame)
@@ -2089,12 +2116,12 @@ void TransformBlock::predict_intra(int plane, int startX, int startY,
     std::vector<uint8_t> aboveRow;
     aboveRow.resize(w + h + 1);
     AboveRow = &aboveRow[1];
-        
+
     std::vector<uint8_t> leftCol;
     leftCol.resize(w + h + 1);
     LeftCol = &leftCol[1];
 
-    uint8_t median = ( 1 << ( m_sequence.BitDepth - 1 ));
+    uint8_t median = (1 << (m_sequence.BitDepth - 1));
     if (!haveAbove && haveLeft) {
         std::fill(aboveRow.begin() + 1, aboveRow.end(), frame->getPixel(plane, x - 1, y));
     } else if (!haveAbove && !haveLeft) {
@@ -2110,7 +2137,7 @@ void TransformBlock::predict_intra(int plane, int startX, int startY,
     } else if (!haveAbove && !haveLeft) {
         std::fill(leftCol.begin() + 1, leftCol.end(), median + 1);
     } else {
-        int leftLimit = std::min(maxY, y + ( haveBelowLeft ? 2 * h : h ) - 1 );
+        int leftLimit = std::min(maxY, y + (haveBelowLeft ? 2 * h : h) - 1);
         for (int i = 0; i < w + h; i++) {
             LeftCol[i] = frame->getPixel(plane, x - 1, std::min(leftLimit, y + i));
         }
@@ -2126,6 +2153,8 @@ void TransformBlock::predict_intra(int plane, int startX, int startY,
     }
     if (mode == PAETH_PRED) {
         paethPredict(AboveRow, LeftCol, frame);
+    } else if (mode == DC_PRED) {
+        dcPredict(haveLeft, haveAbove, AboveRow, LeftCol, log2W, log2H, frame);
     } else {
         ASSERT(0 && "not PAETH_PRED");
     }
