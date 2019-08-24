@@ -470,6 +470,21 @@ namespace Av1 {
         Skips.assign(MiCols, std::vector<bool>(MiRows));
     }
 
+    bool FrameHeader::loop_filter_params(BitReader& br, const SequenceHeader& seq)
+    {
+        return m_loopFilter.parse(br, seq, *this);
+    }
+
+    bool FrameHeader::cdef_params(BitReader& br, const SequenceHeader& seq)
+    {
+        return m_cdef.parse(br, seq, *this);
+    }
+
+    bool FrameHeader::lr_params(BitReader& br, const SequenceHeader& seq)
+    {
+        return m_loopRestoration.parse(br, seq, *this);
+    }
+
     bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
     {
         const static uint8_t allFrames = (1 << NUM_REF_FRAMES) - 1;
@@ -626,10 +641,15 @@ namespace Av1 {
             }
             AllLossless = CodedLossless && (FrameWidth == UpscaledWidth);
         }
-
-        if (!m_loopFilter.parse(br, sequence, *this))
+        if (!loop_filter_params(br, sequence))
             return false;
-        /* lr_params() */
+        if (!cdef_params(br, sequence))
+            return false;
+        if (!lr_params(br, sequence))
+            return false;
+        if (!read_tx_mode(br))
+            return false;
+
         /* frame_reference_mode() */
         /* skip_mode_params() */
         if (FrameIsIntra || error_resilient_mode || !enable_warped_motion)
@@ -760,7 +780,7 @@ namespace Av1 {
         return true;
     }
 
-    bool FrameHeader::parseTxMode(BitReader& br)
+    bool FrameHeader::read_tx_mode(BitReader& br)
     {
         if (CodedLossless) {
             TxMode = ONLY_4X4;
@@ -1040,6 +1060,57 @@ namespace Av1 {
         }
         ASSERT(0);
         return false;
+    }
+    const static RestorationType Remap_Lr_Type[4] = {
+        RESTORE_NONE, RESTORE_SWITCHABLE, RESTORE_WIENER, RESTORE_SGRPROJ
+    };
+    const static int RESTORATION_TILESIZE_MAX = 256;
+    bool LoopRestoration::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
+    {
+        if (frame.AllLossless || frame.allow_intrabc ||
+            !seq.enable_restoration ) {
+            FrameRestorationType[0] = RESTORE_NONE;
+            FrameRestorationType[1] = RESTORE_NONE;
+            FrameRestorationType[2] = RESTORE_NONE;
+            UsesLr = false;
+            return true;
+        }
+        UsesLr = false;
+        bool usesChromaLr = false;
+        for (int i = 0; i < seq.NumPlanes; i++) {
+            uint8_t lr_type;
+            READ_BITS(lr_type, 2);
+            FrameRestorationType[i] = Remap_Lr_Type[lr_type];
+            if (FrameRestorationType[i] != RESTORE_NONE ) {
+                UsesLr = true;
+                if ( i > 0 ) {
+                    usesChromaLr = true;
+                }
+            }
+        }
+        if (UsesLr) {
+            uint8_t lr_unit_shift;
+            if (seq.use_128x128_superblock ) {
+                READ_BITS(lr_unit_shift, 1);
+                lr_unit_shift++;
+            } else {
+                READ_BITS(lr_unit_shift, 1);
+                if ( lr_unit_shift ) {
+                    uint8_t lr_unit_extra_shift;
+                    READ_BITS(lr_unit_extra_shift, 1);
+                    lr_unit_shift += lr_unit_extra_shift;
+                }
+            }
+            LoopRestorationSize[ 0 ] = RESTORATION_TILESIZE_MAX >> (2 - lr_unit_shift);
+            uint8_t lr_uv_shift;
+            if (seq.subsampling_x && seq.subsampling_y && usesChromaLr ) {
+                READ_BITS(lr_uv_shift, 1);
+            } else {
+                lr_uv_shift = 0;
+            }
+            LoopRestorationSize[ 1 ] = LoopRestorationSize[ 0 ] >> lr_uv_shift;
+            LoopRestorationSize[ 2 ] = LoopRestorationSize[ 0 ] >> lr_uv_shift;
+        }
     }
 }
 }

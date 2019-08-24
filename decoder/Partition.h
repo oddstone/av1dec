@@ -9,7 +9,7 @@ public:
     Partition(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     void parse();
     bool decode(std::shared_ptr<YuvFrame>& frame);
-private:
+protected:
     void parseBlock(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     void parseSubPartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     PARTITION_TYPE readPartitionType();

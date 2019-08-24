@@ -289,8 +289,17 @@ namespace Av1 {
         int8_t loop_filter_mode_deltas[LOOP_FILTER_MODE_DELTA_COUNT];
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
     };
+
     struct Cdef {
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+    };
+
+    struct LoopRestoration {
+        bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+        static const int MAX_PLANES = 3;
+        bool UsesLr;
+        RestorationType FrameRestorationType[MAX_PLANES];
+        int LoopRestorationSize[MAX_PLANES];
     };
 
     struct FrameHeader {
@@ -351,6 +360,8 @@ namespace Av1 {
         DeltaQ m_deltaQ;
         DeltaLf m_deltaLf;
         LoopFilter m_loopFilter;
+        Cdef m_cdef;
+        LoopRestoration m_loopRestoration;
 
         bool enable_warped_motion;
         bool allow_warped_motion;
@@ -390,7 +401,12 @@ namespace Av1 {
         bool parseTileInfo(BitReader& br, const SequenceHeader& sequence);
         bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
         bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
-        bool parseTxMode(BitReader& br);
+        bool loop_filter_params(BitReader& br, const SequenceHeader& sequence);
+        bool cdef_params(BitReader& br, const SequenceHeader& sequence);
+        bool lr_params(BitReader& br, const SequenceHeader& seq);
+        bool read_tx_mode(BitReader& br);
+        //bool frame_reference_mode();
+        //bool skip_mode_params( )
         void initGeometry();
         const static uint8_t SUPERRES_DENOM_MIN = 9;
         const static uint8_t SUPERRES_NUM = 8;
