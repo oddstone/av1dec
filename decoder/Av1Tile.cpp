@@ -1,6 +1,8 @@
 #include "Av1Tile.h"
 #include "Av1Parser.h"
+#include "Av1Common.h"
 #include "Block.h"
+#include "Superblock.h"
 #include "Partition.h"
 #include "SymbolDecoder.h"
 #include "VideoFrame.h"
@@ -193,6 +195,8 @@ bool Tile::parse(const uint8_t* data, uint32_t size)
 	}
 	}
 	*/
+
+	m_frame->m_loopRestoration.resetRefs(m_sequence->NumPlanes);
     BLOCK_SIZE sbSize = m_sequence->use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
     int sbSize4 = Num_4x4_Blocks_Wide[sbSize];
     for (uint32_t r = MiRowStart; r < MiRowEnd; r += sbSize4) {
@@ -205,9 +209,9 @@ bool Tile::parse(const uint8_t* data, uint32_t size)
             //read_lr(r, c, sbSize)
             //decode_partition(r, c, sbSize)
             //decodePartition(r, c, sbSize);
-            std::shared_ptr<Partition> p(new Partition(*this, r, c, sbSize));
-            p->parse();
-            m_partitions.push_back(p);
+            std::shared_ptr<SuperBlock> sb(new SuperBlock(*this, r, c, sbSize));
+            sb->parse();
+            m_sbs.push_back(sb);
         
         }
     }
@@ -226,8 +230,8 @@ void Tile::clear_left_context()
 
 bool Tile::decode(std::shared_ptr<YuvFrame>& frame)
 {
-    for (auto& p : m_partitions) {
-        if (!p->decode(frame))
+    for (auto& sb : m_sbs) {
+        if (!sb->decode(frame))
             return false;
     }
     return true;

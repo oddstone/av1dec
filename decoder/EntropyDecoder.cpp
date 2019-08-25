@@ -147,6 +147,21 @@ bool EntropyDecoder::readUseFilterIntra(BLOCK_SIZE bSize)
     return m_symbol->read(filter_intra_cdfs[bSize], 2);
 }
 
+FILTER_INTRA_MODE EntropyDecoder::readFilterIntraMode()
+{
+    return (FILTER_INTRA_MODE)m_symbol->read(filter_intra_mode_cdf, FILTER_INTRA_MODES);
+}
+
+uint8_t EntropyDecoder::readTxDepth(int maxTxDepth, uint8_t ctx)
+{
+    static const int MaxDepthToCat[] = { 0, 0, 1, 2, 3};
+    static const int Sizes[] = {1, 2, 2, 2, 2};
+    int cat = MaxDepthToCat[maxTxDepth];
+    int size = Sizes[maxTxDepth];
+    return (uint8_t)m_symbol->read(tx_size_cdf[cat][ctx], size);
+}
+
+
 bool EntropyDecoder::readAllZero(uint8_t txSzCtx, uint8_t ctx)
 {
     return (bool)m_symbol->read(txb_skip_cdf[txSzCtx][ctx], 2);
@@ -199,6 +214,11 @@ bool EntropyDecoder::readDcSign(PLANE_TYPE planeType, uint8_t ctx)
     return (bool)m_symbol->read(dc_sign_cdf[planeType][ctx], 2);
 }
 
+bool EntropyDecoder::readUseWiener()
+{
+    return (bool)m_symbol->read(wiener_restore_cdf, 2);
+}
+
 bool EntropyDecoder::readUe(uint32_t& v)
 {
     uint8_t len = 0;
@@ -227,4 +247,71 @@ uint32_t EntropyDecoder::readLiteral(uint32_t n)
         x = 2 * x + m_symbol->readBool();
     }
     return x;
+}
+
+static int inverse_recenter(int r, int v) {
+    if ( v > 2 * r )
+        return v;
+    else if ( v & 1 )
+        return r - ((v + 1) >> 1);
+    else
+        return r + (v >> 1);
+}
+int EntropyDecoder::decode_signed_subexp_with_ref_bool(int low, int high, int k, int r)
+{
+    int x = decode_unsigned_subexp_with_ref_bool(high - low, k, r - low);
+    return x + low;
+}
+
+int EntropyDecoder::decode_unsigned_subexp_with_ref_bool(int mx, int k, int r )
+{
+    int v = decode_subexp_bool(mx, k);
+    if ( (r << 1) <= mx ) {
+        return inverse_recenter(r, v);
+    } else {
+        return mx - 1 - inverse_recenter(mx - 1 - r, v);
+    }
+}
+
+int EntropyDecoder::decode_subexp_bool(int numSyms, int k)
+{
+    int i = 0;
+    int mk = 0;
+    while ( 1 ) {
+        int b2 = i ? k + i - 1 : k;
+        int a = 1 << b2;
+        if ( numSyms <= mk + 3 * a ) {
+            uint32_t subexp_unif_bools;
+            subexp_unif_bools = readNS(numSyms - mk);
+            return subexp_unif_bools + mk;
+        } else {
+            uint32_t subexp_more_bools = readLiteral(1);
+            if ( subexp_more_bools ) {
+                i++;
+                mk += a;
+            } else {
+                uint32_t subexp_bools = readLiteral(b2);
+                return subexp_bools + mk;
+            }
+        }
+    }
+}
+
+static int FloorLog2(int x) {
+    int s = 0;
+    while ( x != 0 ) {
+        x = x >> 1;
+        s++;
+    }
+    return s - 1;
+}
+
+uint32_t EntropyDecoder::readNS(int n)
+{
+    int w = FloorLog2(n) + 1;
+    int m = (1 << w) - n;
+    uint32_t v = readLiteral(w - 1);
+    if (v < m)
+        return v;
+    return (v << 1) - m + readLiteral(1);
 }

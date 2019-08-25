@@ -1,3 +1,4 @@
+#include "Av1Common.h"
 #include "Av1Parser.h"
 #include "Av1Tile.h"
 #include "Block.h"
@@ -1176,8 +1177,6 @@ static const int Ac_Qlookup[3][256] = {
         21902, 22334, 22766, 23214, 23662, 24126, 24590, 25070,
         25551, 26047, 26559, 27071, 27599, 28143, 28687, 29247 }
 };
-
-#define ROUND2(x, n) ((n == 0) ? x : ((x + (1 << (n - 1))) >> n))
 
 TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_SIZE txSize)
     : m_entropy(block.m_entropy)

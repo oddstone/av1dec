@@ -222,7 +222,7 @@ namespace Av1 {
     const static uint32_t MAX_TILE_ROWS = 64;
 
     struct Quantization {
-        uint32_t base_q_idx;
+        uint8_t base_q_idx;
         int8_t DeltaQYDc;
         int8_t DeltaQUDc;
         int8_t DeltaQUAc;
@@ -292,14 +292,39 @@ namespace Av1 {
 
     struct Cdef {
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+        void read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize);
+        const static int CDEF_SIZE = 8;
+        uint8_t CdefDamping;
+        uint8_t cdef_bits;
+        uint8_t cdef_y_pri_strength[CDEF_SIZE];
+        uint8_t cdef_y_sec_strength[CDEF_SIZE];
+        uint8_t cdef_uv_pri_strength[CDEF_SIZE];
+        uint8_t cdef_uv_sec_strength[CDEF_SIZE];
+
+        std::vector<std::vector<int>> cdef_idx;
     };
 
     struct LoopRestoration {
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+        void read_lr(Tile& tile,    int r, int c, BLOCK_SIZE bSize);
+        void resetRefs(int NumPlanes);
+
         static const int MAX_PLANES = 3;
+        static const int MAX_PASSES = 2;
+        static const int MAX_WIENER_COEFFS = 3;
+
         bool UsesLr;
         RestorationType FrameRestorationType[MAX_PLANES];
         int LoopRestorationSize[MAX_PLANES];
+
+        std::vector<std::vector<std::vector<RestorationType>>> LrType;
+        std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>> LrWiener;
+        std::vector<std::vector<std::vector<uint8_t>>> RefLrWiener;
+    private:
+        void read_lr_unit(EntropyDecoder& entropy,
+            int plane, int unitRow, int unitCol);
+        int unitRows;
+        int unitCols;
     };
 
     struct FrameHeader {
@@ -381,12 +406,14 @@ namespace Av1 {
         std::vector<std::vector<bool>> IsInters;
         //SkipModes[r + y][c + x] = skip_mode
         std::vector<std::vector<bool>> Skips;
+        std::vector<std::vector<TX_SIZE>> InterTxSizes;
         std::vector<std::vector<TX_SIZE>> TxSizes;
         std::vector<std::vector<BLOCK_SIZE>> MiSizes;
         std::vector<std::vector<uint8_t>> SegmentIds;
         //std::vector<std::vector<uint32_t>> PaletteSizes[2];
         //PaletteColors
         //DeltaLFs
+        const static uint8_t SUPERRES_NUM = 8;
 
 
         FrameHeader();
@@ -409,7 +436,7 @@ namespace Av1 {
         //bool skip_mode_params( )
         void initGeometry();
         const static uint8_t SUPERRES_DENOM_MIN = 9;
-        const static uint8_t SUPERRES_NUM = 8;
+
         const static uint8_t SUPERRES_DENOM_BITS = 3;
         const static uint8_t TX_MODES = 3;
     };

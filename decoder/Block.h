@@ -67,8 +67,12 @@ private:
     BLOCK_SIZE get_plane_residual_size(int subsize, int plane);
     bool is_tx_type_in_set(TxSet txSet, TX_TYPE txType);
     TX_TYPE compute_tx_type(int plane, TX_SIZE txSz, int blockX, int blockY);
+    int get_above_tx_width(uint32_t row, uint32_t col);
+    int get_left_tx_height(uint32_t         row, uint32_t col);
+    uint8_t getTxDepthCtx(TX_SIZE maxRectTxSize);
     TX_SIZE get_tx_size(int plane, TX_SIZE txSz);
     TxSet get_tx_set(TX_SIZE txSz);
+
 
     void predict_intra(int plane, int startX, int startY,
         int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
@@ -106,8 +110,8 @@ private:
     uint32_t PaletteSizeY = 0;
     uint32_t PaletteSizeUV = 0;
     bool use_filter_intra;
+    FILTER_INTRA_MODE filter_intra_mode;
     TX_SIZE TxSize;
-    TX_SIZE InterTxSizes[BLOCK_SIZES][BLOCK_SIZES];
     int RefFrame[2];
     uint32_t sbMask;
 

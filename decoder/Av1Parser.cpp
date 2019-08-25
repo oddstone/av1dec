@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "Av1Parser.h"
+#include "Av1Common.h"
 #include "SymbolDecoder.h"
 #include "log.h"
 
@@ -73,6 +74,9 @@
             return false;                        \
         }                                        \
     } while (0)
+#ifndef ROUND2
+#define ROUND2(x, n) ((n == 0) ? x : ((x + (1 << (n - 1))) >> n))
+#endif
 
 namespace YamiParser {
 namespace Av1 {
@@ -462,12 +466,13 @@ namespace Av1 {
 
     void FrameHeader::initGeometry()
     {
-        TxTypes.assign(MiCols, std::vector<TX_TYPE>(MiRows));
-        IsInters.assign(MiCols, std::vector<bool>(MiRows));
-        TxSizes.assign(MiCols, std::vector<TX_SIZE>(MiRows));
-        MiSizes.assign(MiCols, std::vector<BLOCK_SIZE>(MiRows));
-        SegmentIds.assign(MiCols, std::vector<uint8_t>(MiRows));
-        Skips.assign(MiCols, std::vector<bool>(MiRows));
+        TxTypes.assign(MiRows, std::vector<TX_TYPE>(MiCols));
+        IsInters.assign(MiRows, std::vector<bool>(MiCols));
+        InterTxSizes.assign(MiRows, std::vector<TX_SIZE>(MiCols));
+        TxSizes.assign(MiRows, std::vector<TX_SIZE>(MiCols));
+        MiSizes.assign(MiRows, std::vector<BLOCK_SIZE>(MiCols));
+        SegmentIds.assign(MiRows, std::vector<uint8_t>(MiCols));
+        Skips.assign(MiRows, std::vector<bool>(MiCols));
     }
 
     bool FrameHeader::loop_filter_params(BitReader& br, const SequenceHeader& seq)
@@ -884,7 +889,6 @@ namespace Av1 {
 
     bool Quantization::parse(BitReader& br, const SequenceHeader& seq)
     {
-        uint8_t base_q_idx;
         READ(base_q_idx);
         READ_DELTA_Q(DeltaQYDc);
         if (seq.NumPlanes > 1) {
@@ -1018,7 +1022,6 @@ namespace Av1 {
             }
             return true;
         }
-        ASSERT(0);
         READ_BITS(loop_filter_level[0], 6);
         READ_BITS(loop_filter_level[1], 6);
         if (seq.NumPlanes > 1) {
@@ -1054,17 +1057,60 @@ namespace Av1 {
 
     bool Cdef::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
     {
+        cdef_idx.assign(frame.MiRows, std::vector<int>(frame.MiCols, -1));
         if (frame.CodedLossless || frame.allow_intrabc || !seq.enable_cdef) {
-            /* TODO*/
+            cdef_bits = 0;
+            cdef_y_pri_strength[0] = 0;
+            cdef_y_sec_strength[0] = 0;
+            cdef_uv_pri_strength[0] = 0;
+            cdef_uv_sec_strength[0] = 0;
+            CdefDamping = 3;
             return true;
         }
-        ASSERT(0);
-        return false;
+        uint8_t cdef_damping_minus_3;
+        READ_BITS(cdef_damping_minus_3, 2);
+        CdefDamping = cdef_damping_minus_3 + 3;
+        READ_BITS(cdef_bits, 2);
+        for (int i = 0; i < (1 << cdef_bits); i++) {
+            READ_BITS(cdef_y_pri_strength[i], 4);
+            READ_BITS(cdef_y_sec_strength[i], 2);
+            if (cdef_y_sec_strength[i] == 3)
+                cdef_y_sec_strength[i] += 1;
+            if (seq.NumPlanes > 1) {
+                READ_BITS(cdef_uv_pri_strength[i], 4);
+                READ_BITS(cdef_uv_sec_strength[i], 2);
+                if (cdef_uv_sec_strength[i] == 3)
+                    cdef_uv_sec_strength[i] += 1;
+            }
+        }
+        return true;
+    }
+    void Cdef::read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize)
+    {
+        uint32_t cdefSize4 = Num_4x4_Blocks_Wide[ BLOCK_64X64 ];
+        uint32_t cdefMask4 = ~(cdefSize4 - 1);
+        int r = MiRow & cdefMask4;
+        int c = MiCol & cdefMask4;
+        if ( cdef_idx[ r ][ c ] == -1 ) {
+            uint32_t idx = entropy.readLiteral(cdef_bits);
+            int w4 = Num_4x4_Blocks_Wide[ MiSize ];
+            int h4 = Num_4x4_Blocks_High[ MiSize ];
+            for (int i = r; i < r + h4 ; i += cdefSize4 ) {
+                for (int j = c; j < c + w4 ; j += cdefSize4 ) {
+                    cdef_idx[ i ][ j ] = idx;
+                }
+            }
+        }
     }
     const static RestorationType Remap_Lr_Type[4] = {
         RESTORE_NONE, RESTORE_SWITCHABLE, RESTORE_WIENER, RESTORE_SGRPROJ
     };
     const static int RESTORATION_TILESIZE_MAX = 256;
+
+    static int count_units_in_frame(int unitSize, int frameSize) {
+        return std::max((frameSize + (unitSize >> 1)) / unitSize, 1);
+    }
+
     bool LoopRestoration::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
     {
         if (frame.AllLossless || frame.allow_intrabc ||
@@ -1110,6 +1156,117 @@ namespace Av1 {
             }
             LoopRestorationSize[ 1 ] = LoopRestorationSize[ 0 ] >> lr_uv_shift;
             LoopRestorationSize[ 2 ] = LoopRestorationSize[ 0 ] >> lr_uv_shift;
+
+            LrType.resize(seq.NumPlanes);
+            LrWiener.resize(seq.NumPlanes);
+            RefLrWiener.resize(seq.NumPlanes);
+            for (int plane = 0; plane < seq.NumPlanes; plane++ ) {
+                if ( FrameRestorationType[ plane ] != RESTORE_NONE ) {
+                    int subX = (plane == 0) ? 0 : seq.subsampling_x;
+                    int subY = (plane == 0) ? 0 : seq.subsampling_y;
+                    int unitSize = LoopRestorationSize[ plane ];
+                    unitRows = count_units_in_frame( unitSize, ROUND2(frame.FrameHeight, subY) );
+                    unitCols = count_units_in_frame( unitSize, ROUND2(frame.UpscaledWidth, subX) );
+                    LrType[plane].assign(unitRows, std::vector<RestorationType>(unitCols));
+                    std::vector<std::vector<uint8_t>> v1(MAX_PASSES, std::vector<uint8_t>(MAX_WIENER_COEFFS));
+                    std::vector<std::vector<std::vector<uint8_t>>> v2(unitCols, v1);
+                    LrWiener[plane].assign(unitRows, v2);
+                    RefLrWiener[plane].assign(MAX_PASSES, std::vector<uint8_t>(MAX_WIENER_COEFFS));
+                }
+            }
+        }
+        return true;
+    }
+    void LoopRestoration::read_lr(Tile& tile,
+        int r, int c, BLOCK_SIZE bSize)
+    {
+        FrameHeader& frame = *tile.m_frame;
+        SequenceHeader seq = *tile.m_sequence;
+        if (frame.allow_intrabc) {
+            return;
+        }
+        int w = Num_4x4_Blocks_Wide[bSize];
+        int h = Num_4x4_Blocks_High[bSize];
+        for (int plane = 0; plane < seq.NumPlanes; plane++ ) {
+            if ( FrameRestorationType[ plane ] != RESTORE_NONE ) {
+                int subX = (plane == 0) ? 0 : seq.subsampling_x;
+                int subY = (plane == 0) ? 0 : seq.subsampling_y;
+                int unitSize = LoopRestorationSize[ plane ];
+                int unitRowStart = ( r * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize;
+                int unitRowEnd = std::min( unitRows, ( (r + h) * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize);
+                int numerator;
+                int denominator;
+                if (frame.use_superres ) {
+                    numerator = (MI_SIZE >> subX) * frame.SuperresDenom;
+                    denominator = unitSize * FrameHeader::SUPERRES_NUM;
+                } else {
+                    numerator = MI_SIZE >> subX;
+                    denominator = unitSize;
+                }
+                int unitColStart = (c * numerator + denominator - 1 ) / denominator;
+                int unitColEnd = std::min( unitCols, ( (c + w) * numerator + denominator - 1 ) / denominator);
+                for (int unitRow = unitRowStart; unitRow < unitRowEnd; unitRow++ ) {
+                    for (int unitCol = unitColStart; unitCol < unitColEnd; unitCol++ ) {
+                        read_lr_unit(*tile.m_entropy, plane, unitRow, unitCol);
+                    }
+                }
+            }
+        }
+    }
+
+    static const int Wiener_Taps_Min[3] = { -5, -23, -17 };
+    static const int Wiener_Taps_Max[3] = { 10, 8, 46 };
+    static const int Wiener_Taps_K[3] = { 1, 2, 3 };
+    static const int Wiener_Taps_Mid[3] = { 3, -7, 15 };
+    void LoopRestoration::read_lr_unit(EntropyDecoder& entropy,
+        int plane, int unitRow, int unitCol)
+    {
+        RestorationType restoration_type;
+        if ( FrameRestorationType[ plane ] == RESTORE_WIENER ) {
+            bool use_wiener = entropy.readUseWiener();
+            restoration_type = use_wiener ? RESTORE_WIENER : RESTORE_NONE;
+        } else if ( FrameRestorationType[ plane ] == RESTORE_SGRPROJ ) {
+            ASSERT(0);
+        } else {
+            ASSERT(0);
+        }
+        LrType[plane][unitRow][unitCol] = restoration_type;
+        int firstCoeff;
+        if (restoration_type == RESTORE_WIENER ) {
+            for (int pass = 0; pass < MAX_PASSES; pass++ ) {
+                if ( plane ) {
+                    firstCoeff = 1;
+                    LrWiener[plane][unitRow][unitCol][pass][0] = 0;
+                } else {
+                    firstCoeff = 0;
+                }
+                for (int j = firstCoeff; j < MAX_WIENER_COEFFS; j++ ) {
+                    int min = Wiener_Taps_Min[ j ];
+                    int max = Wiener_Taps_Max[ j ];
+                    int k = Wiener_Taps_K[ j ];
+                    int v = entropy.decode_signed_subexp_with_ref_bool(min, max + 1, k, RefLrWiener[plane][pass][j]);
+                    LrWiener[plane][unitRow][unitCol ][ pass ][ j ] = v;
+                    RefLrWiener[ plane ][ pass ][ j ] = v;
+                }
+            }
+        } else if ( restoration_type == RESTORE_SGRPROJ ) {
+            ASSERT(0);
+        } else {
+            ASSERT(0);
+        }
+
+    }
+    void LoopRestoration::resetRefs(int NumPlanes)
+    {
+        for (int plane = 0; plane < NumPlanes; plane++ ) {
+            if (FrameRestorationType[plane] != RESTORE_NONE) {
+                for (int pass = 0; pass < MAX_PASSES; pass++ ) {
+                    //RefSgrXqd[ plane ][ pass ] = Sgrproj_Xqd_Mid[ pass ]
+                    for (int i = 0; i < MAX_WIENER_COEFFS; i++ ) {
+                        RefLrWiener[plane][pass][i] = Wiener_Taps_Mid[i];
+                    }
+                }
+            }
         }
     }
 }

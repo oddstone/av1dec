@@ -19,6 +19,8 @@ public:
     UV_PREDICTION_MODE readUvMode(CFL_ALLOWED_TYPE cfl_allowed, PREDICTION_MODE y_mode);
     uint8_t readAngleDeltaUV(UV_PREDICTION_MODE uvMode);
     bool readUseFilterIntra(BLOCK_SIZE bSize);
+    FILTER_INTRA_MODE readFilterIntraMode();
+    uint8_t readTxDepth(int maxTxDepth, uint8_t ctx);
     bool readAllZero(uint8_t txSzCtx, uint8_t ctx);
     uint8_t readEobPt(uint8_t eobMultisize, PLANE_TYPE planeType, uint8_t ctx);
     bool readEobExtra(TX_SIZE txSzCtx, PLANE_TYPE ptype, int eobPt);
@@ -26,12 +28,17 @@ public:
     uint8_t readCoeffBase(uint8_t txSzCtx, PLANE_TYPE planeType, uint8_t ctx);
     uint8_t readCoeffBr(uint8_t minTx, PLANE_TYPE planeType, uint8_t ctx);
     bool readDcSign(PLANE_TYPE planeType, uint8_t ctx);
+    bool readUseWiener();
     bool readUe(uint32_t& v);
     uint32_t readLiteral(uint32_t n);
+    int decode_signed_subexp_with_ref_bool(int low, int high, int k, int r);
 
 private:
     void initCoefCdf(uint32_t baseQ);
     uint8_t getPartitionCdfCount(uint8_t bsl);
+    int decode_unsigned_subexp_with_ref_bool(int mx, int k, int r );
+    int decode_subexp_bool(int numSyms, int k);
+    uint32_t readNS(int n);
     std::unique_ptr<YamiParser::Av1::SymbolDecoder> m_symbol;
 
     aom_cdf_prob txb_skip_cdf[TX_SIZES][TXB_SKIP_CONTEXTS][CDF_SIZE(2)];

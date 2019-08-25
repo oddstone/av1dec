@@ -13,6 +13,7 @@ namespace Av1 {
         ~SymbolDecoder();
         uint8_t read(uint16_t* icdf, uint8_t nicdf);
         uint8_t readBool();
+        uint32_t readNS();
 
     private:
         uint8_t read(uint16_t* icdf, uint8_t nicdf, bool disableUpdate);

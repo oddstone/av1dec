@@ -1,4 +1,5 @@
 #include "Partition.h"
+#include "Av1Common.h"
 #include "Av1Parser.h"
 #include "Block.h"
 #include "VideoFrame.h"

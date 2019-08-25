@@ -1,3 +1,6 @@
+#ifndef TransformBlock_h
+#define TransformBlock_h
+
 #include "Block.h"
 
 enum TxClass {
@@ -91,3 +94,4 @@ private:
     bool flipLR;
     int m_eob;
 };
+#endif

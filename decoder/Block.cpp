@@ -1,4 +1,5 @@
 #include "Block.h"
+#include "Av1Common.h"
 #include "Av1Parser.h"
 #include "Av1Tile.h"
 #include "SymbolDecoder.h"
@@ -23,9 +24,9 @@ Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
     , subsampling_y(m_sequence.subsampling_y)
 {
     if (bh4 == 1 && subsampling_y && (MiRow & 1) == 0)
-        HasChroma = true;
+        HasChroma = false;
     else if (bw4 == 1 && subsampling_x && (MiCol & 1) == 0)
-        HasChroma = true;
+        HasChroma = false;
     else
         HasChroma = m_sequence.NumPlanes > 1;
     AvailU = tile.is_inside(r - 1, c);
@@ -322,9 +323,9 @@ bool Block::readSkip()
 
 void Block::readCdef()
 {
-    if (m_frame.CodedLossless)
+    if (skip || m_frame.CodedLossless || !m_sequence.enable_cdef || m_frame.allow_intrabc)
         return;
-    ASSERT(0 && "readCdef");
+    m_frame.m_cdef.read_cdef(m_entropy, MiRow, MiCol, MiSize);
 }
 
 void Block::read_delta_qindex(bool readDeltas)
@@ -405,7 +406,7 @@ void Block::filter_intra_mode_info()
     if (m_sequence.enable_filter_intra && YMode == DC_PRED && PaletteSizeY == 0 && std::max(bw4, bh4) <= 8) {
         use_filter_intra = m_entropy.readUseFilterIntra(MiSize);
         if (use_filter_intra) {
-            ASSERT(0);
+            filter_intra_mode = m_entropy.readFilterIntraMode();
         }
     }
 }
@@ -489,6 +490,54 @@ void Block::mode_info()
         inter_frame_mode_info();
 }
 
+int Block::get_above_tx_width(uint32_t row, uint32_t col)
+{
+    if ( row == MiRow ) {
+        if ( !AvailU ) {
+            return 64;
+        } else if (m_frame.Skips[row - 1][col] && m_frame.IsInters[row - 1][col]) {
+            return Block_Width[m_frame.MiSizes[row - 1][col]];
+        }
+    }
+    return Tx_Width[m_frame.InterTxSizes[row - 1][col]];
+}
+
+int Block::get_left_tx_height(uint32_t row, uint32_t col )
+{
+    if ( col == MiCol ) {
+        if ( !AvailL ) {
+            return 64;
+        } else if (m_frame.Skips[ row ][ col - 1 ] && m_frame.IsInters[ row ][ col - 1 ] ) {
+            return Block_Height[m_frame.MiSizes[row][col - 1]];
+        }
+    }
+    return Tx_Height[m_frame.InterTxSizes[row][col - 1]];
+}
+
+uint8_t Block::getTxDepthCtx(TX_SIZE maxRectTxSize)
+{
+    int maxTxWidth = Tx_Width[maxRectTxSize];
+    int maxTxHeight = Tx_Height[maxRectTxSize];
+    int aboveW;
+    if (AvailU && m_frame.IsInters[MiRow - 1][MiCol]) {
+        aboveW = Block_Width[m_frame.MiSizes[MiRow - 1][MiCol]];
+    } else if (AvailU) {
+        aboveW = get_above_tx_width(MiRow, MiCol);
+    } else {
+        aboveW = 0;
+    }
+    int leftH;
+    if (AvailL && m_frame.IsInters[MiRow][MiCol - 1]) {
+        leftH = Block_Height[m_frame.MiSizes[MiRow][MiCol - 1]];
+    } else if (AvailL) {
+        leftH = get_left_tx_height(MiRow, MiCol);
+    } else {
+        leftH = 0;
+    }
+    int ctx = (aboveW >= maxTxWidth) + (leftH >= maxTxHeight);
+    return ctx;
+}
+
 void Block::read_tx_size(bool allowSelect)
 {
     if (Lossless) {
@@ -499,11 +548,9 @@ void Block::read_tx_size(bool allowSelect)
     int maxTxDepth = Max_Tx_Depth[MiSize];
     TxSize = maxRectTxSize;
     if (MiSize > BLOCK_4X4 && allowSelect && m_frame.TxMode == TX_MODE_SELECT) {
-        ASSERT(0);
-        //tx_depth;
-        /*for (int i = 0; i < tx_depth; i++ )
-			TxSize = Split_Tx_Size[ TxSize ];
-		}*/
+        uint8_t tx_depth = m_entropy.readTxDepth(maxTxDepth, getTxDepthCtx(maxRectTxSize));
+        for (uint8_t i = 0; i < tx_depth; i++)
+            TxSize = Split_Tx_Size[TxSize];
     }
 }
 
@@ -515,7 +562,7 @@ void Block::read_block_tx_size()
         read_tx_size(!skip || !is_inter);
         for (int row = MiRow; row < MiRow + bh4; row++) {
             for (int col = MiCol; col < MiCol + bw4; col++)
-                InterTxSizes[row][col] = TxSize;
+                m_frame.InterTxSizes[row][col] = TxSize;
         }
     }
 }

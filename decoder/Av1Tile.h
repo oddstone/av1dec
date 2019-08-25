@@ -133,6 +133,7 @@ const static uint8_t Mi_Height_Log2[BLOCK_SIZES_ALL] = {
 		} ;
 		*/
 class Tile;
+class SuperBlock;
 
 class BlockDecoded {
 public:
@@ -178,6 +179,10 @@ public:
     bool parse(const uint8_t* data, uint32_t size);
     bool decode(std::shared_ptr<YuvFrame>& frame);
 
+    std::shared_ptr<FrameHeader> m_frame;
+    std::shared_ptr<const SequenceHeader> m_sequence;
+    std::unique_ptr<EntropyDecoder> m_entropy;
+
 private:
     //bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     bool decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
@@ -188,14 +193,12 @@ private:
     void clear_above_context();
     void clear_left_context();
 
-    std::shared_ptr<FrameHeader> m_frame;
-    std::shared_ptr<const SequenceHeader> m_sequence;
-    std::unique_ptr<EntropyDecoder> m_entropy;
+
     BlockDecoded m_decoded;
 
     BlockContext m_above;
     BlockContext m_left;
-    std::deque<std::shared_ptr<Partition>> m_partitions;
+    std::deque<std::shared_ptr<SuperBlock>> m_sbs;
 
     //uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
     //uint16_t m_skipCdf[SKIP_CONTEXTS][3];
