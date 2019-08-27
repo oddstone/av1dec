@@ -56,6 +56,7 @@ private:
         const std::shared_ptr<YuvFrame>& frame);
     void dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
         const std::shared_ptr<YuvFrame>& frame);
+    PREDICTION_MODE getIntraDir();
 
     EntropyDecoder& m_entropy;
     Block& m_block;

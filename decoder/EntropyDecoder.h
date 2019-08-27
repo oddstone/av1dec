@@ -7,6 +7,7 @@
 #include "../aom/prob.h"
 #include "../aom/seg_common.h"
 #include "SymbolDecoder.h"
+#include "Av1Common.h"
 #include <memory>
 
 class EntropyDecoder {
@@ -21,6 +22,7 @@ public:
     bool readUseFilterIntra(BLOCK_SIZE bSize);
     FILTER_INTRA_MODE readFilterIntraMode();
     uint8_t readTxDepth(int maxTxDepth, uint8_t ctx);
+    uint8_t readIntraTxType(TxSet set, TX_SIZE txSzSqr, PREDICTION_MODE intraDir);
     bool readAllZero(uint8_t txSzCtx, uint8_t ctx);
     uint8_t readEobPt(uint8_t eobMultisize, PLANE_TYPE planeType, uint8_t ctx);
     bool readEobExtra(TX_SIZE txSzCtx, PLANE_TYPE ptype, int eobPt);

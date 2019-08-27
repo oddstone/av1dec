@@ -21,16 +21,6 @@ using namespace YamiParser::Av1;
 
 struct YuvFrame;
 
-
-enum TxSet {
-    TX_SET_DCTONLY = 0,
-    TX_SET_INTRA_1,
-    TX_SET_INTRA_2,
-    TX_SET_INTER_1 = 1,
-    TX_SET_INTER_2,
-    TX_SET_INTER_3,
-};
-
 class Block    : public BlockTree {
     friend class TransformBlock;
 

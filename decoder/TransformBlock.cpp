@@ -834,49 +834,6 @@ static const int16_t Default_Scan_32x32[1024] = {
     927, 958, 989, 1020, 1021, 990, 959, 991, 1022, 1023
 };
 
-TX_SIZE Tx_Size_Sqr[TX_SIZES_ALL] = {
-    TX_4X4,
-    TX_8X8,
-    TX_16X16,
-    TX_32X32,
-    TX_64X64,
-    TX_4X4,
-    TX_4X4,
-    TX_8X8,
-    TX_8X8,
-    TX_16X16,
-    TX_16X16,
-    TX_32X32,
-    TX_32X32,
-    TX_4X4,
-    TX_4X4,
-    TX_8X8,
-    TX_8X8,
-    TX_16X16,
-    TX_16X16
-};
-
-TX_SIZE Tx_Size_Sqr_Up[TX_SIZES_ALL] = {
-    TX_4X4,
-    TX_8X8,
-    TX_16X16,
-    TX_32X32,
-    TX_64X64,
-    TX_8X8,
-    TX_8X8,
-    TX_16X16,
-    TX_16X16,
-    TX_32X32,
-    TX_32X32,
-    TX_64X64,
-    TX_64X64,
-    TX_16X16,
-    TX_16X16,
-    TX_32X32,
-    TX_32X32,
-    TX_64X64,
-    TX_64X64
-};
 
 #define SIG_REF_DIFF_OFFSET_NUM 5
 
@@ -1308,13 +1265,38 @@ void TransformBlock::transform_type(TX_TYPE type)
     }
 }
 
+PREDICTION_MODE TransformBlock::getIntraDir()
+{
+    const static PREDICTION_MODE Filter_Intra_Mode_To_Intra_Dir[] = {
+        DC_PRED, V_PRED, H_PRED, D157_PRED, DC_PRED
+    };
+    if (m_block.use_filter_intra)
+        return Filter_Intra_Mode_To_Intra_Dir[m_block.filter_intra_mode];
+    return m_block.YMode;
+
+}
+TX_TYPE Tx_Type_Intra_Inv_Set1[7] = { IDTX, DCT_DCT, V_DCT, H_DCT, ADST_ADST, ADST_DCT, DCT_ADST };
+
+TX_TYPE Tx_Type_Intra_Inv_Set2[5] = { IDTX, DCT_DCT, ADST_ADST, ADST_DCT, DCT_ADST };
+
+TX_TYPE Tx_Type_Inter_Inv_Set1[16] = { IDTX, V_DCT, H_DCT, V_ADST, H_ADST, V_FLIPADST, H_FLIPADST,
+DCT_DCT, ADST_DCT, DCT_ADST, FLIPADST_DCT, DCT_FLIPADST, ADST_ADST,
+FLIPADST_FLIPADST, ADST_FLIPADST, FLIPADST_ADST };
+
+TX_TYPE Tx_Type_Inter_Inv_Set2[12] = { IDTX, V_DCT, H_DCT, DCT_DCT, ADST_DCT, DCT_ADST, FLIPADST_DCT,
+DCT_FLIPADST, ADST_ADST, FLIPADST_FLIPADST, ADST_FLIPADST,
+FLIPADST_ADST };
+
+TX_TYPE Tx_Type_Inter_Inv_Set3[2] = { IDTX, DCT_DCT };
+
 void TransformBlock::transform_type()
 {
     TxSet set = get_tx_set();
     TX_TYPE TxType;
     if (set > 0 && m_block.get_q_idx() > 0) {
-        ASSERT(0 && "inter_tx_type");
-        /*if ( is_inter ) {
+        if (m_block.is_inter ) {
+            ASSERT(0 && "inter_tx_type");
+            /*
 			//inter_tx_type
 			if ( set == TX_SET_INTER_1 )
 				TxType = Tx_Type_Inter_Inv_Set1[ inter_tx_type ];
@@ -1322,13 +1304,14 @@ void TransformBlock::transform_type()
 				TxType = Tx_Type_Inter_Inv_Set2[ inter_tx_type ];
 			else
 				TxType = Tx_Type_Inter_Inv_Set3[ inter_tx_type ];
+                */
 		} else {
-			//intra_tx_type S()
+            uint8_t intra_tx_type = m_entropy.readIntraTxType(set, txSz, getIntraDir());
 			if ( set == TX_SET_INTRA_1 )
 				TxType = Tx_Type_Intra_Inv_Set1[ intra_tx_type ];
 			else
 				TxType = Tx_Type_Intra_Inv_Set2[ intra_tx_type ];
-		}*/
+		}
     } else {
         TxType = DCT_DCT;
     }
