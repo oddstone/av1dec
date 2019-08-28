@@ -1151,8 +1151,6 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
     , txSzSqr(Tx_Size_Sqr[txSz])
     , txSzSqrUp(Tx_Size_Sqr_Up[txSz])
     , txSzCtx((TX_SIZE)((txSzSqr + txSzSqrUp + 1) >> 1))
-    , PlaneTxType(compute_tx_type())
-    , txClass(get_tx_class())
     , log2W(Tx_Width_Log2[txSz])
     , log2H(Tx_Height_Log2[txSz])
     , w(Tx_Width[txSz])
@@ -1306,12 +1304,12 @@ void TransformBlock::transform_type()
 				TxType = Tx_Type_Inter_Inv_Set3[ inter_tx_type ];
                 */
 		} else {
-            uint8_t intra_tx_type = m_entropy.readIntraTxType(set, txSz, getIntraDir());
-			if ( set == TX_SET_INTRA_1 )
-				TxType = Tx_Type_Intra_Inv_Set1[ intra_tx_type ];
-			else
-				TxType = Tx_Type_Intra_Inv_Set2[ intra_tx_type ];
-		}
+            uint8_t intra_tx_type = m_entropy.readIntraTxType(set, txSzSqr, getIntraDir());
+            if ( set == TX_SET_INTRA_1 )
+                TxType = Tx_Type_Intra_Inv_Set1[ intra_tx_type ];
+            else
+                TxType = Tx_Type_Intra_Inv_Set2[ intra_tx_type ];
+        }
     } else {
         TxType = DCT_DCT;
     }
@@ -1647,6 +1645,8 @@ int TransformBlock::coeffs()
         if (plane == 0) {
             transform_type();
         }
+        PlaneTxType = compute_tx_type();
+        txClass = get_tx_class();
         const int16_t* scan = get_scan();
         int eobMultisize = std::min(log2W, 5) + std::min(log2H, 5) - 4;
         eob = getEob(eobMultisize);
@@ -1981,7 +1981,7 @@ uint8_t TransformBlock::getAllZeroCtx()
             ctx = 2 + (std::max(top, left) > 3);
         } else if (std::max(top, left) <= 3) {
             ctx = 4;
-        } else if (std::max(top, left) <= 3) {
+        } else if (std::min(top, left) <= 3) {
             ctx = 5;
         } else {
             ctx = 6;

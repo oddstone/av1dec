@@ -165,8 +165,8 @@ uint8_t EntropyDecoder::readIntraTxType(TxSet set, TX_SIZE txSzSqr, PREDICTION_M
 {
     ASSERT(set == TX_SET_INTRA_1 || set == TX_SET_INTRA_2);
     if (set == TX_SET_INTRA_1)
-        return (uint8_t)m_symbol->read(intra_ext_tx_cdf[0][txSzSqr][intraDir], 7);
-    return (uint8_t)m_symbol->read(intra_ext_tx_cdf[1][txSzSqr][intraDir], 5);
+        return (uint8_t)m_symbol->read(intra_ext_tx_cdf[1][txSzSqr][intraDir], 7);
+    return (uint8_t)m_symbol->read(intra_ext_tx_cdf[2][txSzSqr][intraDir], 5);
 
 }
 

@@ -54,6 +54,8 @@ namespace Av1 {
         uint8_t symbol = -1;
         uint16_t prev;
         uint8_t N = nicdf - 1;
+        //if (SymbolRange == 35888)
+        //    printf("%d\r\n", SymbolRange);
         do {
             symbol++;
             prev = cur;

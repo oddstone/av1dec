@@ -257,13 +257,15 @@ void Block::parse()
     if (skip)
         reset_block_context();
     bool isCompund = RefFrame[1] > INTRA_FRAME;
-    /*
-		for ( y = 0; y < bh4; y++ ) {
-		for ( x = 0; x < bw4; x++ ) {
-		YModes [ r + y ][ c + x ] = YMode
-		if ( RefFrame[ 0 ] == INTRA_FRAME && HasChroma )
-		UVModes [ r + y ][ c + x ] = UVMode
-		for ( refList = 0; refList < 2; refList++ )
+
+    uint32_t r = MiRow;
+    uint32_t c = MiCol;
+    for (int y = 0; y < bh4; y++ ) {
+        for (int x = 0; x < bw4; x++ ) {
+            m_frame.YModes[r + y][c + x] = YMode;
+            if (RefFrame[0] == INTRA_FRAME && HasChroma)
+                m_frame.UVModes[r + y][c + x] = UVMode;
+        /*for ( refList = 0; refList < 2; refList++ )
 		RefFrames[ r + y ][ c + x ][ refList ] = RefFrame[ refList ]
 		if ( is_inter ) {
 		if ( !use_intrabc ) {
@@ -276,14 +278,12 @@ void Block::parse()
 		for ( refList = 0; refList < 1 + isCompound; refList++ ) {
 		Mvs[ r + y ][ c + x ][ refList ] = Mv[ refList ]
 		}
-		}
+		}*/
 		}
 	}
-	*/
+
     compute_prediction();
     residual();
-    uint32_t r = MiRow;
-    uint32_t c = MiCol;
     for (int y = 0; y < bh4; y++) {
         for (int x = 0; x < bw4; x++) {
             m_frame.IsInters[r + y][c + x] = is_inter;
@@ -350,8 +350,8 @@ PREDICTION_MODE Block::intra_frame_y_mode()
     uint8_t Intra_Mode_Context[INTRA_MODES] = {
         0, 1, 2, 3, 4, 4, 4, 4, 3, 0, 1, 2, 0
     };
-    PREDICTION_MODE above = DC_PRED;
-    PREDICTION_MODE left = DC_PRED;
+    PREDICTION_MODE above = AvailU ? m_frame.YModes[MiRow - 1][MiCol] :DC_PRED;
+    PREDICTION_MODE left = AvailL ? m_frame.YModes[MiRow][MiCol - 1] : DC_PRED;
     uint8_t aboveCtx = Intra_Mode_Context[above];
     uint8_t leftCtx = Intra_Mode_Context[left];
     return m_entropy.readIntraFrameYMode(aboveCtx, leftCtx);

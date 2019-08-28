@@ -466,6 +466,8 @@ namespace Av1 {
 
     void FrameHeader::initGeometry()
     {
+        YModes.assign(MiRows, std::vector<PREDICTION_MODE>(MiCols));
+        UVModes.assign(MiRows, std::vector<UV_PREDICTION_MODE>(MiCols));
         TxTypes.assign(MiRows, std::vector<TX_TYPE>(MiCols));
         IsInters.assign(MiRows, std::vector<bool>(MiCols));
         InterTxSizes.assign(MiRows, std::vector<TX_SIZE>(MiCols));
