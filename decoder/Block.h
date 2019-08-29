@@ -32,6 +32,7 @@ public:
 private:
     void intra_segment_id();
     void mode_info();
+    void read_cfl_alphas();
     void intra_frame_mode_info();
     void inter_frame_mode_info();
 
@@ -96,7 +97,11 @@ private:
     bool Lossless;
     bool skip;
     PREDICTION_MODE YMode;
+    uint8_t AngleDeltaY;
     UV_PREDICTION_MODE UVMode;
+    uint8_t AngleDeltaUV;
+    int8_t CflAlphaU;
+    int8_t CflAlphaV;
     uint32_t PaletteSizeY = 0;
     uint32_t PaletteSizeUV = 0;
     bool use_filter_intra;

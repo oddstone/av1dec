@@ -18,7 +18,11 @@ public:
     bool readSkip(uint8_t ctx);
     PARTITION_TYPE readPartition(uint8_t ctx, uint8_t bsl);
     UV_PREDICTION_MODE readUvMode(CFL_ALLOWED_TYPE cfl_allowed, PREDICTION_MODE y_mode);
+    uint8_t readAngleDeltaY(PREDICTION_MODE YMode);
     uint8_t readAngleDeltaUV(UV_PREDICTION_MODE uvMode);
+    uint8_t readCflAlphaSigns();
+    int8_t readCflAlphaU(uint8_t cfl_alpha_signs);
+    int8_t readCflAlphaV(uint8_t cfl_alpha_signs);
     bool readUseFilterIntra(BLOCK_SIZE bSize);
     FILTER_INTRA_MODE readFilterIntraMode();
     uint8_t readTxDepth(int maxTxDepth, uint8_t ctx);

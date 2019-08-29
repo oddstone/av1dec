@@ -764,9 +764,9 @@ namespace Av1 {
         starts.clear();
         uint32_t step = (sbMax + (1 << tileLog2)) >> tileLog2;
         for (uint32_t start = 0; start < sbMax; start += step) {
-            starts.push_back(start << sbShift >> 2);
+            starts.push_back(start << sbShift);
         }
-        starts.push_back(sbMax<<sbShift >> 2);
+        starts.push_back(sbMax<<sbShift);
     }
 
     bool FrameHeader::parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)

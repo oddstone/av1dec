@@ -136,11 +136,35 @@ UV_PREDICTION_MODE EntropyDecoder::readUvMode(CFL_ALLOWED_TYPE cflAllowed, PREDI
     return (UV_PREDICTION_MODE)m_symbol->read(uv_mode_cdf[cflAllowed][yMode], UV_INTRA_MODES - !cflAllowed);
 }
 
+uint8_t EntropyDecoder::readAngleDeltaY(PREDICTION_MODE YMode)
+{
+    uint8_t angle_delta_y = (uint8_t)m_symbol->read(angle_delta_cdf[YMode - V_PRED], 2 * MAX_ANGLE_DELTA + 1);
+    return angle_delta_y - MAX_ANGLE_DELTA;
+}
+
 uint8_t EntropyDecoder::readAngleDeltaUV(UV_PREDICTION_MODE uvMode)
 {
     uint8_t angle_delta_uv = (uint8_t)m_symbol->read(angle_delta_cdf[uvMode - UV_V_PRED], 2 * MAX_ANGLE_DELTA + 1);
     return angle_delta_uv - MAX_ANGLE_DELTA;
 }
+
+uint8_t EntropyDecoder::readCflAlphaSigns()
+{
+    return (uint8_t)m_symbol->read(cfl_sign_cdf, CFL_JOINT_SIGNS);
+}
+
+int8_t EntropyDecoder::readCflAlphaU(uint8_t cfl_alpha_signs)
+{
+    int ctx = cfl_alpha_signs - 2;
+    return (int8_t)m_symbol->read(cfl_alpha_cdf[ctx], CFL_ALPHABET_SIZE) + 1;
+}
+int8_t EntropyDecoder::readCflAlphaV(uint8_t cfl_alpha_signs)
+{
+    int contexts[] = { 0, 3, 0, 1, 4, 0, 2, 5 };
+    int ctx = contexts[cfl_alpha_signs];
+    return (int8_t)m_symbol->read(cfl_alpha_cdf[ctx], CFL_ALPHABET_SIZE) + 1;
+}
+
 
 bool EntropyDecoder::readUseFilterIntra(BLOCK_SIZE bSize)
 {
@@ -155,7 +179,7 @@ FILTER_INTRA_MODE EntropyDecoder::readFilterIntraMode()
 uint8_t EntropyDecoder::readTxDepth(int maxTxDepth, uint8_t ctx)
 {
     static const int MaxDepthToCat[] = { 0, 0, 1, 2, 3};
-    static const int Sizes[] = {1, 2, 2, 2, 2};
+    static const int Sizes[] = {2, 2, 3, 3, 3};
     int cat = MaxDepthToCat[maxTxDepth];
     int size = Sizes[maxTxDepth];
     return (uint8_t)m_symbol->read(tx_size_cdf[cat][ctx], size);

@@ -371,7 +371,7 @@ void Block::intra_angle_info_y()
 {
     if (MiSize >= BLOCK_8X8) {
         if (is_directional_mode(YMode)) {
-            ASSERT(0);
+            AngleDeltaY = m_entropy.readAngleDeltaY(YMode);
         }
     }
 }
@@ -394,8 +394,7 @@ void Block::intra_angle_info_uv()
 {
     if (MiSize > BLOCK_8X8) {
         if (is_directional_mode(UVMode)) {
-            ASSERT(0);
-            uint8_t angle_delta_uv = m_entropy.readAngleDeltaUV(UVMode);
+            AngleDeltaUV = m_entropy.readAngleDeltaUV(UVMode);
         }
     }
 }
@@ -425,6 +424,27 @@ void Block::intra_segment_id()
     else
         segment_id = 0;
     Lossless = m_frame.LosslessArray[segment_id];
+}
+
+void Block::read_cfl_alphas()
+{
+    uint8_t cfl_alpha_signs = m_entropy.readCflAlphaSigns();
+    uint8_t signU = (cfl_alpha_signs + 1) / 3;
+    uint8_t signV = (cfl_alpha_signs + 1) % 3;
+    if (signU != CFL_SIGN_ZERO) {
+        CflAlphaU = m_entropy.readCflAlphaU(cfl_alpha_signs);
+        if (signU == CFL_SIGN_NEG)
+            CflAlphaU = -CflAlphaU;
+    } else {
+        CflAlphaU = 0;
+    }
+    if (signV != CFL_SIGN_ZERO) {
+        CflAlphaV = m_entropy.readCflAlphaV(cfl_alpha_signs);
+        if (signV == CFL_SIGN_NEG)
+            CflAlphaV = -CflAlphaV;
+    } else {
+        CflAlphaV = 0;
+    }
 }
 
 void Block::intra_frame_mode_info()
@@ -460,8 +480,7 @@ void Block::intra_frame_mode_info()
         if (HasChroma) {
             UVMode = uv_mode();
             if (UVMode == UV_CFL_PRED) {
-                ASSERT(0);
-                //read_cfl_alphas()
+                read_cfl_alphas();
             }
             intra_angle_info_uv();
         }
