@@ -17,6 +17,8 @@ public:
     PREDICTION_MODE readIntraFrameYMode(uint8_t aboveCtx, uint8_t leftCtx);
     bool readSkip(uint8_t ctx);
     PARTITION_TYPE readPartition(uint8_t ctx, uint8_t bsl);
+    bool readSplitOrHorz(uint8_t ctx, uint8_t bsl, BLOCK_SIZE bSize);
+    bool readSplitOrVert(uint8_t ctx, uint8_t bsl, BLOCK_SIZE bSize);
     UV_PREDICTION_MODE readUvMode(CFL_ALLOWED_TYPE cfl_allowed, PREDICTION_MODE y_mode);
     uint8_t readAngleDeltaY(PREDICTION_MODE YMode);
     uint8_t readAngleDeltaUV(UV_PREDICTION_MODE uvMode);

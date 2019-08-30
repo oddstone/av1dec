@@ -14,9 +14,9 @@ namespace Av1 {
         uint8_t read(uint16_t* icdf, uint8_t nicdf);
         uint8_t readBool();
         uint32_t readNS();
+        uint8_t read(uint16_t* icdf, uint8_t nicdf, bool forceDisableUpdate);
 
     private:
-        uint8_t read(uint16_t* icdf, uint8_t nicdf, bool disableUpdate);
         void renormalize();
         void updateCdf(uint16_t* cdf, uint8_t ncdf, uint8_t symbol);
         //bool UpdateCdfs;

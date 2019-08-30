@@ -120,13 +120,11 @@ void Partition::parse()
     } else if (hasRows && hasCols) {
         partition = readPartitionType();
     } else if (hasCols) {
-        //split_or_horz S()
-        //          partition = split_or_horz ? PARTITION_SPLIT : PARTITION_HORZ
-        ASSERT(0);
+        bool split_or_horz = readSplitOrHorz();
+        partition = split_or_horz ? PARTITION_SPLIT : PARTITION_HORZ;
     } else if (hasRows) {
-        //split_or_vert S()
-        //partition = split_or_vert ? PARTITION_SPLIT : PARTITION_VERT
-        ASSERT(0);
+        bool split_or_vert = readSplitOrVert();
+        partition = split_or_vert ? PARTITION_SPLIT : PARTITION_VERT;
     } else {
         partition = PARTITION_SPLIT;
     }
@@ -204,19 +202,36 @@ void Partition::parseBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
     m_blocks.push_back(block);    
 }
 
-
-PARTITION_TYPE Partition::readPartitionType()
+void Partition::getPartitionTypeCtx(uint8_t& ctx, uint8_t& bsl)
 {
     bool AvailU = m_tile.is_inside(m_r - 1, m_c);
     bool AvailL = m_tile.is_inside(m_r, m_c - 1);
-    uint8_t bsl = Mi_Width_Log2[m_bSize];
-  	uint8_t above = AvailU && (Mi_Width_Log2[m_frame.MiSizes[m_r - 1][m_c]] < bsl);
-	uint8_t left = AvailL && (Mi_Height_Log2[m_frame.MiSizes[m_r][m_c - 1]] < bsl);
-	uint8_t ctx = left * 2 + above;
+    bsl = Mi_Width_Log2[m_bSize];
+    uint8_t above = AvailU && (Mi_Width_Log2[m_frame.MiSizes[m_r - 1][m_c]] < bsl);
+    uint8_t left = AvailL && (Mi_Height_Log2[m_frame.MiSizes[m_r][m_c - 1]] < bsl);
+    ctx = left * 2 + above;
+}
+
+PARTITION_TYPE Partition::readPartitionType()
+{
+    uint8_t ctx, bsl;
+    getPartitionTypeCtx(ctx, bsl);
     return m_entropy.readPartition(ctx, bsl);
 }
 
-        
+bool Partition::readSplitOrHorz()
+{
+    uint8_t ctx, bsl;
+    getPartitionTypeCtx(ctx, bsl);
+    return m_entropy.readSplitOrHorz(ctx, bsl, m_bSize);
+}
+
+bool Partition::readSplitOrVert()
+{
+    uint8_t ctx, bsl;
+    getPartitionTypeCtx(ctx, bsl);
+    return m_entropy.readSplitOrVert(ctx, bsl, m_bSize);
+}
 /*
 public:
     Partition(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE sbSize);

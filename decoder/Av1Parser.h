@@ -361,6 +361,10 @@ namespace Av1 {
         uint32_t MiCols;
         uint32_t MiRows;
 
+        //cols and rows align to super block size
+        uint32_t AlignedMiCols;
+        uint32_t AlignedMiRows;
+
         //superres_params()
         bool use_superres;
         uint8_t SuperresDenom;

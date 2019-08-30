@@ -120,7 +120,6 @@ uint8_t EntropyDecoder::getPartitionCdfCount(uint8_t bsl)
         return PARTITION_TYPES;
     if (bsl == 5)
         return EXT_PARTITION_TYPES - 2;
-    ;
     //ASSERT(bsl > 1 && bsl < 5);
     return EXT_PARTITION_TYPES;
 }
@@ -129,6 +128,38 @@ PARTITION_TYPE EntropyDecoder::readPartition(uint8_t ctx, uint8_t bsl)
 {
     uint8_t idx = (bsl - 1) * 4 + ctx;
     return (PARTITION_TYPE)m_symbol->read(partition_cdf[idx], getPartitionCdfCount(bsl));
+}
+
+bool EntropyDecoder::readSplitOrHorz(uint8_t ctx, uint8_t bsl, BLOCK_SIZE bSize)
+{
+    uint8_t idx = (bsl - 1) * 4 + ctx;
+    aom_cdf_prob* pcdf = partition_cdf[idx];
+    int psum = (pcdf[PARTITION_VERT] - pcdf[PARTITION_VERT - 1] +
+        pcdf[PARTITION_SPLIT] - pcdf[PARTITION_SPLIT - 1] +
+        pcdf[PARTITION_HORZ_A] - pcdf[PARTITION_HORZ_A - 1] +
+        pcdf[PARTITION_VERT_A] - pcdf[PARTITION_VERT_A - 1] +
+        pcdf[PARTITION_VERT_B] - pcdf[PARTITION_VERT_B - 1]);
+    if (bSize != BLOCK_128X128)
+        psum += pcdf[PARTITION_VERT_4] - pcdf[PARTITION_VERT_4 - 1];
+    //we use reverted cdf so it we need + psum instead - psum
+    uint16_t icdf[] = { AOM_CDF2(CDF_PROB_TOP + psum) };
+    return (bool)m_symbol->read(icdf, 2, true);
+}
+
+bool EntropyDecoder::readSplitOrVert(uint8_t ctx, uint8_t bsl, BLOCK_SIZE bSize)
+{
+    uint8_t idx = (bsl - 1) * 4 + ctx;
+    aom_cdf_prob* pcdf = partition_cdf[idx];
+    int psum = (pcdf[PARTITION_HORZ] - pcdf[PARTITION_HORZ - 1] +
+        pcdf[PARTITION_SPLIT] - pcdf[PARTITION_SPLIT - 1] +
+        pcdf[PARTITION_HORZ_A] - pcdf[PARTITION_HORZ_A - 1] +
+        pcdf[PARTITION_HORZ_B] - pcdf[PARTITION_HORZ_B - 1] +
+        pcdf[PARTITION_VERT_A] - pcdf[PARTITION_VERT_A - 1]);
+    if (bSize != BLOCK_128X128)
+        psum += pcdf[PARTITION_HORZ_4] - pcdf[PARTITION_HORZ_4 - 1];
+    //we use reverted cdf so it we need + psum instead - psum
+    uint16_t icdf[] = { AOM_CDF2(CDF_PROB_TOP + psum) };
+    return (bool)m_symbol->read(icdf, 2, true);
 }
 
 UV_PREDICTION_MODE EntropyDecoder::readUvMode(CFL_ALLOWED_TYPE cflAllowed, PREDICTION_MODE yMode)

@@ -67,8 +67,11 @@ namespace Av1 {
         renormalize();
         if (!disableUpdate)
             updateCdf(icdf, nicdf, symbol);
-        //36908
-        if (SymbolRange == 39901)
+        static FILE* fp = fopen("symbol.txt", "w");
+        fprintf(fp, "%d\r\n", SymbolRange);
+        fflush(fp);
+        //39901 
+        if (SymbolRange == 49364)
             printf("%d\r\n", SymbolRange);
         return symbol;
     }
