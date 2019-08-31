@@ -49,13 +49,17 @@ private:
     int getQ2(int i, int j) const;
     void inverseTransform();
     void reconstruct();
-    void predict_intra(int plane, int startX, int startY,
-        int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
-        int mode, int log2W, int log2H, const std::shared_ptr<YuvFrame>& frame);
+    void predict_intra(int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
+        int mode, const std::shared_ptr<YuvFrame>& frame);
+    void recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
+        const std::shared_ptr<YuvFrame>& frame) const;
     void paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
         const std::shared_ptr<YuvFrame>& frame);
     void dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
         const std::shared_ptr<YuvFrame>& frame);
+    void directinalIntraPredict(
+        bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
+        int mode, const std::shared_ptr<YuvFrame>& frame);
     PREDICTION_MODE getIntraDir();
 
     EntropyDecoder& m_entropy;

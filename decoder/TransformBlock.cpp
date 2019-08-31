@@ -2232,6 +2232,113 @@ TxSet TransformBlock::get_tx_set() const
     return TX_SET_INTRA_1;
 }
 
+static const int INTRA_FILTER_SCALE_BITS = 4;
+
+static const int INTRA_FILTER_MODES = 5;
+
+int Intra_Filter_Taps[ INTRA_FILTER_MODES ][ 8 ][ 7 ] = {
+    {
+        { -6, 10, 0, 0, 0, 12, 0 },
+        { -5, 2, 10, 0, 0, 9, 0 },
+        { -3, 1, 1, 10, 0, 7, 0 },
+        { -3, 1, 1, 2, 10, 5, 0 },
+        { -4, 6, 0, 0, 0, 2, 12 },
+        { -3, 2, 6, 0, 0, 2, 9 },
+        { -3, 2, 2, 6, 0, 2, 7 },
+        { -3, 1, 2, 2, 6, 3, 5 },
+    },
+    {
+        { -10, 16, 0, 0, 0, 10, 0 },
+        { -6, 0, 16, 0, 0, 6, 0 },
+        { -4, 0, 0, 16, 0, 4, 0 },
+        { -2, 0, 0, 0, 16, 2, 0 },
+        { -10, 16, 0, 0, 0, 0, 10 },
+        { -6, 0, 16, 0, 0, 0, 6 },
+        { -4, 0, 0, 16, 0, 0, 4 },
+        { -2, 0, 0, 0, 16, 0, 2 },
+    },
+    {
+        { -8, 8, 0, 0, 0, 16, 0 },
+        { -8, 0, 8, 0, 0, 16, 0 },
+        { -8, 0, 0, 8, 0, 16, 0 },
+        { -8, 0, 0, 0, 8, 16, 0 },
+        { -4, 4, 0, 0, 0, 0, 16 },
+        { -4, 0, 4, 0, 0, 0, 16 },
+        { -4, 0, 0, 4, 0, 0, 16 },
+        { -4, 0, 0, 0, 4, 0, 16 },
+    },
+    {
+        { -2, 8, 0, 0, 0, 10, 0 },
+        { -1, 3, 8, 0, 0, 6, 0 },
+        { -1, 2, 3, 8, 0, 4, 0 },
+        { 0, 1, 2, 3, 8, 2, 0 },
+        { -1, 4, 0, 0, 0, 3, 10 },
+        { -1, 3, 4, 0, 0, 4, 6 },
+        { -1, 2, 3, 4, 0, 4, 4 },
+        { -1, 2, 2, 3, 4, 3, 3 },
+    },
+    {
+        { -12, 14, 0, 0, 0, 14, 0 },
+        { -10, 0, 14, 0, 0, 12, 0 },
+        { -9, 0, 0, 14, 0, 11, 0 },
+        { -8, 0, 0, 0, 14, 10, 0 },
+        { -10, 12, 0, 0, 0, 0, 14 },
+        { -9, 1, 12, 0, 0, 0, 12 },
+        { -8, 0, 0, 12, 0, 1, 11 },
+        { -7, 0, 0, 1, 12, 1, 9 },
+    }
+};
+
+#define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
+
+void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
+    const std::shared_ptr<YuvFrame>& frame) const
+{
+    const int w4 = w >> 2;
+    const int h2 = h >> 1;
+
+//#define DEBUG_RECURSIVE_INTRA_PREDICTION
+#ifdef DEBUG_RECURSIVE_INTRA_PREDICTION
+    std::vector <std::vector<uint8_t>> Pred;
+    Pred.assign(h, std::vector<uint8_t>(w));
+#endif
+    for (int i2 = 0; i2 < h2; i2++) {
+        for (int j4 = 0; j4 < w4; j4++) {
+            uint8_t p[7];
+            for (int i = 0; i < 5; i++) {
+                if (!i2) {
+                    p[i] = AboveRow[ ( j4 << 2 ) + i - 1 ];
+                } else if (!j4 && !i) {
+                    p[i] = LeftCol[ ( i2 << 1 ) - 1 ];
+                } else {
+                    p[i] = frame->getPixel(plane, x + ( j4 << 2 ) + i - 1, y + ( i2 << 1 ) - 1);
+                }
+            }
+            for (int i = 5; i < 7; i++) {
+                if (!j4) {
+                    p[i] = LeftCol[ ( i2 << 1 ) + i - 5 ];
+                } else {
+                    p[i] = frame->getPixel(plane, x + ( j4 << 2 ) - 1, y + ( i2 << 1 ) + i - 5);
+                }
+            }
+            for (int i1 = 0; i1 < 2; i1++) {
+                for (int j1 = 0; j1 < 4; j1++) {
+                    int pr = 0;
+                    for (int i = 0; i < 7; i++) {
+                        pr += Intra_Filter_Taps[ m_block.filter_intra_mode ][ ( i1 << 2 ) + j1 ][ i ] * p[ i ];
+                    }
+                    uint8_t pred = CLIP1(ROUND2SIGNED(pr, INTRA_FILTER_SCALE_BITS));
+                    frame->setPixel(plane, x + ( j4 << 2 ) + j1, y +( i2 << 1 ) + i1, pred);
+#ifdef DEBUG_RECURSIVE_INTRA_PREDICTION
+                    Pred[(i2 << 1) + i1][(j4 << 2) + j1] = pred;
+#endif
+                }
+
+            }
+        }
+    }
+}
+
 void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
     const std::shared_ptr<YuvFrame>& frame)
 {
@@ -2260,15 +2367,17 @@ void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
     
 }
 
-void directinalIntraPredict(
-    int plane, int x, int y, int maxX, int maxY, bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
-    int mode, int log2W, int log2H,
-    const std::shared_ptr<YuvFrame>& frame)
+void TransformBlock::directinalIntraPredict(
+    bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
+    int mode, const std::shared_ptr<YuvFrame>& frame)
 {
+    int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
+    int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
     ASSERT(0 && "directinalIntraPredict");
 }
 
-#define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
 
 void TransformBlock::dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
     const std::shared_ptr<YuvFrame>& frame)
@@ -2294,9 +2403,8 @@ void TransformBlock::dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow,
         }
     }
 }
-void TransformBlock::predict_intra(int plane, int startX, int startY,
-    int haveLeft, int haveAbove, bool haveAboveRight, bool haveBelowLeft,
-    int mode, int log2W, int log2H, const std::shared_ptr<YuvFrame>& frame)
+void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRight, bool haveBelowLeft,
+    int mode, const std::shared_ptr<YuvFrame>& frame)
 {
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
     int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
@@ -2344,9 +2452,9 @@ void TransformBlock::predict_intra(int plane, int startX, int startY,
         AboveRow[-1] = median;
     }
     if (plane == 0 && m_block.use_filter_intra) {
-        ASSERT(0 && "recursive intra prediction");
+        recursiveIntraPrediction(AboveRow, LeftCol, frame);
     } else if (is_directional_mode(mode)) {
-        directinalIntraPredict(plane, x, y, maxX, maxY, haveLeft, haveAbove, AboveRow, LeftCol, mode, log2W, log2H, frame);
+        directinalIntraPredict(haveLeft, haveAbove, AboveRow, LeftCol, mode, frame);
     }  else if (mode == PAETH_PRED) {
         paethPredict(AboveRow, LeftCol, frame);
     } else if (mode == DC_PRED) {
@@ -2359,19 +2467,17 @@ void TransformBlock::predict_intra(int plane, int startX, int startY,
 
 bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
 {
-    int startX = x;
-    int startY = y;
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
     int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
-    int row = (startY << subY) >> MI_SIZE_LOG2;
-    int col = (startX << subX) >> MI_SIZE_LOG2;
+    int row = (y << subY) >> MI_SIZE_LOG2;
+    int col = (x << subX) >> MI_SIZE_LOG2;
     int subBlockMiRow = row & m_block.sbMask;
     int subBlockMiCol = col & m_block.sbMask;
     int stepX = Tx_Width[txSz] >> MI_SIZE_LOG2;
     int stepY = Tx_Height[txSz] >> MI_SIZE_LOG2;
     int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
     int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
-    if (startX >= maxX || startY >= maxY) {
+    if (x >= maxX || y >= maxY) {
         return true;
     }
     if (!m_block.is_inter) {
@@ -2388,21 +2494,20 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             }
             int log2W = Tx_Width_Log2[txSz];
             int log2H = Tx_Height_Log2[txSz];
-            predict_intra(plane, startX, startY,
+            predict_intra(
                 (plane == 0 ? m_block.AvailL : m_block.AvailLChroma) || x > 0,
                 (plane == 0 ? m_block.AvailU : m_block.AvailUChroma) || y > 0,
                 m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) - 1, (subBlockMiCol >> subX) + stepX),
                 m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1),
-                mode,
-                log2W, log2H, frame);
+                mode, frame);
             if (isCfl) {
                 ASSERT(0 && "predict_chroma_from_luma");
                 //predict_chroma_from_luma( plane, startX, startY, txSz);
             }
         }
         if (plane == 0) {
-            int MaxLumaW = startX + stepX * 4;
-            int MaxLumaH = startY + stepY * 4;
+            int MaxLumaW = x + stepX * 4;
+            int MaxLumaH = y + stepY * 4;
         }
     }
 
