@@ -2339,8 +2339,8 @@ void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uin
     }
 }
 
-void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
-    const std::shared_ptr<YuvFrame>& frame)
+void TransformBlock::paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol,
+    const std::shared_ptr<YuvFrame>& frame) const
 {
     uint8_t* d = frame->data[plane];
     int s = frame->strides[plane];
@@ -2368,8 +2368,8 @@ void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
 }
 
 void TransformBlock::directinalIntraPredict(
-    bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
-    int mode, const std::shared_ptr<YuvFrame>& frame)
+    bool haveLeft, bool haveAbove, const uint8_t* LeftCol, const uint8_t* AboveRow,
+    int mode, const std::shared_ptr<YuvFrame>& frame) const
 {
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
     int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
@@ -2379,8 +2379,9 @@ void TransformBlock::directinalIntraPredict(
 }
 
 
-void TransformBlock::dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
-    const std::shared_ptr<YuvFrame>& frame)
+void TransformBlock::dcPredict(bool haveLeft, bool haveAbove,
+    const uint8_t* AboveRow, const uint8_t* LeftCol,
+    const std::shared_ptr<YuvFrame>& frame) const
 {
     uint8_t avg;
     int sum = 0;
@@ -2458,7 +2459,7 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
     }  else if (mode == PAETH_PRED) {
         paethPredict(AboveRow, LeftCol, frame);
     } else if (mode == DC_PRED) {
-        dcPredict(haveLeft, haveAbove, AboveRow, LeftCol, log2W, log2H, frame);
+        dcPredict(haveLeft, haveAbove, AboveRow, LeftCol, frame);
     } else {
         ASSERT(0 && "not PAETH_PRED");
     }

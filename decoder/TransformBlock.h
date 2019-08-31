@@ -53,13 +53,14 @@ private:
         int mode, const std::shared_ptr<YuvFrame>& frame);
     void recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
         const std::shared_ptr<YuvFrame>& frame) const;
-    void paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
-        const std::shared_ptr<YuvFrame>& frame);
-    void dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
-        const std::shared_ptr<YuvFrame>& frame);
+    void paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol,
+        const std::shared_ptr<YuvFrame>& frame) const;
+    void dcPredict(bool haveLeft, bool haveAbove,
+        const uint8_t* AboveRow, const uint8_t* LeftCol,
+        const std::shared_ptr<YuvFrame>& frame) const;
     void directinalIntraPredict(
-        bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
-        int mode, const std::shared_ptr<YuvFrame>& frame);
+        bool haveLeft, bool haveAbove, const uint8_t* LeftCol, const uint8_t* AboveRow,
+        int mode, const std::shared_ptr<YuvFrame>& frame) const;
     PREDICTION_MODE getIntraDir();
 
     EntropyDecoder& m_entropy;
