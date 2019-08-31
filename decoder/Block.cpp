@@ -392,7 +392,7 @@ UV_PREDICTION_MODE Block::uv_mode()
 
 void Block::intra_angle_info_uv()
 {
-    if (MiSize > BLOCK_8X8) {
+    if (MiSize >= BLOCK_8X8) {
         if (is_directional_mode(UVMode)) {
             AngleDeltaUV = m_entropy.readAngleDeltaUV(UVMode);
         }
