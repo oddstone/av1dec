@@ -357,16 +357,6 @@ PREDICTION_MODE Block::intra_frame_y_mode()
     return m_entropy.readIntraFrameYMode(aboveCtx, leftCtx);
 }
 
-bool is_directional_mode(PREDICTION_MODE mode)
-{
-    return (mode >= V_PRED) && (mode <= D67_PRED);
-}
-
-bool is_directional_mode(UV_PREDICTION_MODE mode)
-{
-    return (mode >= UV_V_PRED) && (mode <= UV_D67_PRED);
-}
-
 void Block::intra_angle_info_y()
 {
     if (MiSize >= BLOCK_8X8) {

@@ -1768,40 +1768,242 @@ int sin128(int angle)
     return cos128(angle - 64);
 }
 
-static void B(int& Ta, int& Tb, int angle, bool flip)
+static void B(int* T, int a, int b, int angle, bool flip)
 {
+    int Ta = T[a];
+    int Tb = T[b];
     printf("Ta = %d, Tb = %d, sin = %d, cos = %d, angle = %d", Ta, Tb, sin128(angle), cos128(angle), angle);
     int x = Ta * cos128(angle) - Tb * sin128(angle);
     int y = Ta * sin128(angle) + Tb * cos128(angle);
-    Ta = ROUND2(x, 12);
-    Tb = ROUND2(y, 12);
-    if (flip)
-        std::swap(Ta, Tb);
+    if (!flip) {
+        T[a] = ROUND2(x, 12);
+        T[b] = ROUND2(y, 12);
+    } else {
+        T[b] = ROUND2(x, 12);
+        T[a] = ROUND2(y, 12);
+    }
 }
 
-static void H(int& Ta, int& Tb, bool flip, int r)
+static void H(int* T, int a, int b, bool flip, int r)
 {
     if (flip)
-        std::swap(Ta, Tb);
+        std::swap(T[a], T[b]);
     int min = -(1 << (r - 1));
     int max = (1 << (r - 1)) - 1;
-    int x = Ta;
-    int y = Tb;
-    Ta = CLIP3(min, max, x + y);
-    Tb = CLIP3(min, max, x - y);
+    int x = T[a];
+    int y = T[b];
+    T[a] = CLIP3(min, max, x + y);
+    T[b] = CLIP3(min, max, x - y);
 }
 
 static void iDct(int* T, int n, int r)
 {
     iDctPermutation(T, n);
-    if (n > 2) {
-        ASSERT(0 && "n > 2");
+    if (n == 6) {
+        for (int i = 0; i < 16; i++) {
+            B(T, 32 + i, 64 - i, 63 - 4 * brev(4, i), false);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 8; i++) {
+            B(T, 16 + i, 31 - i, 6 + (brev(3, 7 - i) << 3), false);
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 16; i++) {
+            H(T, 32 + i * 2, 33 + i * 2, i & 1, r);
+        }
+    }
+    if (n >= 4) {
+        for (int i = 0; i < 4; i++) {
+            B(T, 8 + i, 15 - i, 12 + (brev(2, 3 - i) << 4), false);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 8; i++) {
+            H(T, 16 + 2 * i, 17 + 2 * i, i & 1, r);
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 2; j++) {
+                B(T, 62 - i * 4 - j, 33 + i * 4 + j, 60 - 16 * brev(2, i) + 64 * j, true);
+            }
+        }
+    }
+    if (n >= 3) {
+        for (int i = 0; i < 2; i++) {
+            B(T, 4 + i, 7 - i, 56 - 32 * i, false);
+        }
+    }
+    if (n >= 4) {
+        for (int i = 0; i < 4; i++) {
+            H(T, 8 + 2 * i, 9 + 2 * i, i & 1, r);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                B(T, 30 - 4 * i - j, 17 + 4 * i + j, 24 + (j << 6) + ((1 - i) << 5), true);
+            }
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 2; j++) {
+                H(T, 32 + i * 4 + j, 35 + i * 4 - j, i & 1, r);
+            }
+        }
     }
     for (int i = 0; i < 2; i++) {
-        B(T[2 * i], T[2 * i + 1], 32 + 16 * i, 1 - i);
+        B(T, 2 * i, 2 * i + 1, 32 + 16 * i, 1 - i);
+    }
+    if (n >= 3) {
+        for (int i = 0; i < 2; i++) {
+            H(T, 4 + 2 * i, 5 + 2 * i, i, r);
+        }
+    }
+    if (n >= 4) {
+        for (int i = 0; i < 2; i++) {
+            B(T, 14 - i, 9 + i, 48 + 64 * i, true);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 2; j++) {
+                H(T, 16 + 4 * i + j, 19 + 4 * i - j, i & 1, r);
+            }
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 4; j++) {
+                B(T, 61 - i * 8 - j, 34 + i * 8 + j, 56 - i * 32 + (j >> 1) * 64, 1);
+            }
+        }
     }
     for (int i = 0; i < 2; i++) {
-        H(T[i], T[3 - i], false, r);
+        H(T, i, 3 - i, false, r);
+    }
+    if (n >= 3) {
+        B(T, 6, 5, 32, true);
+    }
+    if (n >= 4) {
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                H(T, 8 + 4 * i + j, 11 + 4 * i - j, i, r);
+            }
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 4; i++) {
+            B(T, 29 - i, 18 + i, 48 + (i >> 1) * 64, true);
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                H(T, 32 + 8 * i + j, 39 + 8 * i - j, i & 1, r);
+            }
+        }
+    }
+    if (n >= 3) {
+        for (int i = 0; i < 4; i++) {
+            H(T, i, 7 - i, false, r);
+        }
+    }
+    if (n >= 4) {
+        for (int i = 0; i < 2; i++) {
+            B(T, 13 - i, 10 + i, 32, true);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 4; j++) {
+                H(T, 16 + i * 8 + j, 23 + i * 8 - j, i, r);
+            }
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 8; i++) {
+            B(T, 59 - i, 36 + i, i < 4 ? 48 : 112, true);
+        }
+    }
+    if (n >= 4) {
+        for (int i = 0; i < 8; i++) {
+            H(T, i, 15 - i, false, r);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 4; i++) {
+            B(T, 27 - i, 20 + i, 32, true);
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 8; i++) {
+            H(T, 32 + i, 47 - i, false, r);
+            H(T, 48 + i, 63 - i, true, r);
+        }
+    }
+    if (n >= 5) {
+        for (int i = 0; i < 16; i++) {
+            H(T, i, 31 - i, false, r);
+        }
+    }
+    if (n == 6) {
+        for (int i = 0; i < 8; i++) {
+            B(T, 55 - i, 40 + i, 32, true);
+        }
+        for (int i = 0; i < 32; i++) {
+            H(T, i, 63 - i, false, r);
+        }
+    }
+
+}
+
+static void iAdst4(int* T)
+{
+    static const int SINPI_1_9 = 1321;
+    static const int SINPI_2_9 = 2482;
+    static const int SINPI_3_9 = 3344;
+    static const int SINPI_4_9 = 3803;
+
+    int s[7];
+    int x[4];
+    s[0] = SINPI_1_9 * T[0];
+    s[1] = SINPI_2_9 * T[0];
+    s[2] = SINPI_3_9 * T[1];
+    s[3] = SINPI_4_9 * T[2];
+    s[4] = SINPI_1_9 * T[2];
+    s[5] = SINPI_2_9 * T[3];
+    s[6] = SINPI_4_9 * T[3];
+    int a7 = T[0] - T[2];
+    int b7 = a7 + T[3];
+    s[0] = s[0] + s[3];
+    s[1] = s[1] - s[4];
+    s[3] = s[2];
+    s[2] = SINPI_3_9 * b7;
+    s[0] = s[0] + s[5];
+    s[1] = s[1] - s[6];
+    x[0] = s[0] + s[3];
+    x[1] = s[1] + s[3];
+    x[2] = s[2];
+    x[3] = s[0] + s[1];
+    x[3] = x[3] - s[3];
+    T[0] = ROUND2(x[0], 12);
+    T[1] = ROUND2(x[1], 12);
+    T[2] = ROUND2(x[2], 12);
+    T[3] = ROUND2(x[3], 12);
+}
+static void iAdst(int* T, int n, int r)
+{
+    switch (n) {
+        case 2:
+            iAdst4(T);
+            break;
+        default:
+            ASSERT("not supported iAdst");
+            break;
     }
 }
 
@@ -1865,7 +2067,7 @@ void TransformBlock::inverseTransform()
             case FLIPADST_ADST:
             case H_ADST:
             case H_FLIPADST:
-                ASSERT(0 && "iAdst");
+                iAdst(T, log2W, rowClampRange);
                 break;
             default:
                 ASSERT(0 && "iIdentity");
@@ -1899,7 +2101,7 @@ void TransformBlock::inverseTransform()
             case FLIPADST_ADST:
             case V_ADST:
             case V_FLIPADST:
-                ASSERT(0 && "iAdst");
+                iAdst(T, log2W, rowClampRange);
                 break;
             default:
                 ASSERT(0 && "iIdentity");
@@ -2058,6 +2260,14 @@ void TransformBlock::paethPredict(uint8_t* AboveRow, uint8_t* LeftCol,
     
 }
 
+void directinalIntraPredict(
+    int plane, int x, int y, int maxX, int maxY, bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
+    int mode, int log2W, int log2H,
+    const std::shared_ptr<YuvFrame>& frame)
+{
+    ASSERT(0 && "directinalIntraPredict");
+}
+
 #define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
 
 void TransformBlock::dcPredict(bool haveLeft, bool haveAbove, uint8_t* AboveRow, uint8_t* LeftCol, int log2W, int log2H,
@@ -2133,7 +2343,11 @@ void TransformBlock::predict_intra(int plane, int startX, int startY,
     } else {
         AboveRow[-1] = median;
     }
-    if (mode == PAETH_PRED) {
+    if (plane == 0 && m_block.use_filter_intra) {
+        ASSERT(0 && "recursive intra prediction");
+    } else if (is_directional_mode(mode)) {
+        directinalIntraPredict(plane, x, y, maxX, maxY, haveLeft, haveAbove, AboveRow, LeftCol, mode, log2W, log2H, frame);
+    }  else if (mode == PAETH_PRED) {
         paethPredict(AboveRow, LeftCol, frame);
     } else if (mode == DC_PRED) {
         dcPredict(haveLeft, haveAbove, AboveRow, LeftCol, log2W, log2H, frame);

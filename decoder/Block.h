@@ -113,4 +113,19 @@ private:
     EntropyDecoder& m_entropy;
     std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;
 };
+
+inline bool is_directional_mode(PREDICTION_MODE mode)
+{
+    return (mode >= V_PRED) && (mode <= D67_PRED);
+}
+
+inline bool is_directional_mode(UV_PREDICTION_MODE mode)
+{
+    return (mode >= UV_V_PRED) && (mode <= UV_D67_PRED);
+}
+
+inline bool is_directional_mode(int mode)
+{
+    return is_directional_mode((PREDICTION_MODE)mode);
+}
 #endif
