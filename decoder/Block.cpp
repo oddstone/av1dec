@@ -22,6 +22,8 @@ Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
     , sbMask(m_sequence.use_128x128_superblock ? 31 : 15)
     , subsampling_x(m_sequence.subsampling_x)
     , subsampling_y(m_sequence.subsampling_y)
+    , AngleDeltaY(0)
+    , AngleDeltaUV(0)
 {
     if (bh4 == 1 && subsampling_y && (MiRow & 1) == 0)
         HasChroma = false;
@@ -129,44 +131,11 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
     int subBlockMiCol = col & sbMask;
     int stepX = Tx_Width[txSz] >> MI_SIZE_LOG2;
     int stepY = Tx_Height[txSz] >> MI_SIZE_LOG2;
-    int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
-    int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
+    int maxX = m_frame.MiCols * MI_SIZE;
+    int maxY = m_frame.MiRows * MI_SIZE;
     if (startX >= maxX || startY >= maxY) {
         return;
     }
-#if 0
-    if (!is_inter) {
-        if (((plane == 0) && PaletteSizeY) || ((plane != 0) && PaletteSizeUV)) {
-            ASSERT(0 && "predict_palette");
-            //predict_palette( plane, startX, startY, x, y, txSz )
-        } else {
-            bool isCfl = (plane > 0 && UVMode == UV_CFL_PRED);
-            int mode;
-            if (plane == 0) {
-                mode = YMode;
-            } else {
-                mode = (isCfl) ? DC_PRED : UVMode;
-            }
-            int log2W = Tx_Width_Log2[txSz];
-            int log2H = Tx_Height_Log2[txSz];
-            predict_intra(plane, startX, startY,
-                (plane == 0 ? AvailL : AvailLChroma) || x > 0,
-                (plane == 0 ? AvailU : AvailUChroma) || y > 0,
-                m_decoded.getFlag(plane, (subBlockMiRow >> subY) - 1, (subBlockMiCol >> subX) + stepX),
-                m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1),
-                mode,
-                log2W, log2H);
-            if (isCfl) {
-                ASSERT(0 && "predict_chroma_from_luma");
-                //predict_chroma_from_luma( plane, startX, startY, txSz);
-            }
-        }
-        if (plane == 0) {
-            int MaxLumaW = startX + stepX * 4;
-            int MaxLumaH = startY + stepY * 4;
-        }
-    }
-#endif
     if (!skip) {
         std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, startX, startY, txSz));
         tb->parse();
@@ -174,9 +143,9 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
     }
     for (int i = 0; i < stepY; i++) {
         for (int j = 0; j < stepX; j++) {
-            /*		LoopfilterTxSizes[ plane ]
-		[ (row >> subY) + i ]
-		[ (col >> subX) + j ] = txSz*/
+            /*        LoopfilterTxSizes[ plane ]
+        [ (row >> subY) + i ]
+        [ (col >> subX) + j ] = txSz*/
             m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
         }
     }
@@ -265,22 +234,24 @@ void Block::parse()
             m_frame.YModes[r + y][c + x] = YMode;
             if (RefFrame[0] == INTRA_FRAME && HasChroma)
                 m_frame.UVModes[r + y][c + x] = UVMode;
-        /*for ( refList = 0; refList < 2; refList++ )
-		RefFrames[ r + y ][ c + x ][ refList ] = RefFrame[ refList ]
-		if ( is_inter ) {
-		if ( !use_intrabc ) {
-		CompGroupIdxs[ r + y ][ c + x ] = comp_group_idx
-		CompoundIdxs[ r + y ][ c + x ] = compound_idx
-		}
-		for ( dir = 0; dir < 2; dir++ ) {
-		InterpFilters[ r + y ][ c + x ][ dir ] = interp_filter[ dir ]
-		}
-		for ( refList = 0; refList < 1 + isCompound; refList++ ) {
-		Mvs[ r + y ][ c + x ][ refList ] = Mv[ refList ]
-		}
-		}*/
-		}
-	}
+            for (int refList = 0; refList < 2; refList++ )
+                m_frame.RefFrames[r + y][c + x][refList] = RefFrame[refList];
+            if ( is_inter ) {
+                ASSERT(0);
+                /*
+                if ( !use_intrabc ) {
+                CompGroupIdxs[ r + y ][ c + x ] = comp_group_idx
+                CompoundIdxs[ r + y ][ c + x ] = compound_idx
+                }
+                for ( dir = 0; dir < 2; dir++ ) {
+                InterpFilters[ r + y ][ c + x ][ dir ] = interp_filter[ dir ]
+                }
+                for ( refList = 0; refList < 1 + isCompound; refList++ ) {
+                Mvs[ r + y ][ c + x ][ refList ] = Mv[ refList ]
+                }*/
+            }
+        }
+    }
 
     compute_prediction();
     residual();
@@ -362,6 +333,9 @@ void Block::intra_angle_info_y()
     if (MiSize >= BLOCK_8X8) {
         if (is_directional_mode(YMode)) {
             AngleDeltaY = m_entropy.readAngleDeltaY(YMode);
+            if (AngleDeltaY < -3) {
+                printf("Ok");
+            }
         }
     }
 }

@@ -58,10 +58,16 @@ private:
     void dcPredict(bool haveLeft, bool haveAbove,
         const uint8_t* AboveRow, const uint8_t* LeftCol,
         const std::shared_ptr<YuvFrame>& frame) const;
-    void directinalIntraPredict(
-        bool haveLeft, bool haveAbove, const uint8_t* LeftCol, const uint8_t* AboveRow,
+    bool getLeftSmooth(bool haveLeft) const;
+    bool getAboveSmooth(bool haveAbove) const;
+    bool getSmooth(int r, int c) const;
+    bool get_filter_type(bool haveLeft, bool haveAbove) const;
+    uint8_t* intraEdgeUpsample(const uint8_t* edge, int numPx, std::vector<uint8_t>& upsampled) const;
+    void directionalIntraPredict(
+        bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
         int mode, const std::shared_ptr<YuvFrame>& frame) const;
     PREDICTION_MODE getIntraDir();
+    void predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame);
 
     EntropyDecoder& m_entropy;
     Block& m_block;

@@ -469,6 +469,10 @@ namespace Av1 {
         
         YModes.assign(AlignedMiRows, std::vector<PREDICTION_MODE>(AlignedMiCols));
         UVModes.assign(AlignedMiRows, std::vector<UV_PREDICTION_MODE>(AlignedMiCols));
+        RefFrames.resize(AlignedMiRows);
+        for (int i = 0; i < AlignedMiRows; i++) {
+            RefFrames[i].assign(AlignedMiCols, std::vector<int>(2));
+        }
         TxTypes.assign(AlignedMiRows, std::vector<TX_TYPE>(AlignedMiCols));
         IsInters.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
         InterTxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
@@ -701,6 +705,7 @@ namespace Av1 {
         }
         MiCols = 2 * ((FrameWidth + 7) >> 3);
         MiRows = 2 * ((FrameHeight + 7) >> 3);
+
         uint32_t align = sequence.use_128x128_superblock ? 128 : 64;
         AlignedMiCols = ROOF(FrameWidth, align) >> 2;
         AlignedMiRows = ROOF(FrameHeight, align) >> 2;

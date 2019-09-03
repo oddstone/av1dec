@@ -408,6 +408,7 @@ namespace Av1 {
         std::vector<uint32_t> MiRowStarts;
         std::vector<std::vector<PREDICTION_MODE>> YModes;
         std::vector<std::vector< UV_PREDICTION_MODE>> UVModes;
+        std::vector<std::vector<std::vector<int>>> RefFrames;
         std::vector<std::vector<TX_TYPE>> TxTypes;
         std::vector<std::vector<bool>> IsInters;
         //SkipModes[r + y][c + x] = skip_mode

@@ -2007,6 +2007,28 @@ static void iAdst(int* T, int n, int r)
     }
 }
 
+static void iIdentity(int* T, int n)
+{
+    int size = 1 << n;
+    if (n == 2) {
+        for (int i = 0; i < size; i++) {
+            T[i] = ROUND2(T[i] * 5793, 12);
+        }
+    } else if (n == 3) {
+        for (int i = 0; i < size; i++) {
+            T[i] = T[i] * 2;
+        }
+    } else if (n == 4) {
+        for (int i = 0; i < size; i++) {
+            T[i] = ROUND2(T[i] * 11586, 12);
+        }
+    } else if (n == 5) {
+        for (int i = 0; i < size; i++) {
+            T[i] = T[i] * 4;
+        }
+    }
+}
+
 static void inverseWalshHadamardTransform(int* T, int shift)
 {
     int a = T[0] >> shift;
@@ -2070,7 +2092,7 @@ void TransformBlock::inverseTransform()
                 iAdst(T, log2W, rowClampRange);
                 break;
             default:
-                ASSERT(0 && "iIdentity");
+                iIdentity(T, log2W);
                 break;
             }
         }
@@ -2101,10 +2123,10 @@ void TransformBlock::inverseTransform()
             case FLIPADST_ADST:
             case V_ADST:
             case V_FLIPADST:
-                iAdst(T, log2W, rowClampRange);
+                iAdst(T, log2H, rowClampRange);
                 break;
             default:
-                ASSERT(0 && "iIdentity");
+                iIdentity(T, log2H);
                 break;
             }
         }
@@ -2367,15 +2389,290 @@ void TransformBlock::paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCo
     
 }
 
-void TransformBlock::directinalIntraPredict(
-    bool haveLeft, bool haveAbove, const uint8_t* LeftCol, const uint8_t* AboveRow,
+static const int Mode_To_Angle[ INTRA_MODES ] = { 0, 90, 180, 45, 135, 113, 157, 203, 67, 0, 0, 0, 0 };
+
+static const int Dr_Intra_Derivative[ 90 ] = {
+    0, 0, 0, 1023, 0, 0, 547, 0, 0, 372, 0, 0, 0, 0,
+    273, 0, 0, 215, 0, 0, 178, 0, 0, 151, 0, 0, 132, 0, 0,
+    116, 0, 0, 102, 0, 0, 0, 90, 0, 0, 80, 0, 0, 71, 0, 0,
+    64, 0, 0, 57, 0, 0, 51, 0, 0, 45, 0, 0, 0, 40, 0, 0,
+    35, 0, 0, 31, 0, 0, 27, 0, 0, 23, 0, 0, 19, 0, 0,
+    15, 0, 0, 0, 0, 11, 0, 0, 7, 0, 0, 3, 0, 0
+};
+
+static int getDx(int pAngle)
+{
+    if (pAngle < 90)
+        return Dr_Intra_Derivative[pAngle];
+    else if (pAngle > 90 && pAngle < 180)
+        return Dr_Intra_Derivative[180 - pAngle];
+    ASSERT(0);
+    return 0;
+}
+
+static int getDy(int pAngle)
+{
+    if (pAngle > 90 && pAngle < 180)
+        return Dr_Intra_Derivative[ pAngle - 90 ];
+    else if (pAngle > 180)
+        return Dr_Intra_Derivative[270 - pAngle];
+    ASSERT(0);
+    return 0;
+}
+
+static void filterCorner(uint8_t* LeftCol, uint8_t* AboveRow)
+{
+    uint8_t s = ROUND2(LeftCol[ 0 ] * 5 + AboveRow[ -1 ] * 6 + AboveRow[ 0 ] * 5, 4);
+    LeftCol[-1] = s;
+    AboveRow[1] = s;
+}
+
+bool TransformBlock::getLeftSmooth(bool haveLeft) const
+{
+    bool leftSmooth = false;
+    if (haveLeft) {
+        leftSmooth = getSmooth(y4, x4 -1);
+    }
+    return leftSmooth;
+}
+
+bool TransformBlock::getAboveSmooth(bool haveAbove) const
+{
+    bool aboveSmooth = false;
+    if (haveAbove) {
+        aboveSmooth = getSmooth(y4 - 1, x4);
+    }
+    return aboveSmooth;
+}
+
+bool TransformBlock::getSmooth(int r, int c) const
+{
+    if ( plane > 0 ) {
+        if (m_sequence.subsampling_x && !( c & 1 ) )
+            c++;
+        if (m_sequence.subsampling_y && ( r & 1 ) )
+            r--;
+    }
+    int mode;
+    if (!plane) {
+        mode = m_frame.YModes[r][c];
+    } else {
+        if (m_frame.RefFrames[r][c][0] > INTRA_FRAME)
+            return 0;
+        mode = m_frame.UVModes[r][c];
+    }
+    return (mode == SMOOTH_PRED || mode == SMOOTH_V_PRED || mode == SMOOTH_H_PRED);
+}
+
+bool TransformBlock::get_filter_type(bool haveLeft, bool haveAbove) const
+{
+    bool aboveSmooth = getAboveSmooth(haveAbove);
+    bool leftSmooth = getLeftSmooth(haveLeft);
+    return aboveSmooth || leftSmooth;
+}
+
+uint8_t getIntraEdgeFilterStrength(int w, int h, bool filterType, int delta)
+{
+    int d = std::abs(delta);
+    int blkWh = w + h;
+    uint8_t strength = 0;
+    if (!filterType) {
+        if ( blkWh <= 8 ) {
+            if ( d >= 56 ) strength = 1;
+        } else if ( blkWh <= 12 ) {
+            if ( d >= 40 ) strength = 1;
+        } else if ( blkWh <= 16 ) {
+            if ( d >= 40 ) strength = 1;
+        } else if ( blkWh <= 24 ) {
+            if ( d >= 8 ) strength = 1;
+            if ( d >= 16 ) strength = 2;
+            if ( d >= 32 ) strength = 3;
+        } else if ( blkWh <= 32 ) {
+            strength = 1;
+            if ( d >= 4 ) strength = 2;
+            if ( d >= 32 ) strength = 3;
+        } else {
+            strength = 3;
+        }
+    } else {
+        if ( blkWh <= 8 ) {
+            if ( d >= 40 ) strength = 1;
+            if ( d >= 64 ) strength = 2;
+        } else if ( blkWh <= 16 ) {
+            if ( d >= 20 ) strength = 1;
+            if ( d >= 48 ) strength = 2;
+        } else if ( blkWh <= 24 ) {
+            if ( d >= 4 ) strength = 3;
+        } else {
+            strength = 3;
+        }
+    }
+    return strength;
+}
+
+const static int INTRA_EDGE_KERNELS = 3;
+const static int INTRA_EDGE_TAPS = 5;
+
+uint8_t Intra_Edge_Kernel[INTRA_EDGE_KERNELS][INTRA_EDGE_TAPS] = {
+    { 0, 4, 8, 4, 0 },
+    { 0, 5, 6, 5, 0 },
+    { 2, 4, 4, 4, 2 }
+};
+
+static void intraEdgeFilter(int sz, int strength, uint8_t* array)
+{
+    if (!strength)
+        return;
+    std::vector<uint8_t> edge(array - 1, array - 1 + sz);
+    for (int i = 1; i < sz; i++) {
+        int s = 0;
+        for (int j = 0; j < INTRA_EDGE_TAPS; j++) {
+            int k = CLIP3( 0, sz - 1, i - 2 + j );
+            s += Intra_Edge_Kernel[strength - 1][j] * edge[k];
+        }
+        array[i-1] = ( s + 8 ) >> 4;
+    }
+}
+
+static int getIntraEdgeUpsample(int w, int h, int filterType, int delta)
+{
+    int blkWh = w + h;
+    int d = std::abs(delta);
+    int useUpsample;
+    if ( d <= 0 || d >= 40 ) {
+        useUpsample = 0;
+    } else if ( filterType == 0 ) {
+        useUpsample = (blkWh <= 16);
+    } else {
+        useUpsample = (blkWh <= 8);
+    }
+    return useUpsample;
+}
+
+uint8_t* TransformBlock::intraEdgeUpsample(const uint8_t* edge, int numPx, std::vector<uint8_t>& upsampled) const
+{
+    std::vector<uint8_t> dup;
+    dup.reserve(numPx + 3);
+    dup.push_back(edge[-1]);
+    dup.insert(dup.end(), edge - 1, edge + numPx);
+    dup.push_back(edge[numPx - 1]);
+
+    upsampled.resize(2 * numPx + 1);
+    uint8_t* buf = &upsampled[2];
+    buf[-2] = dup[0];
+    for (int i = 0; i < numPx; i++) {
+        int s = -dup[i] + (9 * dup[i + 1]) + (9 * dup[i + 2]) - dup[i + 3];
+        buf[2 * i - 1] = CLIP1(ROUND2(s, 4));
+        buf[2 * i] = dup[i + 2];
+    }
+    return buf;
+}
+
+void TransformBlock::directionalIntraPredict(
+    bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
     int mode, const std::shared_ptr<YuvFrame>& frame) const
 {
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
-    int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
+    int subY = (plane > 0) ? m_sequence.subsampling_y : 0;
     int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
     int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
-    ASSERT(0 && "directinalIntraPredict");
+    int angleDelta = plane > 0 ? m_block.AngleDeltaY : m_block.AngleDeltaUV;
+    int pAngle = Mode_To_Angle[ mode ] + angleDelta * ANGLE_STEP;
+    int upsampleAbove = 0;
+    int upsampleLeft = 0;
+    std::vector<uint8_t> upsampledAbove;
+    std::vector<uint8_t> upsampledLeft;
+    if (m_sequence.enable_intra_edge_filter) {
+        if (pAngle != 90 && pAngle != 180) {
+            bool filterType = false;
+            if (pAngle > 90 && pAngle < 180 && (w + h ) >= 24) {
+                filterCorner(LeftCol, AboveRow);
+                bool filterType = get_filter_type(haveLeft, haveAbove);
+                if (haveAbove) {
+                    int strength = getIntraEdgeFilterStrength(w, h, filterType, pAngle - 90);
+                    int numPx = std::min( w, ( maxX - x + 1 ) ) + ( pAngle < 90 ? h : 0 ) + 1;
+                    intraEdgeFilter(numPx, strength, AboveRow);
+                }
+                if (haveLeft) {
+                    int strength = getIntraEdgeFilterStrength(w, h, filterType, pAngle - 180);
+                    int numPx = std::min(h, (maxY - y + 1)) + (pAngle > 180 ? w : 0) + 1;
+                    intraEdgeFilter(numPx, strength, LeftCol);
+                }
+            }
+            upsampleAbove = getIntraEdgeUpsample(w, h, filterType, pAngle - 90);
+            int numPx = ( w + (pAngle < 90 ? h : 0) );
+            if (upsampleAbove) {
+                AboveRow = intraEdgeUpsample(AboveRow, numPx, upsampledAbove);
+            }
+            upsampleLeft = getIntraEdgeUpsample(w, h, filterType, pAngle - 180);
+            numPx = ( h + (pAngle > 180 ? w : 0) );
+            if (upsampleLeft) {
+                LeftCol = intraEdgeUpsample(LeftCol, numPx, upsampledLeft);
+            }
+        }
+    }
+    if (pAngle < 90) {
+        int dx = getDx(pAngle);
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                int idx = ( i + 1 ) * dx;
+                int base = (idx >> ( 6 - upsampleAbove ) ) + (j << upsampleAbove);
+                int shift = ( (idx << upsampleAbove) >> 1 ) & 0x1F;
+                int maxBaseX = (w + h - 1) << upsampleAbove;
+                uint8_t pred;
+                if (base < maxBaseX){
+                    pred = ROUND2(AboveRow[base] * ( 32 - shift ) +AboveRow[base + 1] * shift, 5 );
+                } else {
+                    pred = AboveRow[maxBaseX];
+                }
+                frame->setPixel(plane, x + j, y + i, pred);
+            }
+        }
+    } else if (pAngle > 90 && pAngle < 180) {
+        int dx = getDx(pAngle);
+        int dy = getDy(pAngle);
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                int idx = ( j << 6 ) - ( i + 1 ) * dx;
+                int base = idx >> ( 6 - upsampleAbove );
+                int shift;
+                uint8_t pred;
+                if (base >= -(1<<upsampleAbove)) {
+                    shift = ((idx << upsampleAbove) >> 1) & 0x1F;
+                    pred =ROUND2(AboveRow[base] * ( 32 - shift ) + AboveRow[base + 1] * shift, 5);
+                } else {
+                    idx = (i << 6) - (j + 1) * dy;
+                    base = idx >> (6 - upsampleLeft);
+                    shift = ((idx << upsampleLeft) >> 1 ) & 0x1F;
+                    pred = ROUND2(LeftCol[base] * ( 32 - shift ) + LeftCol[base + 1] * shift, 5);
+                }
+                frame->setPixel(plane, x + j, y + i, pred);
+            }
+        }
+    }else if (pAngle > 180) {
+        int dy = getDy(pAngle);
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                int idx = ( j + 1 ) * dy;
+                int base = (idx >> (6 - upsampleLeft)) + (i << upsampleLeft);
+                int shift = (( idx << upsampleLeft) >> 1) & 0x1F;
+                uint8_t pred = ROUND2(LeftCol[base] * (32 - shift) + LeftCol[base + 1] * shift, 5);
+                frame->setPixel(plane, x + j, y + i, pred);
+            }
+        }
+    } else if (pAngle == 90) {
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                frame->setPixel(plane, x + j, y + i, AboveRow[j]);
+            }
+        }
+    } else if (pAngle == 180) {
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                frame->setPixel(plane, x + j, y + i, LeftCol[i]);
+            }
+        }
+    }
 }
 
 
@@ -2455,7 +2752,7 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
     if (plane == 0 && m_block.use_filter_intra) {
         recursiveIntraPrediction(AboveRow, LeftCol, frame);
     } else if (is_directional_mode(mode)) {
-        directinalIntraPredict(haveLeft, haveAbove, AboveRow, LeftCol, mode, frame);
+        directionalIntraPredict(haveLeft, haveAbove, AboveRow, LeftCol, mode, frame);
     }  else if (mode == PAETH_PRED) {
         paethPredict(AboveRow, LeftCol, frame);
     } else if (mode == DC_PRED) {
@@ -2465,6 +2762,42 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
     }
 }
 
+void TransformBlock::predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame)
+{
+    int subX = m_sequence.subsampling_x;
+    int subY = m_sequence.subsampling_y;
+    int startX = (m_block.MiCol << 2);
+    int startY = (m_block.MiRow << 2);
+
+    int8_t alpha = plane == 1 ? m_block.CflAlphaU : m_block.CflAlphaV;
+    int lumaAvg = 0;
+    std::vector<std::vector<int>> L(h, std::vector<int>(w));
+    for (int i = 0; i < h; i++ ) {
+        int lumaY = (startY + i) << subY;
+        lumaY = std::min(lumaY, m_block.MaxLumaH - (1 << subY));
+        for (int j = 0; j < w; j++ ) {
+            int lumaX = (startX + j) << subX;
+            lumaX = std::min(lumaX, m_block.MaxLumaW - (1 << subX));
+            int t = 0;
+            for (int dy = 0; dy <= subY; dy += 1 ) {
+                for (int dx = 0; dx <= subX; dx += 1 ) {
+                    t += frame->getPixel(0, lumaX + dx, lumaY + dy);
+                }
+            }
+            int v = t << ( 3 - subX - subY );
+            L[ i ][ j ] = v;
+            lumaAvg += v;
+        }
+    }
+    lumaAvg = ROUND2( lumaAvg, log2W + log2H );
+    for (int i = 0; i < h; i++ ) {
+        for (int j = 0; j < w; j++ ) {
+            uint8_t dc = frame->getPixel(plane, startX + j, startY + i);
+            int scaledLuma = ROUND2SIGNED( alpha * ( L[i][j] - lumaAvg ), 6 );
+            frame->setPixel(plane, startX + j, startY + i, CLIP1( dc + scaledLuma ));
+        }
+    }
+}
 
 bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
 {
@@ -2502,13 +2835,12 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
                 m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1),
                 mode, frame);
             if (isCfl) {
-                ASSERT(0 && "predict_chroma_from_luma");
-                //predict_chroma_from_luma( plane, startX, startY, txSz);
+                predict_chroma_from_luma(frame);
             }
         }
         if (plane == 0) {
-            int MaxLumaW = x + stepX * 4;
-            int MaxLumaH = y + stepY * 4;
+            m_block.MaxLumaW = x + stepX * 4;
+            m_block.MaxLumaH = y + stepY * 4;
         }
     }
 

@@ -167,13 +167,13 @@ UV_PREDICTION_MODE EntropyDecoder::readUvMode(CFL_ALLOWED_TYPE cflAllowed, PREDI
     return (UV_PREDICTION_MODE)m_symbol->read(uv_mode_cdf[cflAllowed][yMode], UV_INTRA_MODES - !cflAllowed);
 }
 
-uint8_t EntropyDecoder::readAngleDeltaY(PREDICTION_MODE YMode)
+int8_t EntropyDecoder::readAngleDeltaY(PREDICTION_MODE YMode)
 {
     uint8_t angle_delta_y = (uint8_t)m_symbol->read(angle_delta_cdf[YMode - V_PRED], 2 * MAX_ANGLE_DELTA + 1);
     return angle_delta_y - MAX_ANGLE_DELTA;
 }
 
-uint8_t EntropyDecoder::readAngleDeltaUV(UV_PREDICTION_MODE uvMode)
+int8_t EntropyDecoder::readAngleDeltaUV(UV_PREDICTION_MODE uvMode)
 {
     uint8_t angle_delta_uv = (uint8_t)m_symbol->read(angle_delta_cdf[uvMode - UV_V_PRED], 2 * MAX_ANGLE_DELTA + 1);
     return angle_delta_uv - MAX_ANGLE_DELTA;

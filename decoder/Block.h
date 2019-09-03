@@ -97,9 +97,9 @@ private:
     bool Lossless;
     bool skip;
     PREDICTION_MODE YMode;
-    uint8_t AngleDeltaY;
+    int8_t AngleDeltaY;
     UV_PREDICTION_MODE UVMode;
-    uint8_t AngleDeltaUV;
+    int8_t AngleDeltaUV;
     int8_t CflAlphaU;
     int8_t CflAlphaV;
     uint32_t PaletteSizeY = 0;
@@ -109,6 +109,9 @@ private:
     TX_SIZE TxSize;
     int RefFrame[2];
     uint32_t sbMask;
+
+    int MaxLumaW;
+    int MaxLumaH;
 
     EntropyDecoder& m_entropy;
     std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;

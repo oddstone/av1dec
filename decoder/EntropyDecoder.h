@@ -20,8 +20,8 @@ public:
     bool readSplitOrHorz(uint8_t ctx, uint8_t bsl, BLOCK_SIZE bSize);
     bool readSplitOrVert(uint8_t ctx, uint8_t bsl, BLOCK_SIZE bSize);
     UV_PREDICTION_MODE readUvMode(CFL_ALLOWED_TYPE cfl_allowed, PREDICTION_MODE y_mode);
-    uint8_t readAngleDeltaY(PREDICTION_MODE YMode);
-    uint8_t readAngleDeltaUV(UV_PREDICTION_MODE uvMode);
+    int8_t readAngleDeltaY(PREDICTION_MODE YMode);
+    int8_t readAngleDeltaUV(UV_PREDICTION_MODE uvMode);
     uint8_t readCflAlphaSigns();
     int8_t readCflAlphaU(uint8_t cfl_alpha_signs);
     int8_t readCflAlphaV(uint8_t cfl_alpha_signs);
