@@ -59,8 +59,8 @@ static const int Tx_Height_Log2[TX_SIZES_ALL] = {
 };
 
 
-#define ROUND2(x, n) ((n == 0) ? x : ((x + (1 << (n - 1))) >> n))
-#define ROUND2SIGNED(x, n) (x >= 0 ? ROUND2(x, n) : -ROUND2(-x, n))
+#define ROUND2(x, n) (((n) == 0) ? (x) : (((x) + (1 << (n - 1))) >> (n)))
+#define ROUND2SIGNED(x, n) ((x) >= 0 ? ROUND2((x), (n)) : -ROUND2(-(x), (n)))
 
 
 struct BlockTree {

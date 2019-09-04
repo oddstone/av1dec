@@ -52,12 +52,10 @@ private:
     void predict_intra(int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
         int mode, const std::shared_ptr<YuvFrame>& frame);
     void recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
-        const std::shared_ptr<YuvFrame>& frame) const;
-    void paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol,
-        const std::shared_ptr<YuvFrame>& frame) const;
+        const std::shared_ptr<YuvFrame>& frame);
+    void paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol);
     void dcPredict(bool haveLeft, bool haveAbove,
-        const uint8_t* AboveRow, const uint8_t* LeftCol,
-        const std::shared_ptr<YuvFrame>& frame) const;
+        const uint8_t* AboveRow, const uint8_t* LeftCol);
     bool getLeftSmooth(bool haveLeft) const;
     bool getAboveSmooth(bool haveAbove) const;
     bool getSmooth(int r, int c) const;
@@ -65,7 +63,7 @@ private:
     uint8_t* intraEdgeUpsample(const uint8_t* edge, int numPx, std::vector<uint8_t>& upsampled) const;
     void directionalIntraPredict(
         bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
-        int mode, const std::shared_ptr<YuvFrame>& frame) const;
+        int mode);
     PREDICTION_MODE getIntraDir();
     void predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame);
 
@@ -93,6 +91,7 @@ private:
     int log2W;
     int log2H;
 
+    std::vector<std::vector<uint8_t>> pred;
     TX_TYPE PlaneTxType;
     int Quant[1024];
     int Dequant[64][64];

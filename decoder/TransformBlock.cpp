@@ -2314,16 +2314,11 @@ int Intra_Filter_Taps[ INTRA_FILTER_MODES ][ 8 ][ 7 ] = {
 #define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
 
 void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
-    const std::shared_ptr<YuvFrame>& frame) const
+    const std::shared_ptr<YuvFrame>& frame)
 {
     const int w4 = w >> 2;
     const int h2 = h >> 1;
 
-//#define DEBUG_RECURSIVE_INTRA_PREDICTION
-#ifdef DEBUG_RECURSIVE_INTRA_PREDICTION
-    std::vector <std::vector<uint8_t>> Pred;
-    Pred.assign(h, std::vector<uint8_t>(w));
-#endif
     for (int i2 = 0; i2 < h2; i2++) {
         for (int j4 = 0; j4 < w4; j4++) {
             uint8_t p[7];
@@ -2349,11 +2344,8 @@ void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uin
                     for (int i = 0; i < 7; i++) {
                         pr += Intra_Filter_Taps[ m_block.filter_intra_mode ][ ( i1 << 2 ) + j1 ][ i ] * p[ i ];
                     }
-                    uint8_t pred = CLIP1(ROUND2SIGNED(pr, INTRA_FILTER_SCALE_BITS));
-                    frame->setPixel(plane, x + ( j4 << 2 ) + j1, y +( i2 << 1 ) + i1, pred);
-#ifdef DEBUG_RECURSIVE_INTRA_PREDICTION
-                    Pred[(i2 << 1) + i1][(j4 << 2) + j1] = pred;
-#endif
+                    uint8_t p = CLIP1(ROUND2SIGNED(pr, INTRA_FILTER_SCALE_BITS));
+                    pred[(i2 << 1) + i1][(j4 << 2) + j1] = p;
                 }
 
             }
@@ -2361,12 +2353,8 @@ void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uin
     }
 }
 
-void TransformBlock::paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol,
-    const std::shared_ptr<YuvFrame>& frame) const
+void TransformBlock::paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol)
 {
-    uint8_t* d = frame->data[plane];
-    int s = frame->strides[plane];
-    uint8_t* p = d + y * s + x;
 
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
@@ -2374,17 +2362,16 @@ void TransformBlock::paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCo
             uint8_t pLeft = std::abs(base - LeftCol[i]);
             uint8_t pTop = std::abs(base - AboveRow[j]);
             uint8_t pTopLeft = std::abs(base - AboveRow[-1]);
-            uint8_t pred;
+            uint8_t p;
             if (pLeft <= pTop && pLeft <= pTopLeft) {
-                pred = LeftCol[i];
+                p = LeftCol[i];
             } else if (pTop <= pTopLeft) {
-                pred = AboveRow[j];
+                p = AboveRow[j];
             } else {
-                pred = AboveRow[-1];
+                p = AboveRow[-1];
             }
-            *(p + j) = pred;
+            pred[i][j] = p;
         }
-        p += s;
    }
     
 }
@@ -2570,7 +2557,7 @@ uint8_t* TransformBlock::intraEdgeUpsample(const uint8_t* edge, int numPx, std::
 
 void TransformBlock::directionalIntraPredict(
     bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
-    int mode, const std::shared_ptr<YuvFrame>& frame) const
+    int mode)
 {
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
     int subY = (plane > 0) ? m_sequence.subsampling_y : 0;
@@ -2619,13 +2606,13 @@ void TransformBlock::directionalIntraPredict(
                 int base = (idx >> ( 6 - upsampleAbove ) ) + (j << upsampleAbove);
                 int shift = ( (idx << upsampleAbove) >> 1 ) & 0x1F;
                 int maxBaseX = (w + h - 1) << upsampleAbove;
-                uint8_t pred;
+                uint8_t p;
                 if (base < maxBaseX){
-                    pred = ROUND2(AboveRow[base] * ( 32 - shift ) +AboveRow[base + 1] * shift, 5 );
+                    p = ROUND2(AboveRow[base] * ( 32 - shift ) +AboveRow[base + 1] * shift, 5 );
                 } else {
-                    pred = AboveRow[maxBaseX];
+                    p = AboveRow[maxBaseX];
                 }
-                frame->setPixel(plane, x + j, y + i, pred);
+                pred[i][j] = p;
             }
         }
     } else if (pAngle > 90 && pAngle < 180) {
@@ -2636,17 +2623,17 @@ void TransformBlock::directionalIntraPredict(
                 int idx = ( j << 6 ) - ( i + 1 ) * dx;
                 int base = idx >> ( 6 - upsampleAbove );
                 int shift;
-                uint8_t pred;
+                uint8_t p;
                 if (base >= -(1<<upsampleAbove)) {
                     shift = ((idx << upsampleAbove) >> 1) & 0x1F;
-                    pred =ROUND2(AboveRow[base] * ( 32 - shift ) + AboveRow[base + 1] * shift, 5);
+                    p =ROUND2(AboveRow[base] * ( 32 - shift ) + AboveRow[base + 1] * shift, 5);
                 } else {
                     idx = (i << 6) - (j + 1) * dy;
                     base = idx >> (6 - upsampleLeft);
                     shift = ((idx << upsampleLeft) >> 1 ) & 0x1F;
-                    pred = ROUND2(LeftCol[base] * ( 32 - shift ) + LeftCol[base + 1] * shift, 5);
+                    p = ROUND2(LeftCol[base] * ( 32 - shift ) + LeftCol[base + 1] * shift, 5);
                 }
-                frame->setPixel(plane, x + j, y + i, pred);
+                pred[i][j] = p;
             }
         }
     }else if (pAngle > 180) {
@@ -2656,20 +2643,20 @@ void TransformBlock::directionalIntraPredict(
                 int idx = ( j + 1 ) * dy;
                 int base = (idx >> (6 - upsampleLeft)) + (i << upsampleLeft);
                 int shift = (( idx << upsampleLeft) >> 1) & 0x1F;
-                uint8_t pred = ROUND2(LeftCol[base] * (32 - shift) + LeftCol[base + 1] * shift, 5);
-                frame->setPixel(plane, x + j, y + i, pred);
+                uint8_t p = ROUND2(LeftCol[base] * (32 - shift) + LeftCol[base + 1] * shift, 5);
+                pred[i][j] = p;
             }
         }
     } else if (pAngle == 90) {
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
-                frame->setPixel(plane, x + j, y + i, AboveRow[j]);
+                pred[i][j] = AboveRow[j];
             }
         }
     } else if (pAngle == 180) {
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
-                frame->setPixel(plane, x + j, y + i, LeftCol[i]);
+                pred[i][j] = LeftCol[i];
             }
         }
     }
@@ -2677,8 +2664,7 @@ void TransformBlock::directionalIntraPredict(
 
 
 void TransformBlock::dcPredict(bool haveLeft, bool haveAbove,
-    const uint8_t* AboveRow, const uint8_t* LeftCol,
-    const std::shared_ptr<YuvFrame>& frame) const
+    const uint8_t* AboveRow, const uint8_t* LeftCol)
 {
     uint8_t avg;
     int sum = 0;
@@ -2697,7 +2683,7 @@ void TransformBlock::dcPredict(bool haveLeft, bool haveAbove,
     }
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
-            frame->setPixel(plane, x + j, y + i, avg);
+            pred[i][j] = avg;
         }
     }
 }
@@ -2749,14 +2735,15 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
     } else {
         AboveRow[-1] = median;
     }
+    pred.assign(h, std::vector<uint8_t>(w));
     if (plane == 0 && m_block.use_filter_intra) {
         recursiveIntraPrediction(AboveRow, LeftCol, frame);
     } else if (is_directional_mode(mode)) {
-        directionalIntraPredict(haveLeft, haveAbove, AboveRow, LeftCol, mode, frame);
+        directionalIntraPredict(haveLeft, haveAbove, AboveRow, LeftCol, mode);
     }  else if (mode == PAETH_PRED) {
-        paethPredict(AboveRow, LeftCol, frame);
+        paethPredict(AboveRow, LeftCol);
     } else if (mode == DC_PRED) {
-        dcPredict(haveLeft, haveAbove, AboveRow, LeftCol, frame);
+        dcPredict(haveLeft, haveAbove, AboveRow, LeftCol);
     } else {
         ASSERT(0 && "not PAETH_PRED");
     }
@@ -2794,7 +2781,7 @@ void TransformBlock::predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame)
         for (int j = 0; j < w; j++ ) {
             uint8_t dc = frame->getPixel(plane, startX + j, startY + i);
             int scaledLuma = ROUND2SIGNED( alpha * ( L[i][j] - lumaAvg ), 6 );
-            frame->setPixel(plane, startX + j, startY + i, CLIP1( dc + scaledLuma ));
+            pred[i][j] = CLIP1( dc + scaledLuma );
         }
     }
 }
@@ -2847,14 +2834,10 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     reconstruct();
 
     //copy to frame
-    uint8_t* d = frame->data[plane];
-    int s = frame->strides[plane];
-    uint8_t* p = d + y * s + x;
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
-            *(p+j) = (uint8_t)(Residual[i][j]+ *(p+j));
+            frame->setPixel(plane, x + j, y + i, (uint8_t)(Residual[i][j]+ pred[i][j]));
         }
-        p += s;
     }
 
     for (int i = 0; i < stepY; i++) {
