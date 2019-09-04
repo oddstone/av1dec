@@ -54,18 +54,20 @@ private:
     void recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
         const std::shared_ptr<YuvFrame>& frame);
     void paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol);
-    void dcPredict(bool haveLeft, bool haveAbove,
+    void dcPredict(bool haveAbove, bool haveLeft,
         const uint8_t* AboveRow, const uint8_t* LeftCol);
     bool getLeftSmooth(bool haveLeft) const;
     bool getAboveSmooth(bool haveAbove) const;
     bool getSmooth(int r, int c) const;
     bool get_filter_type(bool haveLeft, bool haveAbove) const;
     uint8_t* intraEdgeUpsample(const uint8_t* edge, int numPx, std::vector<uint8_t>& upsampled) const;
-    void directionalIntraPredict(
-        bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
+    void directionalIntraPredict(bool haveAbove, bool haveLeft, uint8_t* AboveRow, uint8_t* LeftCol,
         int mode);
     PREDICTION_MODE getIntraDir();
     void predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame);
+    void smoothPredict(const uint8_t* AboveRow, const uint8_t* LeftCol);
+    void smoothVPredict(const uint8_t* AboveRow, const uint8_t* LeftCol);
+    void smoothHPredict(const uint8_t* AboveRow, const uint8_t* LeftCol);
 
     EntropyDecoder& m_entropy;
     Block& m_block;

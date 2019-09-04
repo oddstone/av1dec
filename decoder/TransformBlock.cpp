@@ -2002,7 +2002,7 @@ static void iAdst(int* T, int n, int r)
             iAdst4(T);
             break;
         default:
-            ASSERT("not supported iAdst");
+            ASSERT(0 && "not supported iAdst");
             break;
     }
 }
@@ -2328,14 +2328,14 @@ void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uin
                 } else if (!j4 && !i) {
                     p[i] = LeftCol[ ( i2 << 1 ) - 1 ];
                 } else {
-                    p[i] = frame->getPixel(plane, x + ( j4 << 2 ) + i - 1, y + ( i2 << 1 ) - 1);
+                    p[i] = pred[(i2 << 1) - 1][(j4 << 2) + i - 1];
                 }
             }
             for (int i = 5; i < 7; i++) {
                 if (!j4) {
                     p[i] = LeftCol[ ( i2 << 1 ) + i - 5 ];
                 } else {
-                    p[i] = frame->getPixel(plane, x + ( j4 << 2 ) - 1, y + ( i2 << 1 ) + i - 5);
+                    p[i] = pred[(i2 << 1) + i - 5][(j4 << 2) - 1];
                 }
             }
             for (int i1 = 0; i1 < 2; i1++) {
@@ -2556,7 +2556,7 @@ uint8_t* TransformBlock::intraEdgeUpsample(const uint8_t* edge, int numPx, std::
 }
 
 void TransformBlock::directionalIntraPredict(
-    bool haveLeft, bool haveAbove, uint8_t* LeftCol, uint8_t* AboveRow,
+    bool haveAbove, bool haveLeft, uint8_t* AboveRow, uint8_t* LeftCol,
     int mode)
 {
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
@@ -2663,7 +2663,7 @@ void TransformBlock::directionalIntraPredict(
 }
 
 
-void TransformBlock::dcPredict(bool haveLeft, bool haveAbove,
+void TransformBlock::dcPredict(bool haveAbove, bool haveLeft,
     const uint8_t* AboveRow, const uint8_t* LeftCol)
 {
     uint8_t avg;
@@ -2687,6 +2687,60 @@ void TransformBlock::dcPredict(bool haveLeft, bool haveAbove,
         }
     }
 }
+
+static const int Sm_Weights_Tx_4x4 [ 4 ] = { 255, 149, 85, 64 };
+static const int Sm_Weights_Tx_8x8 [ 8 ] = { 255, 197, 146, 105, 73, 50, 37, 32 };
+static const int Sm_Weights_Tx_16x16[ 16 ] = { 255, 225, 196, 170, 145, 123, 102, 84, 68, 54, 43, 33, 26, 20, 17, 16 };
+static const int Sm_Weights_Tx_32x32[ 32 ] = { 255, 240, 225, 210, 196, 182, 169, 157, 145, 133, 122, 111, 101, 92, 83, 74,
+    66, 59, 52, 45, 39, 34, 29, 25, 21, 17, 14, 12, 10, 9, 8, 8 };
+static const int Sm_Weights_Tx_64x64[ 64 ] = { 255, 248, 240, 233, 225, 218, 210, 203, 196, 189, 182, 176, 169, 163, 156, 150,
+    144, 138, 133, 127, 121, 116, 111, 106, 101, 96, 91, 86, 82, 77, 73,
+    69, 65, 61, 57, 54, 50, 47, 44, 41, 38, 35, 32, 29, 27, 25, 22, 20, 18, 16, 15,
+    13, 12, 10, 9, 8, 7, 6, 6, 5, 5, 4, 4, 4 };
+
+const int* getSmWeights(int log)
+{
+    const int (*weights[]) = {Sm_Weights_Tx_4x4, Sm_Weights_Tx_8x8, Sm_Weights_Tx_16x16, Sm_Weights_Tx_32x32, Sm_Weights_Tx_64x64 };
+    return weights[log - 2];
+}
+
+void TransformBlock::smoothPredict(const uint8_t* AboveRow, const uint8_t* LeftCol)
+{
+    const int* smWeightsX = getSmWeights(log2W);
+    const int* smWeightsY = getSmWeights(log2H);
+    for (int i = 0; i < h; i++ ) {
+        for (int j = 0; j < w; j++ ) {
+            int smoothPred = smWeightsY[i] * AboveRow[j]
+                + (256 - smWeightsY[i]) * LeftCol[h - 1]
+                + smWeightsX[j] * LeftCol[i]
+                + (256 - smWeightsX[j]) * AboveRow[w - 1];
+            pred[i][j] = ROUND2( smoothPred, 9 );
+        }
+    }
+}
+
+void TransformBlock::smoothVPredict(const uint8_t* AboveRow, const uint8_t* LeftCol)
+{
+    const int* smWeights = getSmWeights(log2H);
+    for (int i = 0; i < h; i++ ) {
+        for (int j = 0; j < w; j++ ) {
+            int smoothPred = smWeights[ i ] * AboveRow[j] + ( 256 - smWeights[i] ) * LeftCol[h - 1];
+            pred[i][j] = ROUND2( smoothPred, 8);
+        }
+    }
+}
+
+void TransformBlock::smoothHPredict(const uint8_t* AboveRow, const uint8_t* LeftCol)
+{
+    const int* smWeights = getSmWeights(log2W);
+    for (int i = 0; i < h; i++ ) {
+        for (int j = 0; j < w; j++ ) {
+            int smoothPred = smWeights[j] * LeftCol[i] +(256 - smWeights[j] ) * AboveRow[w - 1];
+            pred[i][j] = ROUND2( smoothPred, 8);
+        }
+    }
+}
+
 void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRight, bool haveBelowLeft,
     int mode, const std::shared_ptr<YuvFrame>& frame)
 {
@@ -2739,11 +2793,17 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
     if (plane == 0 && m_block.use_filter_intra) {
         recursiveIntraPrediction(AboveRow, LeftCol, frame);
     } else if (is_directional_mode(mode)) {
-        directionalIntraPredict(haveLeft, haveAbove, AboveRow, LeftCol, mode);
+        directionalIntraPredict(haveAbove, haveLeft, AboveRow, LeftCol,  mode);
     }  else if (mode == PAETH_PRED) {
         paethPredict(AboveRow, LeftCol);
     } else if (mode == DC_PRED) {
-        dcPredict(haveLeft, haveAbove, AboveRow, LeftCol);
+        dcPredict(haveAbove, haveLeft, AboveRow, LeftCol);
+    } else if (mode == SMOOTH_PRED){
+        smoothPredict(AboveRow, LeftCol);
+    } else if (mode == SMOOTH_V_PRED) {
+        smoothVPredict(AboveRow, LeftCol);
+    } else if (mode == SMOOTH_H_PRED) {
+        smoothHPredict(AboveRow, LeftCol);
     } else {
         ASSERT(0 && "not PAETH_PRED");
     }
@@ -2830,13 +2890,17 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             m_block.MaxLumaH = y + stepY * 4;
         }
     }
+    if (x == 8 && y == 0) {
+        printf("ok");
+    }
 
     reconstruct();
 
     //copy to frame
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
-            frame->setPixel(plane, x + j, y + i, (uint8_t)(Residual[i][j]+ pred[i][j]));
+            uint8_t pixel = CLIP1(Residual[i][j] + pred[i][j]);
+            frame->setPixel(plane, x + j, y + i, pixel);
         }
     }
 
