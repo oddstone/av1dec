@@ -77,7 +77,7 @@ private:
     FrameHeader& m_frame;
     const SequenceHeader& m_sequence;
     Tile& m_tile;
-    BlockDecoded m_decoded;
+    BlockDecoded& m_decoded;
 
     //from spec
     uint32_t MiRow;

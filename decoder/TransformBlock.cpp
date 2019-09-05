@@ -1787,7 +1787,7 @@ static void B(int* T, int a, int b, int angle, bool flip)
 static void H(int* T, int a, int b, bool flip, int r)
 {
     if (flip)
-        std::swap(T[a], T[b]);
+        std::swap(a, b);
     int min = -(1 << (r - 1));
     int max = (1 << (r - 1)) - 1;
     int x = T[a];
@@ -1995,11 +1995,100 @@ static void iAdst4(int* T)
     T[2] = ROUND2(x[2], 12);
     T[3] = ROUND2(x[3], 12);
 }
+
+static void iAdstInputPermutation(int* T, int n)
+{
+    int n0 = 1 << n;
+    std::vector<int> copyT(T, T + n0);
+    for (int i = 0; i < n0; i++) {
+        int idx = (i & 1) ? (i - 1) : (n0 - i - 1);
+        T[i] = copyT[idx];
+    }
+}
+
+static void iAdstOuputPermutation(int* T, int n)
+{
+    int n0 = 1 << n;
+    std::vector<int> copyT(T, T + n0);
+    for (int i = 0; i < n0; i++) {
+        int a = ( ( i >> 3 ) & 1 );
+        int b = ( ( i >> 2 ) & 1 ) ^ ( ( i >> 3 ) & 1 );
+        int c = ( ( i >> 1 ) & 1 ) ^ ( ( i >> 2 ) & 1 );
+        int d = ( i & 1 ) ^ ( ( i >> 1 ) & 1 );
+        int idx = ( ( d << 3 ) | ( c << 2 ) | ( b << 1 ) | a ) >> ( 4 - n );
+        T[i] = ( i & 1 ) ? ( - copyT[ idx ] ) : copyT[ idx ];
+    }
+}
+
+static void iAdst8(int* T, int r)
+{
+    iAdstInputPermutation(T, 3);
+    for (int i = 0; i < 4; i++) {
+        B(T, 2 * i, 2 * i + 1, 60 - 16 * i, true);
+    }
+    for (int i = 0; i < 4; i++) {
+        H(T, i, 4 + i, false, r );
+    }
+    for (int i = 0; i < 2; i++) {
+        B(T, 4 + 3 * i, 5 + i, 48 - 32 * i, true );
+    }
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            H(T, 4 * j + i, 2 + 4 * j + i, false, r );
+        }
+    }
+    for (int i = 0; i < 2; i++) {
+        B(T, 2 + 4 * i, 3 + 4 * i, 32, true );
+    }
+    iAdstOuputPermutation(T, 3);
+}
+
+static void iAdst16(int* T, int r)
+{
+    iAdstInputPermutation(T, 4);
+    for (int i = 0; i < 8; i++) {
+        B(T, 2 * i, 2 * i + 1, 62 - 8 * i, true);
+    }
+    for (int i = 0; i < 8; i++) {
+        H(T, i, 8 + i, false, r );
+    }
+    for (int i = 0; i < 2; i++) {
+        B(T, 8 + 2 * i, 9 + 2 * i, 56 - 32 * i, true);
+        B(T, 13 + 2 * i, 12 + 2 * i, 8 + 32 * i, true);
+    }
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 2; j++) {
+            H(T, 8 * j + i, 4 + 8 * j + i, false, r );
+        }
+    }
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            B(T, 4 + 8 * j + 3 * i, 5 + 8 * j + i, 48 - 32 * i, true);
+        }
+    }
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 3; j++) {
+            H(T, 4 * j + i, 2 + 4 * j + i, false, r );
+        }
+    }
+    for (int i = 0; i < 4; i++) {
+        B(T, 2 + 4 * i, 3 + 4 * i, 32, true );
+    }
+    iAdstOuputPermutation(T, 34);
+}
+
+
 static void iAdst(int* T, int n, int r)
 {
     switch (n) {
         case 2:
             iAdst4(T);
+            break;
+        case 3:
+            iAdst8(T, r);
+            break;
+        case 4:
+            iAdst16(T, r);
             break;
         default:
             ASSERT(0 && "not supported iAdst");
@@ -2563,7 +2652,7 @@ void TransformBlock::directionalIntraPredict(
     int subY = (plane > 0) ? m_sequence.subsampling_y : 0;
     int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
     int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
-    int angleDelta = plane > 0 ? m_block.AngleDeltaY : m_block.AngleDeltaUV;
+    int angleDelta = plane == 0 ? m_block.AngleDeltaY : m_block.AngleDeltaUV;
     int pAngle = Mode_To_Angle[ mode ] + angleDelta * ANGLE_STEP;
     int upsampleAbove = 0;
     int upsampleLeft = 0;
@@ -2789,6 +2878,7 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
     } else {
         AboveRow[-1] = median;
     }
+    LeftCol[-1] = AboveRow[-1];
     pred.assign(h, std::vector<uint8_t>(w));
     if (plane == 0 && m_block.use_filter_intra) {
         recursiveIntraPrediction(AboveRow, LeftCol, frame);
@@ -2861,6 +2951,9 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     if (x >= maxX || y >= maxY) {
         return true;
     }
+    if (x == 40 && y == 0) {
+        printf("ok");
+    }
     if (!m_block.is_inter) {
         if (((plane == 0) && m_block.PaletteSizeY) || ((plane != 0) && m_block.PaletteSizeUV)) {
             ASSERT(0 && "predict_palette");
@@ -2890,7 +2983,7 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             m_block.MaxLumaH = y + stepY * 4;
         }
     }
-    if (x == 8 && y == 0) {
+    if (x == 40 && y == 0) {
         printf("ok");
     }
 
