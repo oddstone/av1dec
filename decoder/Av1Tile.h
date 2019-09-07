@@ -173,6 +173,7 @@ class Tile {
     friend class BlockDecoded;
     friend class TransformBlock;
     friend class Partition;
+    friend class SuperBlock;
 
 public:
     Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum);

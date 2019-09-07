@@ -1998,6 +1998,7 @@ static void iAdst4(int* T)
 
 static void iAdstInputPermutation(int* T, int n)
 {
+    ASSERT(n >= 3 && n <= 4);
     int n0 = 1 << n;
     std::vector<int> copyT(T, T + n0);
     for (int i = 0; i < n0; i++) {
@@ -2008,6 +2009,7 @@ static void iAdstInputPermutation(int* T, int n)
 
 static void iAdstOuputPermutation(int* T, int n)
 {
+    ASSERT(n >= 3 && n <= 4);
     int n0 = 1 << n;
     std::vector<int> copyT(T, T + n0);
     for (int i = 0; i < n0; i++) {
@@ -2056,7 +2058,7 @@ static void iAdst16(int* T, int r)
         B(T, 8 + 2 * i, 9 + 2 * i, 56 - 32 * i, true);
         B(T, 13 + 2 * i, 12 + 2 * i, 8 + 32 * i, true);
     }
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 2; j++) {
             H(T, 8 * j + i, 4 + 8 * j + i, false, r );
         }
@@ -2067,14 +2069,14 @@ static void iAdst16(int* T, int r)
         }
     }
     for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 3; j++) {
+        for (int j = 0; j < 4; j++) {
             H(T, 4 * j + i, 2 + 4 * j + i, false, r );
         }
     }
     for (int i = 0; i < 4; i++) {
         B(T, 2 + 4 * i, 3 + 4 * i, 32, true );
     }
-    iAdstOuputPermutation(T, 34);
+    iAdstOuputPermutation(T, 4);
 }
 
 
@@ -2212,7 +2214,7 @@ void TransformBlock::inverseTransform()
             case FLIPADST_ADST:
             case V_ADST:
             case V_FLIPADST:
-                iAdst(T, log2H, rowClampRange);
+                iAdst(T, log2H, colClampRange);
                 break;
             default:
                 iIdentity(T, log2H);
@@ -2447,10 +2449,10 @@ void TransformBlock::paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCo
 
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
-            uint8_t base = AboveRow[ j ] + LeftCol[i] - AboveRow[-1];
-            uint8_t pLeft = std::abs(base - LeftCol[i]);
-            uint8_t pTop = std::abs(base - AboveRow[j]);
-            uint8_t pTopLeft = std::abs(base - AboveRow[-1]);
+            int base = AboveRow[ j ] + LeftCol[i] - AboveRow[-1];
+            int pLeft = std::abs(base - LeftCol[i]);
+            int pTop = std::abs(base - AboveRow[j]);
+            int pTopLeft = std::abs(base - AboveRow[-1]);
             uint8_t p;
             if (pLeft <= pTop && pLeft <= pTopLeft) {
                 p = LeftCol[i];
@@ -2903,8 +2905,8 @@ void TransformBlock::predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame)
 {
     int subX = m_sequence.subsampling_x;
     int subY = m_sequence.subsampling_y;
-    int startX = (m_block.MiCol << 2);
-    int startY = (m_block.MiRow << 2);
+    int startX = x;
+    int startY = y;
 
     int8_t alpha = plane == 1 ? m_block.CflAlphaU : m_block.CflAlphaV;
     int lumaAvg = 0;
@@ -2929,7 +2931,7 @@ void TransformBlock::predict_chroma_from_luma(std::shared_ptr<YuvFrame>& frame)
     lumaAvg = ROUND2( lumaAvg, log2W + log2H );
     for (int i = 0; i < h; i++ ) {
         for (int j = 0; j < w; j++ ) {
-            uint8_t dc = frame->getPixel(plane, startX + j, startY + i);
+            uint8_t dc = pred[i][j];
             int scaledLuma = ROUND2SIGNED( alpha * ( L[i][j] - lumaAvg ), 6 );
             pred[i][j] = CLIP1( dc + scaledLuma );
         }
@@ -2968,16 +2970,18 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             }
             int log2W = Tx_Width_Log2[txSz];
             int log2H = Tx_Height_Log2[txSz];
+            bool haveAboveRight = m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) - 1, (subBlockMiCol >> subX) + stepX);
+            bool haveBelowLeft = m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1);
+
             predict_intra(
                 (plane == 0 ? m_block.AvailL : m_block.AvailLChroma) || x > 0,
                 (plane == 0 ? m_block.AvailU : m_block.AvailUChroma) || y > 0,
-                m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) - 1, (subBlockMiCol >> subX) + stepX),
-                m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1),
-                mode, frame);
+                haveAboveRight, haveBelowLeft, mode, frame);
             if (isCfl) {
                 predict_chroma_from_luma(frame);
             }
         }
+
         if (plane == 0) {
             m_block.MaxLumaW = x + stepX * 4;
             m_block.MaxLumaH = y + stepY * 4;

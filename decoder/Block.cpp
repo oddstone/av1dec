@@ -146,7 +146,7 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
             /*        LoopfilterTxSizes[ plane ]
         [ (row >> subY) + i ]
         [ (col >> subX) + j ] = txSz*/
-            m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
+            //m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
         }
     }
 }

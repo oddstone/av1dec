@@ -42,6 +42,7 @@ void BlockDecoded::clearFlags(int r, int c, int sbSize4)
         int subY = (plane > 0) ? subsampling_y : 0;
         int sbWidth4 = (MiColEnd - c) >> subX;
         int sbHeight4 = (MiRowEnd - r) >> subY;
+        memset(m_decoded[plane], false, sizeof(m_decoded[plane]));
         for (int y = -1; y <= (sbSize4 >> subY); y++) {
             for (int x = -1; x <= (sbSize4 >> subX); x++) {
                 if (y < 0 && x < sbWidth4)
@@ -205,7 +206,6 @@ bool Tile::parse(const uint8_t* data, uint32_t size)
             //ReadDeltas = delta_q_present
             //clear_cdef(r, c)
             //clear_block_decoded_flags(r, c, sbSize4)
-            m_decoded.clearFlags(r, c, sbSize4);
             //read_lr(r, c, sbSize)
             //decode_partition(r, c, sbSize)
             //decodePartition(r, c, sbSize);
