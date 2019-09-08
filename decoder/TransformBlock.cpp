@@ -2502,23 +2502,25 @@ static void filterCorner(uint8_t* LeftCol, uint8_t* AboveRow)
 {
     uint8_t s = ROUND2(LeftCol[ 0 ] * 5 + AboveRow[ -1 ] * 6 + AboveRow[ 0 ] * 5, 4);
     LeftCol[-1] = s;
-    AboveRow[1] = s;
+    AboveRow[-1] = s;
 }
 
-bool TransformBlock::getLeftSmooth(bool haveLeft) const
+bool TransformBlock::getLeftSmooth() const
 {
+    bool avail = !plane ? m_block.AvailL : m_block.AvailLChroma;
     bool leftSmooth = false;
-    if (haveLeft) {
-        leftSmooth = getSmooth(y4, x4 -1);
+    if (avail) {
+        leftSmooth = getSmooth(m_block.MiRow, m_block.MiCol - 1);
     }
     return leftSmooth;
 }
 
-bool TransformBlock::getAboveSmooth(bool haveAbove) const
+bool TransformBlock::getAboveSmooth() const
 {
+    bool avail = !plane ? m_block.AvailU : m_block.AvailUChroma;
     bool aboveSmooth = false;
-    if (haveAbove) {
-        aboveSmooth = getSmooth(y4 - 1, x4);
+    if (avail) {
+        aboveSmooth = getSmooth(m_block.MiRow - 1 , m_block.MiCol);
     }
     return aboveSmooth;
 }
@@ -2526,9 +2528,9 @@ bool TransformBlock::getAboveSmooth(bool haveAbove) const
 bool TransformBlock::getSmooth(int r, int c) const
 {
     if ( plane > 0 ) {
-        if (m_sequence.subsampling_x && !( c & 1 ) )
+        if (m_sequence.subsampling_x && !( m_block.MiCol & 1 ) )
             c++;
-        if (m_sequence.subsampling_y && ( r & 1 ) )
+        if (m_sequence.subsampling_y && ( m_block.MiRow & 1 ) )
             r--;
     }
     int mode;
@@ -2544,8 +2546,8 @@ bool TransformBlock::getSmooth(int r, int c) const
 
 bool TransformBlock::get_filter_type(bool haveLeft, bool haveAbove) const
 {
-    bool aboveSmooth = getAboveSmooth(haveAbove);
-    bool leftSmooth = getLeftSmooth(haveLeft);
+    bool aboveSmooth = getAboveSmooth();
+    bool leftSmooth = getLeftSmooth();
     return aboveSmooth || leftSmooth;
 }
 
@@ -2662,20 +2664,19 @@ void TransformBlock::directionalIntraPredict(
     std::vector<uint8_t> upsampledLeft;
     if (m_sequence.enable_intra_edge_filter) {
         if (pAngle != 90 && pAngle != 180) {
-            bool filterType = false;
-            if (pAngle > 90 && pAngle < 180 && (w + h ) >= 24) {
+            if (pAngle > 90 && pAngle < 180 && (w + h) >= 24) {
                 filterCorner(LeftCol, AboveRow);
-                bool filterType = get_filter_type(haveLeft, haveAbove);
-                if (haveAbove) {
-                    int strength = getIntraEdgeFilterStrength(w, h, filterType, pAngle - 90);
-                    int numPx = std::min( w, ( maxX - x + 1 ) ) + ( pAngle < 90 ? h : 0 ) + 1;
-                    intraEdgeFilter(numPx, strength, AboveRow);
-                }
-                if (haveLeft) {
-                    int strength = getIntraEdgeFilterStrength(w, h, filterType, pAngle - 180);
-                    int numPx = std::min(h, (maxY - y + 1)) + (pAngle > 180 ? w : 0) + 1;
-                    intraEdgeFilter(numPx, strength, LeftCol);
-                }
+            }
+            bool filterType = get_filter_type(haveLeft, haveAbove);
+            if (haveAbove) {
+                int strength = getIntraEdgeFilterStrength(w, h, filterType, pAngle - 90);
+                int numPx = std::min( w, ( maxX - x + 1 ) ) + ( pAngle < 90 ? h : 0 ) + 1;
+                intraEdgeFilter(numPx, strength, AboveRow);
+            }
+            if (haveLeft) {
+                int strength = getIntraEdgeFilterStrength(w, h, filterType, pAngle - 180);
+                int numPx = std::min(h, (maxY - y + 1)) + (pAngle > 180 ? w : 0) + 1;
+                intraEdgeFilter(numPx, strength, LeftCol);
             }
             upsampleAbove = getIntraEdgeUpsample(w, h, filterType, pAngle - 90);
             int numPx = ( w + (pAngle < 90 ? h : 0) );
@@ -2953,7 +2954,7 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     if (x >= maxX || y >= maxY) {
         return true;
     }
-    if (x == 40 && y == 0) {
+    if (x == 64/2 && y == 128/2 && plane > 0) {
         printf("ok");
     }
     if (!m_block.is_inter) {
@@ -2987,10 +2988,9 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             m_block.MaxLumaH = y + stepY * 4;
         }
     }
-    if (x == 40 && y == 0) {
+    if (x == 64 / 2 && y == 128 / 2 && plane > 0) {
         printf("ok");
     }
-
     reconstruct();
 
     //copy to frame

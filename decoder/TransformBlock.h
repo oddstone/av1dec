@@ -56,8 +56,8 @@ private:
     void paethPredict(const uint8_t* AboveRow, const uint8_t* LeftCol);
     void dcPredict(bool haveAbove, bool haveLeft,
         const uint8_t* AboveRow, const uint8_t* LeftCol);
-    bool getLeftSmooth(bool haveLeft) const;
-    bool getAboveSmooth(bool haveAbove) const;
+    bool getLeftSmooth() const;
+    bool getAboveSmooth() const;
     bool getSmooth(int r, int c) const;
     bool get_filter_type(bool haveLeft, bool haveAbove) const;
     uint8_t* intraEdgeUpsample(const uint8_t* edge, int numPx, std::vector<uint8_t>& upsampled) const;
