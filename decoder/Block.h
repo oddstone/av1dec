@@ -65,9 +65,6 @@ private:
     TxSet get_tx_set(TX_SIZE txSz);
 
 
-    void predict_intra(int plane, int startX, int startY,
-        int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
-        int mode, int log2W, int log2H);
     uint8_t getAllZeroCtx(int plane, int x4, int y4, int w4, int h4, TX_SIZE txSz);
     int16_t get_q_idx();
 

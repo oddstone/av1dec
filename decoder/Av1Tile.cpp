@@ -8,24 +8,11 @@
 #include "VideoFrame.h"
 #include "log.h"
 
-static void CopyAndReverse(void* dest, const void* src, uint32_t size)
-{
-#define CDF_PROB_BITS 15
-#define CDF_PROB_TOP (1 << CDF_PROB_BITS)
-    const uint16_t* cdf = (const uint16_t*)src;
-    uint16_t* icdf = (uint16_t*)dest;
-    for (uint32_t i = 0; i < size; i++) {
-        *icdf = CDF_PROB_TOP - *cdf;
-        icdf++;
-        cdf++;
-    }
-}
-
 BlockDecoded::BlockDecoded()
 {
 }
 
-void BlockDecoded::init(Tile& tile)
+void BlockDecoded::init(const Tile& tile)
 {
     const SequenceHeader& s = *tile.m_sequence;
     NumPlanes = s.NumPlanes;
@@ -46,18 +33,18 @@ void BlockDecoded::clearFlags(int r, int c, int sbSize4)
         for (int y = -1; y <= (sbSize4 >> subY); y++) {
             for (int x = -1; x <= (sbSize4 >> subX); x++) {
                 if (y < 0 && x < sbWidth4)
-                    m_decoded[plane][y + OFFSET][x + OFFSET] = true;
+                    setFlag(plane, y, x);
                 else if (x < 0 && y < sbHeight4)
-                    m_decoded[plane][y + OFFSET][x + OFFSET] = true;
+                    setFlag(plane, y, x);
                 else
-                    m_decoded[plane][y + OFFSET][x + OFFSET] = false;
+                    clearFlag(plane, y, x);
             }
         }
-        m_decoded[plane][(sbSize4 >> subY) + OFFSET][-1 + OFFSET] = false;
+        clearFlag(plane, sbSize4 >> subY, -1);
     }
 }
 
-bool BlockDecoded::getFlag(int plane, int r, int c)
+bool BlockDecoded::getFlag(int plane, int r, int c) const
 {
     return m_decoded[plane][r + OFFSET][c + OFFSET];
 }
@@ -66,6 +53,12 @@ void BlockDecoded::setFlag(int plane, int r, int c)
 {
     m_decoded[plane][r + OFFSET][c + OFFSET] = true;
 }
+
+void BlockDecoded::clearFlag(int plane, int r, int c)
+{
+    m_decoded[plane][r + OFFSET][c + OFFSET] = false;
+}
+
 
 Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum)
     : m_sequence(sequence)
@@ -80,9 +73,6 @@ Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<Frame
     CurrentQIndex = frame->m_quant.base_q_idx;
     m_decoded.init(*this);
 
-    //CopyAndReverse(m_partitionCdf, Default_Partition_Cdf, sizeof(Default_Partition_Cdf));
-    //CopyAndReverse(m_skipCdf, Default_Skip_Cdf, sizeof(Default_Skip_Cdf));
-    //CopyAndReverse(m_intraFrameYModeCdf, Default_Intra_Frame_Y_Mode_Cdf, sizeof(Default_Intra_Frame_Y_Mode_Cdf));
 }
 
 bool Tile::is_inside(uint32_t r, uint32_t c)

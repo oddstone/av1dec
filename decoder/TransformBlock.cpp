@@ -1772,7 +1772,7 @@ static void B(int* T, int a, int b, int angle, bool flip)
 {
     int Ta = T[a];
     int Tb = T[b];
-    printf("Ta = %d, Tb = %d, sin = %d, cos = %d, angle = %d", Ta, Tb, sin128(angle), cos128(angle), angle);
+    //printf("Ta = %d, Tb = %d, sin = %d, cos = %d, angle = %d", Ta, Tb, sin128(angle), cos128(angle), angle);
     int x = Ta * cos128(angle) - Tb * sin128(angle);
     int y = Ta * sin128(angle) + Tb * cos128(angle);
     if (!flip) {
@@ -2224,7 +2224,6 @@ void TransformBlock::inverseTransform()
         for (int i = 0; i < h; i++)
             Residual[i][j] = ROUND2(T[i], colShift);
     }
-    printf("ok");
 }
 
 void TransformBlock::reconstruct()
@@ -2954,9 +2953,6 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     if (x >= maxX || y >= maxY) {
         return true;
     }
-    if (x == 64/2 && y == 128/2 && plane > 0) {
-        printf("ok");
-    }
     if (!m_block.is_inter) {
         if (((plane == 0) && m_block.PaletteSizeY) || ((plane != 0) && m_block.PaletteSizeUV)) {
             ASSERT(0 && "predict_palette");
@@ -2987,9 +2983,6 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             m_block.MaxLumaW = x + stepX * 4;
             m_block.MaxLumaH = y + stepY * 4;
         }
-    }
-    if (x == 64 / 2 && y == 128 / 2 && plane > 0) {
-        printf("ok");
     }
     reconstruct();
 

@@ -110,15 +110,6 @@ void Block::compute_prediction()
     }
 }
 
-void Block::predict_intra(int plane, int startX, int startY,
-    int availL, int availU, bool decodedUpRight, bool decodedBottomLeft,
-    int mode, int log2W, int log2H)
-{
-    if (mode != PAETH_PRED) {
-        ASSERT(0 && "not PAETH_PRED");
-    }
-}
-
 void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x, int y)
 {
     int startX = baseX + 4 * x;
@@ -197,11 +188,13 @@ void Block::residual()
                 } else {
                     int baseXBlock = (MiCol >> subX) * MI_SIZE;
                     int baseYBlock = (MiRow >> subY) * MI_SIZE;
-                    for (int y = 0; y < num4x4H; y += stepY)
-                        for (int x = 0; x < num4x4W; x += stepX)
+                    for (int y = 0; y < num4x4H; y += stepY) {
+                        for (int x = 0; x < num4x4W; x += stepX) {
                             transform_block(plane, baseXBlock, baseYBlock, txSz,
                                 x + ((chunkX << 4) >> subX),
                                 y + ((chunkY << 4) >> subY));
+                        }
+                    }
                 }
             }
         }
@@ -333,9 +326,6 @@ void Block::intra_angle_info_y()
     if (MiSize >= BLOCK_8X8) {
         if (is_directional_mode(YMode)) {
             AngleDeltaY = m_entropy.readAngleDeltaY(YMode);
-            if (AngleDeltaY < -3) {
-                printf("Ok");
-            }
         }
     }
 }

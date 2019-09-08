@@ -138,12 +138,13 @@ class SuperBlock;
 class BlockDecoded {
 public:
     BlockDecoded();
-    void init(Tile& tile);
+    void init(const Tile& tile);
     void clearFlags(int r, int c, int sbSize4);
     void setFlag(int plane, int r, int c);
-    bool getFlag(int plane, int r, int c);
+    bool getFlag(int plane, int r, int c) const;
 
 private:
+    void clearFlag(int plane, int r, int c);
     static const int SIZE = 128 / 4 + 2;
     static const int OFFSET = 1;
     bool m_decoded[3][SIZE][SIZE];

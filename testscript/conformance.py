@@ -50,7 +50,7 @@ def get_ref_md5(fn):
         suffix = "  " + name
         for line in f.readlines():
             line = line.strip()
-            print("+" + line + "-")
+            #print("+" + line + "-")
             if line.endswith(suffix):
                 line = line.replace(suffix, "")
                 return line
@@ -93,7 +93,6 @@ def is_candidiate(f):
 
 def print_summary(name, files):
     if len(files) > 0:
-        print("")
         print(name + " files:")
         for f in files:
             print("    " + f)
@@ -118,17 +117,17 @@ summary = [[], [], []]
 for root, dirs, files in os.walk(path):
     for f in files:
         fn = join(root, f)
-        print("root = "+root)
-        print("f = "+f)
+        #print("root = "+root)
+        #print("f = "+f)
         if is_candidiate(fn):
             s = test(fn)
             status[s] += 1
             summary[s].append(f)
 print("")
-print("+++++++++")
+print("+++++++++ report +++++++++");
 print_summary("failed", summary[FAILED])
 print_summary("skipped", summary[SKIPPED])
 print_summary("passed", summary[PASSED])
 print("")
 print("total = "+ str(status[PASSED] + status[FAILED] + status[SKIPPED]) +", failed = "+ str(status[FAILED]) + ", skipped = " + str(status[SKIPPED]))
-print("+++++++++")
+print("----------")
