@@ -383,6 +383,38 @@ namespace Av1 {
         return true;
     }
 
+    BLOCK_SIZE Subsampled_Size[BLOCK_SIZES_ALL][2][2] = {
+        { { BLOCK_4X4, BLOCK_4X4 }, { BLOCK_4X4, BLOCK_4X4 } },
+        { { BLOCK_4X8, BLOCK_4X4 }, { BLOCK_INVALID, BLOCK_4X4 } },
+        { { BLOCK_8X4, BLOCK_INVALID }, { BLOCK_4X4, BLOCK_4X4 } },
+        { { BLOCK_8X8, BLOCK_8X4 }, { BLOCK_4X8, BLOCK_4X4 } },
+        { { BLOCK_8X16, BLOCK_8X8 }, { BLOCK_INVALID, BLOCK_4X8 } },
+        { { BLOCK_16X8, BLOCK_INVALID }, { BLOCK_8X8, BLOCK_8X4 } },
+        { { BLOCK_16X16, BLOCK_16X8 }, { BLOCK_8X16, BLOCK_8X8 } },
+        { { BLOCK_16X32, BLOCK_16X16 }, { BLOCK_INVALID, BLOCK_8X16 } },
+        { { BLOCK_32X16, BLOCK_INVALID }, { BLOCK_16X16, BLOCK_16X8 } },
+        { { BLOCK_32X32, BLOCK_32X16 }, { BLOCK_16X32, BLOCK_16X16 } },
+        { { BLOCK_32X64, BLOCK_32X32 }, { BLOCK_INVALID, BLOCK_16X32 } },
+        { { BLOCK_64X32, BLOCK_INVALID }, { BLOCK_32X32, BLOCK_32X16 } },
+        { { BLOCK_64X64, BLOCK_64X32 }, { BLOCK_32X64, BLOCK_32X32 } },
+        { { BLOCK_64X128, BLOCK_64X64 }, { BLOCK_INVALID, BLOCK_32X64 } },
+        { { BLOCK_128X64, BLOCK_INVALID }, { BLOCK_64X64, BLOCK_64X32 } },
+        { { BLOCK_128X128, BLOCK_128X64 }, { BLOCK_64X128, BLOCK_64X64 } },
+        { { BLOCK_4X16, BLOCK_4X8 }, { BLOCK_INVALID, BLOCK_4X8 } },
+        { { BLOCK_16X4, BLOCK_INVALID }, { BLOCK_8X4, BLOCK_8X4 } },
+        { { BLOCK_8X32, BLOCK_8X16 }, { BLOCK_INVALID, BLOCK_4X16 } },
+        { { BLOCK_32X8, BLOCK_INVALID }, { BLOCK_16X8, BLOCK_16X4 } },
+        { { BLOCK_16X64, BLOCK_16X32 }, { BLOCK_INVALID, BLOCK_8X32 } },
+        { { BLOCK_64X16, BLOCK_INVALID }, { BLOCK_32X16, BLOCK_32X8 } },
+    };
+
+    BLOCK_SIZE SequenceHeader::get_plane_residual_size(int subsize, int plane) const
+    {
+        int subx = plane > 0 ? subsampling_x : 0;
+        int suby = plane > 0 ? subsampling_y : 0;
+        return Subsampled_Size[subsize][subx][suby];
+    }
+
     Parser::Parser()
         : m_seenFrameHeader(false)
     {
@@ -478,8 +510,14 @@ namespace Av1 {
         InterTxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
         TxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
         MiSizes.assign(AlignedMiRows, std::vector<BLOCK_SIZE>(AlignedMiCols));
+        for (int i = 0; i < MAX_PLANES; i++) {
+            LoopfilterTxSizes[i].assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
+        }
         SegmentIds.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
         Skips.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
+        for (int i = 0; i < FRAME_LF_COUNT; i++) {
+            DeltaLFs[i].assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+        }
     }
 
     bool FrameHeader::loop_filter_params(BitReader& br, const SequenceHeader& seq)
@@ -495,6 +533,12 @@ namespace Av1 {
     bool FrameHeader::lr_params(BitReader& br, const SequenceHeader& seq)
     {
         return m_loopRestoration.parse(br, seq, *this);
+    }
+
+    void FrameHeader::setup_past_independence()
+    {
+        m_loopFilter.setup_past_independence();
+        m_segmentation.setup_past_independence();
     }
 
     bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
@@ -610,7 +654,7 @@ namespace Av1 {
         }
         if (primary_ref_frame == PRIMARY_REF_NONE) {
             //init_non_coeff_cdfs()
-            //setup_past_independence()
+            setup_past_independence();
         } else {
             ASSERT(0);
         }
@@ -959,15 +1003,11 @@ namespace Av1 {
     bool Segmentation::parse(BitReader& br)
     {
         READ(segmentation_enabled);
-        if (segmentation_enabled)
+        if (segmentation_enabled) {
             ASSERT(0);
+        }
         else {
-            for (int i = 0; i < MAX_SEGMENTS; i++) {
-                for (int j = 0; j < SEG_LVL_MAX; j++) {
-                    FeatureEnabled[i][j] = 0;
-                    FeatureData[i][j] = 0;
-                }
-            }
+            resetFeatures();
         }
         SegIdPreSkip = false;
         LastActiveSegId = 0;
@@ -983,9 +1023,24 @@ namespace Av1 {
         }
         return true;
     }
-    bool Segmentation::seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE feature)
+    bool Segmentation::seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE feature) const
     {
         return segmentation_enabled && FeatureEnabled[segmentId][feature];
+    }
+
+    void Segmentation::resetFeatures()
+    {
+        for (int i = 0; i < MAX_SEGMENTS; i++) {
+            for (int j = 0; j < SEG_LVL_MAX; j++) {
+                FeatureEnabled[i][j] = 0;
+                FeatureData[i][j] = 0;
+            }
+        }
+    }
+
+    void Segmentation::setup_past_independence()
+    {
+        resetFeatures();
     }
 
     bool DeltaQ::parse(BitReader& br, const Quantization& quant)
@@ -1016,23 +1071,34 @@ namespace Av1 {
         return true;
     }
 
-    bool LoopFilter::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
+    void LoopFilterParams::setup_past_independence()
+    {
+        loop_filter_delta_enabled = true;
+        resetDeltas();
+    }
+
+    void LoopFilterParams::resetDeltas()
+    {
+        loop_filter_ref_deltas[INTRA_FRAME] = 1;
+        loop_filter_ref_deltas[LAST_FRAME] = 0;
+        loop_filter_ref_deltas[LAST2_FRAME] = 0;
+        loop_filter_ref_deltas[LAST3_FRAME] = 0;
+        loop_filter_ref_deltas[BWDREF_FRAME] = 0;
+        loop_filter_ref_deltas[GOLDEN_FRAME] = -1;
+        loop_filter_ref_deltas[ALTREF_FRAME] = -1;
+        loop_filter_ref_deltas[ALTREF2_FRAME] = -1;
+
+        for (uint8_t i = 0; i < 2; i++) {
+            loop_filter_mode_deltas[i] = 0;
+        }
+    }
+
+    bool LoopFilterParams::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
     {
         if (frame.CodedLossless || frame.allow_intrabc) {
             loop_filter_level[0] = 0;
             loop_filter_level[1] = 0;
-            loop_filter_ref_deltas[INTRA_FRAME] = 1;
-            loop_filter_ref_deltas[LAST_FRAME] = 0;
-            loop_filter_ref_deltas[LAST2_FRAME] = 0;
-            loop_filter_ref_deltas[LAST3_FRAME] = 0;
-            loop_filter_ref_deltas[BWDREF_FRAME] = 0;
-            loop_filter_ref_deltas[GOLDEN_FRAME] = -1;
-            loop_filter_ref_deltas[ALTREF_FRAME] = -1;
-            loop_filter_ref_deltas[ALTREF2_FRAME] = -1;
-
-            for (uint8_t i = 0; i < 2; i++) {
-                loop_filter_mode_deltas[i] = 0;
-            }
+            resetDeltas();
             return true;
         }
         READ_BITS(loop_filter_level[0], 6);
@@ -1044,7 +1110,6 @@ namespace Av1 {
             }
         }
         READ_BITS(loop_filter_sharpness, 3);
-        bool loop_filter_delta_enabled;
         READ(loop_filter_delta_enabled);
         if (loop_filter_delta_enabled) {
             bool loop_filter_delta_update;

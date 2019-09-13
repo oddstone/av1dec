@@ -201,9 +201,7 @@ private:
     BlockContext m_above;
     BlockContext m_left;
     std::deque<std::shared_ptr<SuperBlock>> m_sbs;
+    int8_t DeltaLF[FRAME_LF_COUNT];
 
-    //uint16_t m_partitionCdf[PARTITION_WIDTH_TYPES][PARTITION_CONTEXTS][EXT_PARTITION_TYPES + 1];
-    //uint16_t m_skipCdf[SKIP_CONTEXTS][3];
-    //uint16_t m_intraFrameYModeCdf[INTRA_MODE_CONTEXTS][INTRA_MODE_CONTEXTS][INTRA_MODES + 1];
 };
 #endif

@@ -1,8 +1,10 @@
 #include "Av1Decoder.h"
 #include "Av1Parser.h"
+#include "LoopFilter.h"
 #include "bitReader.h"
 #include "VideoFrame.h"
 #include "log.h"
+
 
 namespace YamiParser {
 namespace Av1 {
@@ -25,7 +27,7 @@ namespace Av1 {
             bool ret;
             ObuType type = header.obu_type;
             uint64_t sz = header.obu_size;
-            printf("type = %s, extension = %d, obu_size = %d\r\n", obuType2String(type), header.obu_extension_flag, (int)sz);
+            //printf("type = %s, extension = %d, obu_size = %d\r\n", obuType2String(type), header.obu_extension_flag, (int)sz);
 
             BitReader br(data + (reader.getPos() >> 3), sz);
             if (type == OBU_SEQUENCE_HEADER) {
@@ -78,8 +80,21 @@ namespace Av1 {
                 return false;
             }
         }
+        if (!h.disable_frame_end_update_cdf ) {
+            printf("warning: disable_frame_end_update_cdf is not supported");
+        }
+        decode_frame_wrapup(frame);
         m_output.push_back(frame);
         return true;
+    }
+
+    void Decoder::decode_frame_wrapup(const std::shared_ptr<YuvFrame>& frame)
+    {
+        FrameHeader& h = *m_parser->m_frame;
+        if (h.show_existing_frame)
+            return;
+        LoopFilter filter(*m_parser);
+        filter.filter(frame);
     }
     std::shared_ptr<YuvFrame> Decoder::getOutput()
     {

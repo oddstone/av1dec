@@ -195,6 +195,9 @@ namespace Av1 {
 
         bool parse(BitReader& br);
 
+        //utils function
+        BLOCK_SIZE get_plane_residual_size(int subsize, int plane) const;
+
     private:
         bool parseColorConfig(BitReader& br);
         bool parseTimingInfo(BitReader& br);
@@ -260,11 +263,10 @@ namespace Av1 {
         int16_t FeatureData[MAX_SEGMENTS][SEG_LVL_MAX];
         bool SegIdPreSkip;
         uint8_t LastActiveSegId;
-
-        ;
-        bool seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE);
-
+        bool seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE) const;
+        void setup_past_independence();
     private:
+        void resetFeatures();
     };
 
     struct DeltaQ {
@@ -280,14 +282,18 @@ namespace Av1 {
         bool parse(BitReader& br, const DeltaQ& deltaQ);
     };
 
-    struct LoopFilter {
+    struct LoopFilterParams {
         const static int LOOP_FILTER_LEVEL_COUNT = 4;
         const static int LOOP_FILTER_MODE_DELTA_COUNT = 2;
+        bool loop_filter_delta_enabled;
         uint8_t loop_filter_level[LOOP_FILTER_LEVEL_COUNT];
         int8_t loop_filter_ref_deltas[TOTAL_REFS_PER_FRAME];
         uint8_t loop_filter_sharpness;
         int8_t loop_filter_mode_deltas[LOOP_FILTER_MODE_DELTA_COUNT];
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
+        void setup_past_independence();
+    private:
+        void resetDeltas();
     };
 
     struct Cdef {
@@ -388,7 +394,7 @@ namespace Av1 {
         Segmentation m_segmentation;
         DeltaQ m_deltaQ;
         DeltaLf m_deltaLf;
-        LoopFilter m_loopFilter;
+        LoopFilterParams m_loopFilter;
         Cdef m_cdef;
         LoopRestoration m_loopRestoration;
 
@@ -404,6 +410,8 @@ namespace Av1 {
 
         TXMode TxMode;
 
+        const static int MAX_PLANES = 3;
+
         std::vector<uint32_t> MiColStarts;
         std::vector<uint32_t> MiRowStarts;
         std::vector<std::vector<PREDICTION_MODE>> YModes;
@@ -416,10 +424,11 @@ namespace Av1 {
         std::vector<std::vector<TX_SIZE>> InterTxSizes;
         std::vector<std::vector<TX_SIZE>> TxSizes;
         std::vector<std::vector<BLOCK_SIZE>> MiSizes;
+        std::vector<std::vector<TX_SIZE>> LoopfilterTxSizes[MAX_PLANES];
         std::vector<std::vector<uint8_t>> SegmentIds;
+        std::vector<std::vector<uint8_t>> DeltaLFs[FRAME_LF_COUNT];
         //std::vector<std::vector<uint32_t>> PaletteSizes[2];
         //PaletteColors
-        //DeltaLFs
         const static uint8_t SUPERRES_NUM = 8;
 
 
@@ -428,6 +437,7 @@ namespace Av1 {
         int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
 
     private:
+        void setup_past_independence();
         void mark_ref_frames(const SequenceHeader& sequence, uint8_t idLen);
         bool parseFrameSize(BitReader& br, const SequenceHeader& sequence);
         bool parseSuperresParams(BitReader& br, const SequenceHeader& sequence);

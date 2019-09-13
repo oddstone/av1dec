@@ -46,36 +46,9 @@ Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
     }
 }
 
-BLOCK_SIZE Subsampled_Size[BLOCK_SIZES_ALL][2][2] = {
-    { { BLOCK_4X4, BLOCK_4X4 }, { BLOCK_4X4, BLOCK_4X4 } },
-    { { BLOCK_4X8, BLOCK_4X4 }, { BLOCK_INVALID, BLOCK_4X4 } },
-    { { BLOCK_8X4, BLOCK_INVALID }, { BLOCK_4X4, BLOCK_4X4 } },
-    { { BLOCK_8X8, BLOCK_8X4 }, { BLOCK_4X8, BLOCK_4X4 } },
-    { { BLOCK_8X16, BLOCK_8X8 }, { BLOCK_INVALID, BLOCK_4X8 } },
-    { { BLOCK_16X8, BLOCK_INVALID }, { BLOCK_8X8, BLOCK_8X4 } },
-    { { BLOCK_16X16, BLOCK_16X8 }, { BLOCK_8X16, BLOCK_8X8 } },
-    { { BLOCK_16X32, BLOCK_16X16 }, { BLOCK_INVALID, BLOCK_8X16 } },
-    { { BLOCK_32X16, BLOCK_INVALID }, { BLOCK_16X16, BLOCK_16X8 } },
-    { { BLOCK_32X32, BLOCK_32X16 }, { BLOCK_16X32, BLOCK_16X16 } },
-    { { BLOCK_32X64, BLOCK_32X32 }, { BLOCK_INVALID, BLOCK_16X32 } },
-    { { BLOCK_64X32, BLOCK_INVALID }, { BLOCK_32X32, BLOCK_32X16 } },
-    { { BLOCK_64X64, BLOCK_64X32 }, { BLOCK_32X64, BLOCK_32X32 } },
-    { { BLOCK_64X128, BLOCK_64X64 }, { BLOCK_INVALID, BLOCK_32X64 } },
-    { { BLOCK_128X64, BLOCK_INVALID }, { BLOCK_64X64, BLOCK_64X32 } },
-    { { BLOCK_128X128, BLOCK_128X64 }, { BLOCK_64X128, BLOCK_64X64 } },
-    { { BLOCK_4X16, BLOCK_4X8 }, { BLOCK_INVALID, BLOCK_4X8 } },
-    { { BLOCK_16X4, BLOCK_INVALID }, { BLOCK_8X4, BLOCK_8X4 } },
-    { { BLOCK_8X32, BLOCK_8X16 }, { BLOCK_INVALID, BLOCK_4X16 } },
-    { { BLOCK_32X8, BLOCK_INVALID }, { BLOCK_16X8, BLOCK_16X4 } },
-    { { BLOCK_16X64, BLOCK_16X32 }, { BLOCK_INVALID, BLOCK_8X32 } },
-    { { BLOCK_64X16, BLOCK_INVALID }, { BLOCK_32X16, BLOCK_32X8 } },
-};
-
 BLOCK_SIZE Block::get_plane_residual_size(int subsize, int plane)
 {
-    int subx = plane > 0 ? subsampling_x : 0;
-    int suby = plane > 0 ? subsampling_y : 0;
-    return Subsampled_Size[subsize][subx][suby];
+    return m_sequence.get_plane_residual_size(subsize, plane);
 }
 
 int16_t Block::get_q_idx()
@@ -262,9 +235,11 @@ void Block::parse()
                     PaletteColors[0][r + y][c + x][i] = palette_colors_y[i]
                     for (i = 0; i < PaletteSizeUV; i++)
                         PaletteColors[1][r + y][c + x][i] = palette_colors_u[i]
-                        for (i = 0; i < FRAME_LF_COUNT; i++)
-                            DeltaLFs[r + y][c + x][i] = DeltaLF[i]
+
             */
+            for (int i = 0; i < FRAME_LF_COUNT; i++) {
+                m_frame.DeltaLFs[i][r + y][c + x] = m_tile.DeltaLF[i];
+            }
         }
     }
 }

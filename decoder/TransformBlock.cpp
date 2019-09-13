@@ -2996,10 +2996,8 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
 
     for (int i = 0; i < stepY; i++) {
         for (int j = 0; j < stepX; j++) {
-            /*		LoopfilterTxSizes[ plane ]
-		[ (row >> subY) + i ]
-		[ (col >> subX) + j ] = txSz*/
-           m_block.m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
+            m_frame.LoopfilterTxSizes[plane][(row >> subY) + i ][ (col >> subX) + j ] = txSz;
+            m_block.m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
         }
     }
     return true;
