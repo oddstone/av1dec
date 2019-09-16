@@ -296,7 +296,7 @@ namespace Av1 {
         void resetDeltas();
     };
 
-    struct Cdef {
+    struct CdefParams {
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
         void read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize);
         const static int CDEF_SIZE = 8;
@@ -395,7 +395,7 @@ namespace Av1 {
         DeltaQ m_deltaQ;
         DeltaLf m_deltaLf;
         LoopFilterParams m_loopFilter;
-        Cdef m_cdef;
+        CdefParams m_cdef;
         LoopRestoration m_loopRestoration;
 
         bool enable_warped_motion;

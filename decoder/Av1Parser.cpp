@@ -1133,7 +1133,7 @@ namespace Av1 {
         return true;
     }
 
-    bool Cdef::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
+    bool CdefParams::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
     {
         cdef_idx.assign(frame.MiRows, std::vector<int>(frame.MiCols, -1));
         if (frame.CodedLossless || frame.allow_intrabc || !seq.enable_cdef) {
@@ -1163,7 +1163,7 @@ namespace Av1 {
         }
         return true;
     }
-    void Cdef::read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize)
+    void CdefParams::read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize)
     {
         uint32_t cdefSize4 = Num_4x4_Blocks_Wide[ BLOCK_64X64 ];
         uint32_t cdefMask4 = ~(cdefSize4 - 1);
