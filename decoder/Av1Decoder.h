@@ -20,7 +20,7 @@ namespace Av1 {
         ~Decoder();
     private:
         bool decodeFrame(Tiles tiles);
-        void decode_frame_wrapup(const std::shared_ptr<YuvFrame>&);
+        std::shared_ptr<YuvFrame> decode_frame_wrapup(const std::shared_ptr<YuvFrame>&);
         std::unique_ptr<Parser> m_parser;
         std::deque<std::shared_ptr<YuvFrame>>    m_output;
         Tiles               m_tiles;

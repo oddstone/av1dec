@@ -360,15 +360,6 @@ int EntropyDecoder::decode_subexp_bool(int numSyms, int k)
     }
 }
 
-static int FloorLog2(int x) {
-    int s = 0;
-    while ( x != 0 ) {
-        x = x >> 1;
-        s++;
-    }
-    return s - 1;
-}
-
 uint32_t EntropyDecoder::readNS(int n)
 {
     int w = FloorLog2(n) + 1;

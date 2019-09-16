@@ -1,5 +1,6 @@
 #include "Av1Decoder.h"
 #include "Av1Parser.h"
+#include "Cdef.h"
 #include "LoopFilter.h"
 #include "bitReader.h"
 #include "VideoFrame.h"
@@ -83,18 +84,22 @@ namespace Av1 {
         if (!h.disable_frame_end_update_cdf ) {
             printf("warning: disable_frame_end_update_cdf is not supported");
         }
-        decode_frame_wrapup(frame);
-        m_output.push_back(frame);
+        std::shared_ptr<YuvFrame> filtered = decode_frame_wrapup(frame);
+        m_output.push_back(filtered);
         return true;
     }
 
-    void Decoder::decode_frame_wrapup(const std::shared_ptr<YuvFrame>& frame)
+    std::shared_ptr<YuvFrame> Decoder::decode_frame_wrapup(const std::shared_ptr<YuvFrame>& frame)
     {
         FrameHeader& h = *m_parser->m_frame;
         if (h.show_existing_frame)
-            return;
+            return frame;
         LoopFilter filter(*m_parser);
         filter.filter(frame);
+
+        Cdef cdef(*m_parser);
+        std::shared_ptr<YuvFrame> cdefed = cdef.filter(frame);
+        return cdefed;
     }
     std::shared_ptr<YuvFrame> Decoder::getOutput()
     {

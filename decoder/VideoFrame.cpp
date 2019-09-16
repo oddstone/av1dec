@@ -16,6 +16,12 @@ std::shared_ptr<YuvFrame> YuvFrame::create(int width, int height)
     p->m_data.resize(alignedW * alignedH  * 3 / 2);
     p->width = width;
     p->height = height;
+    p->widths[0] = width;
+    p->widths[1] = width/2;
+    p->widths[2] = width/2;
+    p->heights[0] = height;
+    p->heights[1] = height/2;
+    p->heights[2] = height/2;
     p->data[0] = &p->m_data[0];
     p->data[1] = &p->m_data[alignedW * alignedH];
     p->data[2] = &p->m_data[alignedW * alignedH * 5 /4];
@@ -33,8 +39,8 @@ std::shared_ptr<YuvFrame> YuvFrame::create(const std::shared_ptr<YuvFrame>& othe
     for (int p = 0; p < MAX_PLANES; p++) {
         const uint8_t* src = other->data[p];
         uint8_t* dest = frame->data[p];
-        for (int h = 0; h < other->height; h++) {
-            memcpy(dest, src, other->width);
+        for (int h = 0; h < other->heights[p]; h++) {
+            memcpy(dest, src, other->widths[p]);
             src += other->strides[p];
             dest += other->strides[p];
         }
