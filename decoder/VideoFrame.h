@@ -12,6 +12,7 @@ struct YuvFrame {
     uint8_t*    data[MAX_PLANES];
     int         strides[MAX_PLANES];
     static std::shared_ptr<YuvFrame> create(int width, int height);
+    static std::shared_ptr<YuvFrame> create(const std::shared_ptr<YuvFrame>&);
     inline uint8_t getPixel(int plane, int x, int y);
     inline void setPixel(int plane, int x, int y, uint8_t pixel);
 };

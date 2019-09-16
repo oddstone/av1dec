@@ -25,3 +25,19 @@ std::shared_ptr<YuvFrame> YuvFrame::create(int width, int height)
     return std::dynamic_pointer_cast<YuvFrame>(p);
 }
 
+std::shared_ptr<YuvFrame> YuvFrame::create(const std::shared_ptr<YuvFrame>& other)
+{
+    std::shared_ptr<YuvFrame> frame = YuvFrame::create(other->width, other->height);
+    if (!frame)
+        return frame;
+    for (int p = 0; p < MAX_PLANES; p++) {
+        const uint8_t* src = other->data[p];
+        uint8_t* dest = frame->data[p];
+        for (int h = 0; h < other->height; h++) {
+            memcpy(dest, src, other->width);
+            src += other->strides[p];
+            dest += other->strides[p];
+        }
+    }
+    return frame;
+}
