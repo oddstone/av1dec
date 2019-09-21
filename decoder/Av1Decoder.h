@@ -21,6 +21,7 @@ namespace Av1 {
     private:
         bool decodeFrame(Tiles tiles);
         std::shared_ptr<YuvFrame> decode_frame_wrapup(const std::shared_ptr<YuvFrame>&);
+        std::shared_ptr<YuvFrame> upscaling(const std::shared_ptr<YuvFrame>&);
         std::unique_ptr<Parser> m_parser;
         std::deque<std::shared_ptr<YuvFrame>>    m_output;
         Tiles               m_tiles;

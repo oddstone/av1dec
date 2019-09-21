@@ -145,4 +145,6 @@ static int FloorLog2(int x) {
     return s - 1;
 }
 
+#define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
+
 #endif

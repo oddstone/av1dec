@@ -310,7 +310,7 @@ namespace Av1 {
         std::vector<std::vector<int>> cdef_idx;
     };
 
-    struct LoopRestoration {
+    struct LoopRestorationpParams {
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
         void read_lr(Tile& tile,    int r, int c, BLOCK_SIZE bSize);
         void resetRefs(int NumPlanes);
@@ -324,8 +324,8 @@ namespace Av1 {
         int LoopRestorationSize[MAX_PLANES];
 
         std::vector<std::vector<std::vector<RestorationType>>> LrType;
-        std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>> LrWiener;
-        std::vector<std::vector<std::vector<uint8_t>>> RefLrWiener;
+        std::vector<std::vector<std::vector<std::vector<std::vector<int8_t>>>>> LrWiener;
+        std::vector<std::vector<std::vector<int8_t>>> RefLrWiener;
     private:
         void read_lr_unit(EntropyDecoder& entropy,
             int plane, int unitRow, int unitCol);
@@ -396,7 +396,7 @@ namespace Av1 {
         DeltaLf m_deltaLf;
         LoopFilterParams m_loopFilter;
         CdefParams m_cdef;
-        LoopRestoration m_loopRestoration;
+        LoopRestorationpParams m_loopRestoration;
 
         bool enable_warped_motion;
         bool allow_warped_motion;

@@ -2401,8 +2401,6 @@ int Intra_Filter_Taps[ INTRA_FILTER_MODES ][ 8 ][ 7 ] = {
     }
 };
 
-#define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
-
 void TransformBlock::recursiveIntraPrediction(const uint8_t* AboveRow, const uint8_t* LeftCol,
     const std::shared_ptr<YuvFrame>& frame)
 {

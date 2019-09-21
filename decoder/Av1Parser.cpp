@@ -1189,7 +1189,7 @@ namespace Av1 {
         return std::max((frameSize + (unitSize >> 1)) / unitSize, 1);
     }
 
-    bool LoopRestoration::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
+    bool LoopRestorationpParams::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
     {
         if (frame.AllLossless || frame.allow_intrabc ||
             !seq.enable_restoration ) {
@@ -1246,16 +1246,16 @@ namespace Av1 {
                     unitRows = count_units_in_frame( unitSize, ROUND2(frame.FrameHeight, subY) );
                     unitCols = count_units_in_frame( unitSize, ROUND2(frame.UpscaledWidth, subX) );
                     LrType[plane].assign(unitRows, std::vector<RestorationType>(unitCols));
-                    std::vector<std::vector<uint8_t>> v1(MAX_PASSES, std::vector<uint8_t>(MAX_WIENER_COEFFS));
-                    std::vector<std::vector<std::vector<uint8_t>>> v2(unitCols, v1);
+                    std::vector<std::vector<int8_t>> v1(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
+                    std::vector<std::vector<std::vector<int8_t>>> v2(unitCols, v1);
                     LrWiener[plane].assign(unitRows, v2);
-                    RefLrWiener[plane].assign(MAX_PASSES, std::vector<uint8_t>(MAX_WIENER_COEFFS));
+                    RefLrWiener[plane].assign(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
                 }
             }
         }
         return true;
     }
-    void LoopRestoration::read_lr(Tile& tile,
+    void LoopRestorationpParams::read_lr(Tile& tile,
         int r, int c, BLOCK_SIZE bSize)
     {
         FrameHeader& frame = *tile.m_frame;
@@ -1296,7 +1296,7 @@ namespace Av1 {
     static const int Wiener_Taps_Max[3] = { 10, 8, 46 };
     static const int Wiener_Taps_K[3] = { 1, 2, 3 };
     static const int Wiener_Taps_Mid[3] = { 3, -7, 15 };
-    void LoopRestoration::read_lr_unit(EntropyDecoder& entropy,
+    void LoopRestorationpParams::read_lr_unit(EntropyDecoder& entropy,
         int plane, int unitRow, int unitCol)
     {
         RestorationType restoration_type;
@@ -1334,7 +1334,7 @@ namespace Av1 {
         }
 
     }
-    void LoopRestoration::resetRefs(int NumPlanes)
+    void LoopRestorationpParams::resetRefs(int NumPlanes)
     {
         for (int plane = 0; plane < NumPlanes; plane++ ) {
             if (FrameRestorationType[plane] != RESTORE_NONE) {

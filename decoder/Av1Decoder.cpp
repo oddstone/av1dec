@@ -2,6 +2,7 @@
 #include "Av1Parser.h"
 #include "Cdef.h"
 #include "LoopFilter.h"
+#include "LoopRestoration.h"
 #include "bitReader.h"
 #include "VideoFrame.h"
 #include "log.h"
@@ -98,9 +99,23 @@ namespace Av1 {
         filter.filter(frame);
 
         Cdef cdef(*m_parser);
-        std::shared_ptr<YuvFrame> cdefed = cdef.filter(frame);
-        return cdefed;
+        std::shared_ptr<YuvFrame> CdefFrame = cdef.filter(frame);
+        std::shared_ptr<YuvFrame> UpscaledCdefFrame = upscaling(CdefFrame);
+        std::shared_ptr<YuvFrame> UpscaledCurrFrame = upscaling(frame);
+        LoopRestoration restoration(*m_parser, UpscaledCdefFrame, UpscaledCurrFrame);
+        std::shared_ptr<YuvFrame> lrFrame = restoration.filter();
+
+        return lrFrame;
     }
+
+    std::shared_ptr<YuvFrame> Decoder::upscaling(const std::shared_ptr<YuvFrame>& frame)
+    {
+        FrameHeader& h = *m_parser->m_frame;
+        if (!h.use_superres)
+            return frame;
+        ASSERT(0);
+    }
+
     std::shared_ptr<YuvFrame> Decoder::getOutput()
     {
         std::shared_ptr<YuvFrame> f;
