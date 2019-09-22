@@ -1178,26 +1178,6 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
         dqDenom = 1;
         break;
     }
-    flipUD = false;
-    flipLR = false;
-    switch (PlaneTxType) {
-    case FLIPADST_DCT:
-    case FLIPADST_ADST:
-    case V_FLIPADST:
-        flipUD = true;
-        break;
-    case DCT_FLIPADST:
-    case ADST_FLIPADST:
-    case H_FLIPADST:
-        flipLR = true;
-        break;
-    case FLIPADST_FLIPADST:
-        flipUD = true;
-        flipLR = true;
-        break;
-    default:
-        break;
-    }
 }
 
 static const int TX_SET_TYPES_INTRA = 3;
@@ -1646,6 +1626,26 @@ int TransformBlock::coeffs()
             transform_type();
         }
         PlaneTxType = compute_tx_type();
+        flipUD = false;
+        flipLR = false;
+        switch (PlaneTxType) {
+            case FLIPADST_DCT:
+            case FLIPADST_ADST:
+            case V_FLIPADST:
+                flipUD = true;
+                break;
+            case DCT_FLIPADST:
+            case ADST_FLIPADST:
+            case H_FLIPADST:
+                flipLR = true;
+                break;
+            case FLIPADST_FLIPADST:
+                flipUD = true;
+                flipLR = true;
+                break;
+            default:
+                break;
+        }
         txClass = get_tx_class();
         const int16_t* scan = get_scan();
         int eobMultisize = std::min(log2W, 5) + std::min(log2H, 5) - 4;
