@@ -158,7 +158,7 @@ void LoopRestoration::loop_restore_block(const    std::shared_ptr<YuvFrame>& LrF
     if (rType == RESTORE_WIENER){
         wienerFilter(LrFrame, plane, unitRow, unitCol, x, y, w, h, StripeStartY, StripeEndY);
     } else if (rType == RESTORE_SGRPROJ) {
-        ASSERT(0);
+        //ASSERT(0);
     }
     
     

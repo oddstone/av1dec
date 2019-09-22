@@ -326,6 +326,11 @@ namespace Av1 {
         std::vector<std::vector<std::vector<RestorationType>>> LrType;
         std::vector<std::vector<std::vector<std::vector<std::vector<int8_t>>>>> LrWiener;
         std::vector<std::vector<std::vector<int8_t>>> RefLrWiener;
+
+        std::vector<std::vector<std::vector<uint8_t>>> LrSgrSet;
+        std::vector<std::vector<std::vector<std::vector<int8_t>>>> LrSgrXqd;
+        std::vector<std::vector<int8_t>> RefSgrXqd;
+
     private:
         void read_lr_unit(EntropyDecoder& entropy,
             int plane, int unitRow, int unitCol);
@@ -390,14 +395,6 @@ namespace Av1 {
         uint32_t TileRowsLog2;
         uint8_t TileSizeBytes;
 
-        Quantization m_quant;
-        Segmentation m_segmentation;
-        DeltaQ m_deltaQ;
-        DeltaLf m_deltaLf;
-        LoopFilterParams m_loopFilter;
-        CdefParams m_cdef;
-        LoopRestorationpParams m_loopRestoration;
-
         bool enable_warped_motion;
         bool allow_warped_motion;
 
@@ -429,6 +426,15 @@ namespace Av1 {
         std::vector<std::vector<uint8_t>> DeltaLFs[FRAME_LF_COUNT];
         //std::vector<std::vector<uint32_t>> PaletteSizes[2];
         //PaletteColors
+
+		Quantization m_quant;
+		Segmentation m_segmentation;
+		DeltaQ m_deltaQ;
+		DeltaLf m_deltaLf;
+		LoopFilterParams m_loopFilter;
+		CdefParams m_cdef;
+		LoopRestorationpParams m_loopRestoration;
+
         const static uint8_t SUPERRES_NUM = 8;
 
 

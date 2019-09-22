@@ -282,6 +282,21 @@ bool EntropyDecoder::readUseWiener()
     return (bool)m_symbol->read(wiener_restore_cdf, 2);
 }
 
+bool EntropyDecoder::readUseSgrproj()
+{
+    return (bool)m_symbol->read(sgrproj_restore_cdf, 2);
+}
+
+RestorationType EntropyDecoder::readRestorationType()
+{
+    return (RestorationType)m_symbol->read(switchable_restore_cdf, RESTORE_SWITCHABLE_TYPES);
+}
+
+uint8_t EntropyDecoder::readLrSgrSet()
+{
+    return readLiteral(SGRPROJ_PARAMS_BITS);
+}
+
 bool EntropyDecoder::readUe(uint32_t& v)
 {
     uint8_t len = 0;

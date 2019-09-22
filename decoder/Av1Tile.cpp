@@ -225,6 +225,7 @@ bool Tile::decode(std::shared_ptr<YuvFrame>& frame)
     for (auto& sb : m_sbs) {
         if (!sb->decode(frame))
             return false;
+
     }
     return true;
 }

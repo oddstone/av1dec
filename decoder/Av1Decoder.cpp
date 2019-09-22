@@ -104,7 +104,6 @@ namespace Av1 {
         std::shared_ptr<YuvFrame> UpscaledCurrFrame = upscaling(frame);
         LoopRestoration restoration(*m_parser, UpscaledCdefFrame, UpscaledCurrFrame);
         std::shared_ptr<YuvFrame> lrFrame = restoration.filter();
-
         return lrFrame;
     }
 

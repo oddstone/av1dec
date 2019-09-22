@@ -37,6 +37,9 @@ public:
     uint8_t readCoeffBr(uint8_t minTx, PLANE_TYPE planeType, uint8_t ctx);
     bool readDcSign(PLANE_TYPE planeType, uint8_t ctx);
     bool readUseWiener();
+    bool readUseSgrproj();
+    uint8_t readLrSgrSet();
+    RestorationType readRestorationType();
     bool readUe(uint32_t& v);
     uint32_t readLiteral(uint32_t n);
     int decode_signed_subexp_with_ref_bool(int low, int high, int k, int r);

@@ -223,6 +223,8 @@ void Block::parse()
     residual();
     for (int y = 0; y < bh4; y++) {
         for (int x = 0; x < bw4; x++) {
+			if (((r + y) >= 288) || ((c + x) >= 1920 / 4))
+				printf("done");
             m_frame.IsInters[r + y][c + x] = is_inter;
             //SkipModes[r + y][c + x] = skip_mode
             m_frame.Skips[r + y][c + x] = skip;

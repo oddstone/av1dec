@@ -147,4 +147,19 @@ static int FloorLog2(int x) {
 
 #define CLIP1(x) CLIP3(0, ((1 << m_sequence.BitDepth) - 1), x)
 
+#define SGRPROJ_PARAMS_BITS 4
+#define SGRPROJ_PRJ_SUBEXP_K 4
+#define SGRPROJ_PRJ_BITS 7
+#define SGRPROJ_RST_BITS 4
+#define SGRPROJ_MTABLE_BITS 20
+#define SGRPROJ_RECIP_BITS 12
+#define SGRPROJ_SGR_BITS 8
+
+static const int Sgr_Params[ (1 << SGRPROJ_PARAMS_BITS) ][ 4 ] = {
+    { 2, 12, 1, 4 }, { 2, 15, 1, 6 }, { 2, 18, 1, 8 }, { 2, 21, 1, 9 },
+    { 2, 24, 1, 10 }, { 2, 29, 1, 11 }, { 2, 36, 1, 12 }, { 2, 45, 1, 13 },
+    { 2, 56, 1, 14 }, { 2, 68, 1, 15 }, { 0, 0, 1, 5 }, { 0, 0, 1, 8 },
+    { 0, 0, 1, 11 }, { 0, 0, 1, 14 }, { 2, 30, 0, 0 }, { 2, 75, 0, 0 }
+};
+
 #endif

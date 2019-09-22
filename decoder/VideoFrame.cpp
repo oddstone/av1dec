@@ -11,8 +11,8 @@ private:
 std::shared_ptr<YuvFrame> YuvFrame::create(int width, int height)
 {
     std::shared_ptr<YuvFrameImp> p(new YuvFrameImp);
-    int alignedW = ROOF(width, 8);
-    int alignedH = ROOF(height, 8);
+    int alignedW = ROOF(width, 128);
+    int alignedH = ROOF(height, 128);
     p->m_data.resize(alignedW * alignedH  * 3 / 2);
     p->width = width;
     p->height = height;

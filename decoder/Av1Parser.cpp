@@ -1238,6 +1238,8 @@ namespace Av1 {
             LrType.resize(seq.NumPlanes);
             LrWiener.resize(seq.NumPlanes);
             RefLrWiener.resize(seq.NumPlanes);
+            LrSgrXqd.resize(seq.NumPlanes);
+            RefSgrXqd.resize(seq.NumPlanes);
             for (int plane = 0; plane < seq.NumPlanes; plane++ ) {
                 if ( FrameRestorationType[ plane ] != RESTORE_NONE ) {
                     int subX = (plane == 0) ? 0 : seq.subsampling_x;
@@ -1246,10 +1248,19 @@ namespace Av1 {
                     unitRows = count_units_in_frame( unitSize, ROUND2(frame.FrameHeight, subY) );
                     unitCols = count_units_in_frame( unitSize, ROUND2(frame.UpscaledWidth, subX) );
                     LrType[plane].assign(unitRows, std::vector<RestorationType>(unitCols));
-                    std::vector<std::vector<int8_t>> v1(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
-                    std::vector<std::vector<std::vector<int8_t>>> v2(unitCols, v1);
-                    LrWiener[plane].assign(unitRows, v2);
-                    RefLrWiener[plane].assign(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
+
+                    {
+                        std::vector<std::vector<int8_t>> v1(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
+                        std::vector<std::vector<std::vector<int8_t>>> v2(unitCols, v1);
+                        LrWiener[plane].assign(unitRows, v2);
+                        RefLrWiener[plane].assign(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
+                    }
+                    {
+                        std::vector<int8_t> v1(MAX_PASSES);
+                        std::vector<std::vector<int8_t>> v2(unitCols, v1);
+                        LrSgrXqd[plane].assign(unitRows, v2);
+                        RefSgrXqd[plane].resize(MAX_PASSES);
+                    }
                 }
             }
         }
@@ -1296,6 +1307,11 @@ namespace Av1 {
     static const int Wiener_Taps_Max[3] = { 10, 8, 46 };
     static const int Wiener_Taps_K[3] = { 1, 2, 3 };
     static const int Wiener_Taps_Mid[3] = { 3, -7, 15 };
+
+    static const int Sgrproj_Xqd_Min[2] = { -96, -32 };
+    static const int Sgrproj_Xqd_Max[2] = { 31, 95 };
+    static const int Sgrproj_Xqd_Mid[2] = { -32, 31 };
+
     void LoopRestorationpParams::read_lr_unit(EntropyDecoder& entropy,
         int plane, int unitRow, int unitCol)
     {
@@ -1304,9 +1320,10 @@ namespace Av1 {
             bool use_wiener = entropy.readUseWiener();
             restoration_type = use_wiener ? RESTORE_WIENER : RESTORE_NONE;
         } else if ( FrameRestorationType[ plane ] == RESTORE_SGRPROJ ) {
-            ASSERT(0);
+            bool use_sgrproj = entropy.readUseSgrproj();
+            restoration_type = use_sgrproj ? RESTORE_SGRPROJ : RESTORE_NONE;
         } else {
-            ASSERT(0);
+            restoration_type = entropy.readRestorationType();
         }
         LrType[plane][unitRow][unitCol] = restoration_type;
         int firstCoeff;
@@ -1328,18 +1345,34 @@ namespace Av1 {
                 }
             }
         } else if ( restoration_type == RESTORE_SGRPROJ ) {
-            ASSERT(0);
-        } else {
-            ASSERT(0);
-        }
+            uint8_t lr_sgr_set = entropy.readLrSgrSet();
+            for (int i = 0; i < 2; i++ ) {
+                int8_t radius = Sgr_Params[ lr_sgr_set ][ i * 2 ];
+                int min = Sgrproj_Xqd_Min[i];
+                int max = Sgrproj_Xqd_Max[i];
+                int v;
+                if ( radius ) {
+                    v = entropy.decode_signed_subexp_with_ref_bool(min, max + 1,
+                            SGRPROJ_PRJ_SUBEXP_K, RefSgrXqd[ plane ][ i ]);
+                } else {
+                    v = 0;
+                    if ( i == 1 ) {
+                        v = CLIP3( min, max, (1 << SGRPROJ_PRJ_BITS) -
+                            RefSgrXqd[ plane ][ 0 ] );
+                    }
+                }
+                LrSgrXqd[ plane ][ unitRow ][ unitCol ][ i ] = v;
+                RefSgrXqd[ plane ][ i ] = v;
+            }
 
+        }
     }
     void LoopRestorationpParams::resetRefs(int NumPlanes)
     {
         for (int plane = 0; plane < NumPlanes; plane++ ) {
             if (FrameRestorationType[plane] != RESTORE_NONE) {
                 for (int pass = 0; pass < MAX_PASSES; pass++ ) {
-                    //RefSgrXqd[ plane ][ pass ] = Sgrproj_Xqd_Mid[ pass ]
+                    RefSgrXqd[plane][pass] = Sgrproj_Xqd_Mid[pass];
                     for (int i = 0; i < MAX_WIENER_COEFFS; i++ ) {
                         RefLrWiener[plane][pass][i] = Wiener_Taps_Mid[i];
                     }
