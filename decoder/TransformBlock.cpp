@@ -1801,7 +1801,7 @@ static void iDct(int* T, int n, int r)
     iDctPermutation(T, n);
     if (n == 6) {
         for (int i = 0; i < 16; i++) {
-            B(T, 32 + i, 64 - i, 63 - 4 * brev(4, i), false);
+            B(T, 32 + i, 63 - i, 63 - 4 * brev(4, i), false);
         }
     }
     if (n >= 5) {
