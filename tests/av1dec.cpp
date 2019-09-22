@@ -1,6 +1,7 @@
 #include "decodeinput.h"
 #include "Av1Decoder.h"
 #include "VideoFrame.h"
+#include <string.h>
 
 void usage(const char* app)
 {

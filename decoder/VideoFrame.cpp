@@ -1,4 +1,5 @@
 #include "VideoFrame.h"
+#include <string.h>
 
 struct YuvFrameImp : public YuvFrame
 {

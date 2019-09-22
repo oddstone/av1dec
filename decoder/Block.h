@@ -20,6 +20,7 @@ namespace Av1 {
 using namespace YamiParser::Av1;
 
 struct YuvFrame;
+class TransformBlock;
 
 class Block    : public BlockTree {
     friend class TransformBlock;

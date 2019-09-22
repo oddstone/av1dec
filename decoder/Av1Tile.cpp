@@ -2,7 +2,7 @@
 #include "Av1Parser.h"
 #include "Av1Common.h"
 #include "Block.h"
-#include "Superblock.h"
+#include "SuperBlock.h"
 #include "Partition.h"
 #include "SymbolDecoder.h"
 #include "VideoFrame.h"
