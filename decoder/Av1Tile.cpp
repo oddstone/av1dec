@@ -212,12 +212,12 @@ bool Tile::parse(const uint8_t* data, uint32_t size)
 
 void Tile::clear_above_context()
 {
-    m_above.clear(m_frame->MiCols);
+    m_above.clear(m_frame->AlignedMiCols);
 }
 
 void Tile::clear_left_context()
 {
-    m_left.clear(m_frame->MiRows);
+    m_left.clear(m_frame->AlignedMiRows);
 }
 
 bool Tile::decode(std::shared_ptr<YuvFrame>& frame)
