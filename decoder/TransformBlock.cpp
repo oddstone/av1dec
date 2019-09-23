@@ -2835,8 +2835,8 @@ void TransformBlock::predict_intra(int haveLeft, int haveAbove, bool haveAboveRi
 {
     int subX = (plane > 0) ? m_sequence.subsampling_x : 0;
     int subY = (plane > 0) ? m_sequence.subsampling_x : 0;
-    int maxX = (m_frame.MiCols * MI_SIZE) >> subX;
-    int maxY = (m_frame.MiRows * MI_SIZE) >> subY;
+    int maxX = ((m_frame.MiCols * MI_SIZE) >> subX) - 1;
+    int maxY = ((m_frame.MiRows * MI_SIZE) >> subY) - 1;
 
     uint8_t* AboveRow;
     uint8_t* LeftCol;
