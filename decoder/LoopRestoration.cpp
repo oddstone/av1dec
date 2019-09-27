@@ -131,8 +131,113 @@ void LoopRestoration::wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
             LrFrame->setPixel(plane, x + c, y + r, CLIP1(v));
         }
     }
-    
 }
+
+std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y, int w, int h, uint8_t set, int StripeStartY, int StripeEndY, int pass)
+{
+    uint8_t BitDepth = m_sequence.BitDepth;
+
+    std::vector<std::vector<int>> F(h, std::vector<int>(w));
+    int r = Sgr_Params[ set ][ pass * 2 + 0 ];
+    if (r == 0)
+        return std::move(F);
+    int eps = Sgr_Params[ set ][ pass * 2 + 1 ];
+    std::vector<std::vector<int>> A(h + 2, std::vector<int>(w + 2));
+    std::vector<std::vector<int>> B(h + 2, std::vector<int>(w + 2));
+
+    int n = ( 2 * r + 1 ) * ( 2 * r + 1 );
+    int n2e = n * n * eps;
+    int s = (((1 << SGRPROJ_MTABLE_BITS) + n2e / 2) / n2e);
+    for (int i = -1; i < h + 1; i++ ) {
+        for (int j = -1; j < w + 1; j++ ) {
+            int a = 0;
+            int b = 0;
+            for (int  dy = -r ; dy <= r; dy++ ) {
+                for (int  dx = -r; dx <= r; dx++ ) {
+                    int c = get_source_sample( plane, x + j + dx, y + i + dy,  StripeStartY, StripeEndY);
+                    a += c * c;
+                    b += c;
+                }
+            }
+            a = ROUND2( a, 2 * (BitDepth - 8) );
+            int d = ROUND2(b, BitDepth - 8);
+            int p = std::max( 0, a * n - d * d );
+            int z = ROUND2( p * s, SGRPROJ_MTABLE_BITS );
+            int a2;
+            if ( z >= 255 )
+                a2 = 256;
+            else if ( z == 0 )
+                a2 = 1;
+            else
+                a2 = ((z << SGRPROJ_SGR_BITS) + (z/2)) / (z + 1);
+            int oneOverN = ((1 << SGRPROJ_RECIP_BITS) + (n/2)) / n;
+            int b2 = ( (1 << SGRPROJ_SGR_BITS) - a2 ) * b * oneOverN;
+            A[i + 1][j + 1] = a2;
+            B[ i + 1 ][ j + 1 ] = ROUND2( b2, SGRPROJ_RECIP_BITS );
+        }
+    }
+
+    for (int i = 0; i < h; i++ ) {
+        int shift = 5;
+        if ( pass == 0 && ( i & 1 ) ) {
+            shift = 4;
+        }
+        for (int j = 0; j < w; j++ ) {
+            int a = 0;
+            int b = 0;
+            for (int dy = -1 ; dy <= 1; dy++ ) {
+                for (int dx = -1; dx <= 1; dx++ ) {
+                    int weight;
+                    if ( pass == 0 ) {
+                        if ( (i + dy) & 1 ) {
+                            weight = (dx == 0) ? 6 : 5;
+                        } else {
+                            weight = 0;
+                        }
+                    } else {
+                        weight = (dx == 0 || dy == 0) ? 4 : 3;
+                    }
+                    a += weight * A[ i + dy + 1][ j + dx + 1];
+                    b += weight * B[ i + dy + 1][ j + dx + 1];
+                }
+            }
+            int v = a * UpscaledCdefFrame->getPixel(plane, x + j, y + i) + b;
+            F[ i ][ j ] = ROUND2( v, SGRPROJ_SGR_BITS + shift - SGRPROJ_RST_BITS);
+        }
+    }
+    return std::move(F);
+}
+
+void LoopRestoration::selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
+    int plane, int unitRow, int unitCol, int x, int y, int w, int h, int StripeStartY, int StripeEndY)
+{
+    uint8_t set = m_loopRestoration.LrSgrSet[plane][unitRow][unitCol];
+    std::vector<std::vector<int>> flt0 = boxFilter(plane, x, y, w, h, set, StripeStartY, StripeEndY, 0);
+    std::vector<std::vector<int>> flt1 = boxFilter(plane, x, y, w, h, set, StripeStartY, StripeEndY, 1);
+    int w0 = m_loopRestoration.LrSgrXqd[ plane ][ unitRow ][ unitCol ][ 0 ];
+    int w1 = m_loopRestoration.LrSgrXqd[ plane ][ unitRow ][ unitCol ][ 1 ];
+    int w2 = (1 << SGRPROJ_PRJ_BITS) - w0 - w1;
+    int r0 = Sgr_Params[ set ][ 0 ];
+    int r1 = Sgr_Params[ set ][ 2 ];
+    for (int i = 0; i < h; i++ ) {
+        for (int j = 0; j < w; j++ ) {
+            int u = UpscaledCdefFrame->getPixel(plane, x + j, y + i) << SGRPROJ_RST_BITS;
+            int v = w1 * u;
+            if (r0)
+                v += w0 * flt0[ i ][ j ];
+            else
+                v += w0 * u;
+            if ( r1 )
+                v += w2 * flt1[ i ][ j ];
+            else
+                v += w2 * u;
+            int s = ROUND2( v, SGRPROJ_RST_BITS + SGRPROJ_PRJ_BITS);
+            LrFrame->setPixel(plane, x + j, y + i, CLIP1(s));
+        }
+    }
+
+}
+
 void LoopRestoration::loop_restore_block(const    std::shared_ptr<YuvFrame>& LrFrame,
     int plane, int row, int col )
 {
@@ -158,7 +263,7 @@ void LoopRestoration::loop_restore_block(const    std::shared_ptr<YuvFrame>& LrF
     if (rType == RESTORE_WIENER){
         wienerFilter(LrFrame, plane, unitRow, unitCol, x, y, w, h, StripeStartY, StripeEndY);
     } else if (rType == RESTORE_SGRPROJ) {
-        //ASSERT(0);
+        selfGuidedFilter(LrFrame, plane, unitRow, unitCol, x, y, w, h, StripeStartY, StripeEndY);
     }
     
     

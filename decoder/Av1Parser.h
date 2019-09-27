@@ -9,7 +9,7 @@
 #include <string.h>
 #include <vector>
 
-#define CLIP3(min, max, v) (v > max ? max : ((v < min) ? min : v))
+#define CLIP3(min, max, v) ((v) > (max) ? (max) : (((v) < (min)) ? (min) : (v)))
 class Block;
 class TransformBlock;
 

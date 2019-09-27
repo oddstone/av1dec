@@ -1238,6 +1238,7 @@ namespace Av1 {
             LrType.resize(seq.NumPlanes);
             LrWiener.resize(seq.NumPlanes);
             RefLrWiener.resize(seq.NumPlanes);
+            LrSgrSet.resize(seq.NumPlanes);
             LrSgrXqd.resize(seq.NumPlanes);
             RefSgrXqd.resize(seq.NumPlanes);
             for (int plane = 0; plane < seq.NumPlanes; plane++ ) {
@@ -1256,6 +1257,7 @@ namespace Av1 {
                         RefLrWiener[plane].assign(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
                     }
                     {
+                        LrSgrSet[plane].assign(unitRows, std::vector<uint8_t>(unitCols));
                         std::vector<int8_t> v1(MAX_PASSES);
                         std::vector<std::vector<int8_t>> v2(unitCols, v1);
                         LrSgrXqd[plane].assign(unitRows, v2);
@@ -1346,6 +1348,7 @@ namespace Av1 {
             }
         } else if ( restoration_type == RESTORE_SGRPROJ ) {
             uint8_t lr_sgr_set = entropy.readLrSgrSet();
+            LrSgrSet[plane][unitRow][unitCol ] = lr_sgr_set;
             for (int i = 0; i < 2; i++ ) {
                 int8_t radius = Sgr_Params[ lr_sgr_set ][ i * 2 ];
                 int min = Sgrproj_Xqd_Min[i];

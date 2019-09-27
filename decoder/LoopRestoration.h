@@ -28,6 +28,12 @@ private:
     void wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
         int plane, int unitRow, int unitCol,
         int x, int y, int w, int h, int StripeStartY, int StripeEndY);
+    std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y,
+        int w, int h, uint8_t set, int StripeStartY, int StripeEndY, int pass);
+
+    void selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
+        int plane, int unitRow, int unitCol,
+        int x, int y, int w, int h, int StripeStartY, int StripeEndY);
     void loop_restore_block(const         std::shared_ptr<YuvFrame>& LrFrame,
         int plane, int row, int col );
     const FrameHeader& m_frame;

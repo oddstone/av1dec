@@ -2507,7 +2507,15 @@ bool TransformBlock::getLeftSmooth() const
     bool avail = !plane ? m_block.AvailL : m_block.AvailLChroma;
     bool leftSmooth = false;
     if (avail) {
-        leftSmooth = getSmooth(m_block.MiRow, m_block.MiCol - 1);
+        int r = m_block.MiRow;
+        int c = m_block.MiCol - 1;
+        if (plane > 0) {
+            if (m_sequence.subsampling_x && (m_block.MiCol & 1))
+                c--;
+            if (m_sequence.subsampling_y && !(m_block.MiRow & 1))
+                r++;
+        }
+        leftSmooth = getSmooth(r, c);
     }
     return leftSmooth;
 }
@@ -2517,19 +2525,22 @@ bool TransformBlock::getAboveSmooth() const
     bool avail = !plane ? m_block.AvailU : m_block.AvailUChroma;
     bool aboveSmooth = false;
     if (avail) {
-        aboveSmooth = getSmooth(m_block.MiRow - 1 , m_block.MiCol);
+        int r = m_block.MiRow - 1;
+        int c = m_block.MiCol;
+        if (plane > 0) {
+            if (m_sequence.subsampling_x && !(m_block.MiCol & 1))
+                c++;
+            if (m_sequence.subsampling_y && (m_block.MiRow & 1))
+                r--;
+        }
+        aboveSmooth = getSmooth(r, c);
     }
     return aboveSmooth;
 }
 
 bool TransformBlock::getSmooth(int r, int c) const
 {
-    if ( plane > 0 ) {
-        if (m_sequence.subsampling_x && !( m_block.MiCol & 1 ) )
-            c++;
-        if (m_sequence.subsampling_y && ( m_block.MiRow & 1 ) )
-            r--;
-    }
+
     int mode;
     if (!plane) {
         mode = m_frame.YModes[r][c];
@@ -2983,7 +2994,6 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
         }
     }
     reconstruct();
-
     //copy to frame
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
