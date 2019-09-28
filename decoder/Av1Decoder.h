@@ -1,4 +1,5 @@
-#pragma once
+#ifndef Av1Decoder_h
+#define Av1Decoder_h
 
 #include <memory>
 #include <deque>
@@ -11,6 +12,8 @@ class Tile;
 namespace YamiParser {
 namespace Av1 {
     class Parser;
+    struct FrameHeader;
+    typedef std::shared_ptr<FrameHeader> FramePtr;
     typedef std::vector<std::shared_ptr<Tile>> Tiles;
     class Decoder {
     public:
@@ -24,7 +27,9 @@ namespace Av1 {
         std::shared_ptr<YuvFrame> upscaling(const std::shared_ptr<YuvFrame>&);
         std::unique_ptr<Parser> m_parser;
         std::deque<std::shared_ptr<YuvFrame>>    m_output;
-        Tiles               m_tiles;
+        FramePtr m_frame;
+        Tiles m_tiles;
     };
 };
 };
+#endif

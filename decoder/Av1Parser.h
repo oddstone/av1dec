@@ -16,6 +16,13 @@ class TransformBlock;
 namespace YamiParser {
 namespace Av1 {
 
+    struct SequenceHeader;
+    struct FrameHeader;
+    typedef std::vector<std::shared_ptr<Tile>> TileGroup;
+    typedef std::shared_ptr<FrameHeader> FramePtr;
+    typedef std::shared_ptr<SequenceHeader> SequencePtr;
+    typedef std::shared_ptr<const SequenceHeader> ConstSequencePtr;
+
     struct obu_extension_header {
         uint8_t temporal_id;
         uint8_t spatial_id;
@@ -434,26 +441,27 @@ namespace Av1 {
 		LoopFilterParams m_loopFilter;
 		CdefParams m_cdef;
 		LoopRestorationpParams m_loopRestoration;
+        ConstSequencePtr m_sequence;
 
         const static uint8_t SUPERRES_NUM = 8;
 
 
-        FrameHeader();
-        bool parse(BitReader& br, const SequenceHeader& sequence);
+        FrameHeader(ConstSequencePtr&);
+        bool parse(BitReader& br);
         int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
 
     private:
         void setup_past_independence();
-        void mark_ref_frames(const SequenceHeader& sequence, uint8_t idLen);
-        bool parseFrameSize(BitReader& br, const SequenceHeader& sequence);
-        bool parseSuperresParams(BitReader& br, const SequenceHeader& sequence);
+        void mark_ref_frames(uint8_t idLen);
+        bool parseFrameSize(BitReader& br);
+        bool parseSuperresParams(BitReader& br);
         bool parseRenderSize(BitReader& br);
-        bool parseTileInfo(BitReader& br, const SequenceHeader& sequence);
+        bool parseTileInfo(BitReader& br);
         bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
-        bool parseQuantizationParams(BitReader& br, const SequenceHeader& sequence);
-        bool loop_filter_params(BitReader& br, const SequenceHeader& sequence);
-        bool cdef_params(BitReader& br, const SequenceHeader& sequence);
-        bool lr_params(BitReader& br, const SequenceHeader& seq);
+        bool parseQuantizationParams(BitReader& br);
+        bool loop_filter_params(BitReader& br);
+        bool cdef_params(BitReader& br);
+        bool lr_params(BitReader& br);
         bool read_tx_mode(BitReader& br);
         //bool frame_reference_mode();
         //bool skip_mode_params( )
@@ -464,17 +472,16 @@ namespace Av1 {
         const static uint8_t TX_MODES = 3;
     };
 
-    typedef std::vector<std::shared_ptr<Tile>> TileGroup;
     class Parser {
     public:
         Parser();
         bool parseSequenceHeader(BitReader& br);
         bool parseTemporalDelimiter(BitReader& br);
-        bool parseFrameHeader(BitReader& br);
-        bool parseTileGroup(BitReader& br, TileGroup& group);
+        std::shared_ptr<FrameHeader> parseFrameHeader(BitReader& br);
+        bool parseTileGroup(BitReader& br,       const FramePtr& frame, TileGroup& group);
         bool parseMetadata(BitReader& br);
         bool parsePadding(BitReader& br);
-        bool parseFrame(BitReader& br, TileGroup& group);
+        FramePtr parseFrame(BitReader& br, TileGroup& group);
         bool praseReserved(BitReader& br);
         std::shared_ptr<SequenceHeader> m_sequence;
         std::shared_ptr<FrameHeader> m_frame;

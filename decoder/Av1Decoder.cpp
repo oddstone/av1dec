@@ -37,13 +37,14 @@ namespace Av1 {
             } else if (type == OBU_TD) {
                 ret = m_parser->parseTemporalDelimiter(br);
             } else if (type == OBU_FRAME_HEADER) {
-                ret = m_parser->parseFrameHeader(br);
+                m_frame = m_parser->parseFrameHeader(br);
+                ret = bool(m_frame);
             } else if (type == OBU_TILE_GROUP) {
-                if (!m_parser->m_frame) {
+                if (!m_frame) {
                     ASSERT(0 && "no frame header");
                 }
                 TileGroup group;
-                ret = m_parser->parseTileGroup(br, group);
+                ret = m_parser->parseTileGroup(br, m_frame, group);
                 if (ret) {
                     m_tiles.insert(m_tiles.end(), group.begin(), group.end());
                     if (m_tiles.size() == m_parser->m_frame->NumTiles) {
@@ -57,10 +58,13 @@ namespace Av1 {
                 ret = m_parser->parsePadding(br);
             } else if (type == OBU_FRAME) {
                 TileGroup group;
-                ret = m_parser->parseFrame(br, group);
-                if (ret) {
+                m_frame = m_parser->parseFrame(br, group);
+                if (m_frame) {
                     ret = decodeFrame(group);
+                } else {
+                    ret = false;
                 }
+                m_tiles.clear();
             } else {
                 ret = m_parser->praseReserved(br);
             }
@@ -73,7 +77,7 @@ namespace Av1 {
     }
     bool Decoder::decodeFrame(TileGroup tiles)
     {
-        FrameHeader& h = *m_parser->m_frame;
+        FrameHeader& h = *m_frame;
         std::shared_ptr<YuvFrame> frame = YuvFrame::create(h.FrameWidth, h.FrameHeight);
         if (!frame)
             return false;
@@ -92,7 +96,7 @@ namespace Av1 {
 
     std::shared_ptr<YuvFrame> Decoder::decode_frame_wrapup(const std::shared_ptr<YuvFrame>& frame)
     {
-        FrameHeader& h = *m_parser->m_frame;
+        FrameHeader& h = *m_frame;
         if (h.show_existing_frame)
             return frame;
         LoopFilter filter(*m_parser);

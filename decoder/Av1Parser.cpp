@@ -431,29 +431,29 @@ namespace Av1 {
 
         return true;
     }
-    bool Parser::parseFrameHeader(BitReader& br)
+    FramePtr Parser::parseFrameHeader(BitReader& br)
     {
-        if (m_seenFrameHeader) {
-            ASSERT(0);
-        } else {
-            m_seenFrameHeader = true;
-            m_frame.reset(new FrameHeader);
-            if (!m_frame->parse(br, *m_sequence))
-                return false;
-            /* if (show_existing_frame) */
+        FramePtr frame;
+        if (!m_sequence)
+            return std::move(frame);
+        ConstSequencePtr seq = m_sequence;
+        m_frame.reset(new FrameHeader(seq));
+        frame = m_frame;
+        if (!m_frame->parse(br)) {
+            frame.reset();
         }
-        return true;
+        /* if (show_existing_frame) */
+        return frame;
     }
-    bool Parser::parseTileGroup(BitReader& br, TileGroup& group)
+    bool Parser::parseTileGroup(BitReader& br, const FramePtr& frame, TileGroup& group)
     {
         bool tile_start_and_end_present_flag = false;
-        ;
-        if (m_frame->NumTiles > 1)
+        if (frame->NumTiles > 1)
             READ(tile_start_and_end_present_flag);
         uint32_t tg_start, tg_end;
-        if (m_frame->NumTiles == 1 || !tile_start_and_end_present_flag) {
+        if (frame->NumTiles == 1 || !tile_start_and_end_present_flag) {
             tg_start = 0;
-            tg_end = m_frame->NumTiles - 1;
+            tg_end = frame->NumTiles - 1;
         } else {
             ASSERT(0);
         }
@@ -469,10 +469,10 @@ namespace Av1 {
                 tileSize = br.getRemainingBitsCount() / 8;
             } else {
                 uint32_t tile_size_minus_1;
-                READ_LE(tile_size_minus_1, m_frame->TileSizeBytes);
+                READ_LE(tile_size_minus_1, frame->TileSizeBytes);
                 tileSize = tile_size_minus_1 + 1;
             }
-            std::shared_ptr<Tile> tile(new Tile(m_sequence, m_frame, TileNum));
+            std::shared_ptr<Tile> tile(new Tile(m_sequence, frame, TileNum));
             if (!tile->parse(br.getCurrent(), br.getRemainingBitsCount() >> 3)) {
                 ERROR("decode tile failed");
                 return false;
@@ -491,9 +491,10 @@ namespace Av1 {
         return true;
     }
 
-    FrameHeader::FrameHeader()
+    FrameHeader::FrameHeader(ConstSequencePtr&      sequence)
     {
         memset(this, 0, offsetof(FrameHeader, MiColStarts));
+        m_sequence = sequence;
     }
 
     void FrameHeader::initGeometry()
@@ -520,19 +521,19 @@ namespace Av1 {
         }
     }
 
-    bool FrameHeader::loop_filter_params(BitReader& br, const SequenceHeader& seq)
+    bool FrameHeader::loop_filter_params(BitReader& br)
     {
-        return m_loopFilter.parse(br, seq, *this);
+        return m_loopFilter.parse(br, *m_sequence, *this);
     }
 
-    bool FrameHeader::cdef_params(BitReader& br, const SequenceHeader& seq)
+    bool FrameHeader::cdef_params(BitReader& br)
     {
-        return m_cdef.parse(br, seq, *this);
+        return m_cdef.parse(br, *m_sequence, *this);
     }
 
-    bool FrameHeader::lr_params(BitReader& br, const SequenceHeader& seq)
+    bool FrameHeader::lr_params(BitReader& br)
     {
-        return m_loopRestoration.parse(br, seq, *this);
+        return m_loopRestoration.parse(br, *m_sequence, *this);
     }
 
     void FrameHeader::setup_past_independence()
@@ -541,8 +542,9 @@ namespace Av1 {
         m_segmentation.setup_past_independence();
     }
 
-    bool FrameHeader::parse(BitReader& br, const SequenceHeader& sequence)
+    bool FrameHeader::parse(BitReader& br)
     {
+        const SequenceHeader& sequence = *m_sequence;
         const static uint8_t allFrames = (1 << NUM_REF_FRAMES) - 1;
         uint32_t idLen = 0;
         if (sequence.frame_id_numbers_present_flag)
@@ -610,7 +612,7 @@ namespace Av1 {
         if (sequence.frame_id_numbers_present_flag) {
             PrevFrameID = current_frame_id;
             READ_BITS(current_frame_id, idLen);
-            mark_ref_frames(sequence, idLen);
+            mark_ref_frames(idLen);
         }
         if (frame_type == SWITCH_FRAME) {
             frame_size_override_flag = true;
@@ -637,7 +639,7 @@ namespace Av1 {
             READ(refresh_frame_flags);
         }
         if (FrameIsIntra) {
-            if (!parseFrameSize(br, sequence))
+            if (!parseFrameSize(br))
                 return false;
             if (!parseRenderSize(br))
                 return false;
@@ -660,9 +662,9 @@ namespace Av1 {
         }
         if (use_ref_frame_mvs)
             ASSERT(0);
-        if (!parseTileInfo(br, sequence))
+        if (!parseTileInfo(br))
             return false;
-        if (!m_quant.parse(br, sequence)) {
+        if (!m_quant.parse(br, *m_sequence)) {
             return false;
         }
         if (!m_segmentation.parse(br))
@@ -697,11 +699,11 @@ namespace Av1 {
             }
             AllLossless = CodedLossless && (FrameWidth == UpscaledWidth);
         }
-        if (!loop_filter_params(br, sequence))
+        if (!loop_filter_params(br))
             return false;
-        if (!cdef_params(br, sequence))
+        if (!cdef_params(br))
             return false;
-        if (!lr_params(br, sequence))
+        if (!lr_params(br))
             return false;
         if (!read_tx_mode(br))
             return false;
@@ -720,8 +722,10 @@ namespace Av1 {
         initGeometry();
         return true;
     }
-    void FrameHeader::mark_ref_frames(const SequenceHeader& sequence, uint8_t idLen)
+
+    void FrameHeader::mark_ref_frames(uint8_t idLen)
     {
+        const SequenceHeader& sequence = *m_sequence;
         uint8_t diffLen = sequence.delta_frame_id_length_minus2 + 2;
         for (int i = 0; i < NUM_REF_FRAMES; i++) {
             if (current_frame_id > (1 << diffLen)) {
@@ -735,8 +739,9 @@ namespace Av1 {
     }
 
 #define ROOF(b, a) ((b + (a -1)) & ~(a-1))
-    bool FrameHeader::parseFrameSize(BitReader& br, const SequenceHeader& sequence)
+    bool FrameHeader::parseFrameSize(BitReader& br)
     {
+        const SequenceHeader& sequence = *m_sequence;
         if (frame_size_override_flag) {
             uint32_t frame_width_minus_1, frame_height_minus_1;
             READ_BITS(frame_width_minus_1, sequence.frame_width_bits_minus_1 + 1);
@@ -753,11 +758,11 @@ namespace Av1 {
         uint32_t align = sequence.use_128x128_superblock ? 128 : 64;
         AlignedMiCols = ROOF(FrameWidth, align) >> 2;
         AlignedMiRows = ROOF(FrameHeight, align) >> 2;
-        return parseSuperresParams(br, sequence);
+        return parseSuperresParams(br);
     }
-    bool FrameHeader::parseSuperresParams(BitReader& br, const SequenceHeader& sequence)
+    bool FrameHeader::parseSuperresParams(BitReader& br)
     {
-
+        const SequenceHeader& sequence = *m_sequence;
         if (sequence.enable_superres) {
             READ(use_superres);
         } else {
@@ -858,8 +863,9 @@ namespace Av1 {
         return true;
     }
 
-    bool FrameHeader::parseTileInfo(BitReader& br, const SequenceHeader& sequence)
+    bool FrameHeader::parseTileInfo(BitReader& br)
     {
+        const SequenceHeader& sequence = *m_sequence;
         uint32_t sbCols = sequence.use_128x128_superblock ? ((MiCols + 31) >> 5) : ((MiCols + 15) >> 4);
         uint32_t sbRows = sequence.use_128x128_superblock ? ((MiRows + 31) >> 5) : ((MiRows + 15) >> 4);
         uint8_t sbShift = sequence.use_128x128_superblock ? 5 : 4;
@@ -982,12 +988,16 @@ namespace Av1 {
         return true;
     }
 
-    bool Parser::parseFrame(BitReader& br, TileGroup& group)
+    FramePtr Parser::parseFrame(BitReader& br, TileGroup& group)
     {
-        if (!parseFrameHeader(br))
-            return false;
+        FramePtr frame = parseFrameHeader(br);
+        if (!frame)
+            return frame;
         skipTrailingBits(br);
-        return parseTileGroup(br, group);
+        if (!parseTileGroup(br, frame, group)) {
+            frame.reset();
+        }
+        return frame;
     }
     bool Parser::praseReserved(BitReader& br)
     {
