@@ -7,8 +7,7 @@
 #include "VideoFrame.h"
 #include "log.h"
 
-
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     Decoder::Decoder()
     {
@@ -99,14 +98,14 @@ namespace Av1 {
         FrameHeader& h = *m_frame;
         if (h.show_existing_frame)
             return frame;
-        LoopFilter filter(*m_parser);
+        LoopFilter filter(m_frame);
         filter.filter(frame);
 
-        Cdef cdef(*m_parser);
+        Cdef cdef(m_frame);
         std::shared_ptr<YuvFrame> CdefFrame = cdef.filter(frame);
         std::shared_ptr<YuvFrame> UpscaledCdefFrame = upscaling(CdefFrame);
         std::shared_ptr<YuvFrame> UpscaledCurrFrame = upscaling(frame);
-        LoopRestoration restoration(*m_parser, UpscaledCdefFrame, UpscaledCurrFrame);
+        LoopRestoration restoration(m_frame, UpscaledCdefFrame, UpscaledCurrFrame);
         std::shared_ptr<YuvFrame> lrFrame = restoration.filter();
         return lrFrame;
     }
@@ -128,6 +127,6 @@ namespace Av1 {
         }
         return f;
     }
-        
+
 };
 };

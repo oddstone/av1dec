@@ -9,7 +9,7 @@
 
 EntropyDecoder::EntropyDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update, uint32_t baseQ)
 {
-    m_symbol.reset(new YamiParser::Av1::SymbolDecoder(data, sz, disable_cdf_update));
+    m_symbol.reset(new Yami::Av1::SymbolDecoder(data, sz, disable_cdf_update));
     av1_copy(palette_y_size_cdf, default_palette_y_size_cdf);
     av1_copy(palette_uv_size_cdf, default_palette_uv_size_cdf);
     av1_copy(palette_y_color_index_cdf, default_palette_y_color_index_cdf);

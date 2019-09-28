@@ -9,7 +9,7 @@
 struct YuvFrame;
 class Tile;
 
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     class Parser;
     struct FrameHeader;

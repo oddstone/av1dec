@@ -8,7 +8,7 @@
 #include <memory>
 #include <stdint.h>
 
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     class SymbolDecoder;
     struct FrameHeader;
@@ -17,7 +17,7 @@ namespace Av1 {
 }
 }
 
-using namespace YamiParser::Av1;
+using namespace Yami::Av1;
 
 struct YuvFrame;
 class TransformBlock;

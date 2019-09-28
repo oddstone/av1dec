@@ -31,7 +31,7 @@
      ((uint64_t)((const uint8_t*)(x))[6] <<  8) | \
      ((uint64_t)((const uint8_t*)(x))[7]))
 
-namespace YamiParser {
+namespace Yami {
 
 const uint32_t BitReader::CACHEBYTES = sizeof(unsigned long int);
 
@@ -204,4 +204,4 @@ bool BitReader::readUe(uint32_t& v)
 	return true;
 }
 
-} /*namespace YamiParser*/
+} /*namespace Yami*/

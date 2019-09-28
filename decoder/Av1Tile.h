@@ -9,14 +9,14 @@
 
 class Partition;
 
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     class SymbolDecoder;
     struct FrameHeader;
     struct SequenceHeader;
 }
 }
-using namespace YamiParser::Av1;
+using namespace Yami::Av1;
 
 struct YuvFrame;
 

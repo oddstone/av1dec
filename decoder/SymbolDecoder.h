@@ -2,10 +2,10 @@
 #include <memory>
 #include <stdint.h>
 
-namespace YamiParser {
+namespace Yami {
 class BitReader;
 }
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     class SymbolDecoder {
     public:
@@ -25,7 +25,7 @@ namespace Av1 {
         uint16_t SymbolValue;
         uint32_t SymbolMaxBits;
         bool DisableCdfUpdate;
-        std::unique_ptr<YamiParser::BitReader> m_reader;
+        std::unique_ptr<Yami::BitReader> m_reader;
     };
 }
 }

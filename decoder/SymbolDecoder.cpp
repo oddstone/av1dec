@@ -3,12 +3,12 @@
 #include "bitReader.h"
 #include <algorithm>
 
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     SymbolDecoder::SymbolDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update)
         : DisableCdfUpdate(disable_cdf_update)
     {
-        m_reader.reset(new YamiParser::BitReader(data, sz));
+        m_reader.reset(new Yami::BitReader(data, sz));
         uint8_t numBits;
         if (sz <= 1)
             numBits = 8;

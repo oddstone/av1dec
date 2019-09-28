@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <algorithm> /*std::min*/
 
-namespace YamiParser {
+namespace Yami {
 
 class BitReader {
 public:
@@ -126,6 +126,6 @@ bool BitReader::peek(T& v, uint32_t nbits) const
     return tmp.readT(v, nbits);
 }
 
-} /*namespace YamiParser*/
+} /*namespace Yami*/
 
 #endif

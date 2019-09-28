@@ -13,15 +13,12 @@
 class Block;
 class TransformBlock;
 
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
 
     struct SequenceHeader;
     struct FrameHeader;
     typedef std::vector<std::shared_ptr<Tile>> TileGroup;
-    typedef std::shared_ptr<FrameHeader> FramePtr;
-    typedef std::shared_ptr<SequenceHeader> SequencePtr;
-    typedef std::shared_ptr<const SequenceHeader> ConstSequencePtr;
 
     struct obu_extension_header {
         uint8_t temporal_id;

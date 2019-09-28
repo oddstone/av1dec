@@ -1,6 +1,20 @@
 #ifndef Av1Common_h
 #define Av1Common_h
 #include "enums.h"
+#include <memory>
+
+namespace Yami {
+    namespace Av1 {
+        class Parser;
+        struct FrameHeader;
+        struct SequenceHeader;
+
+        typedef std::shared_ptr<SequenceHeader> SequencePtr;
+        typedef std::shared_ptr<const SequenceHeader> ConstSequencePtr;
+        typedef std::shared_ptr<FrameHeader> FramePtr;
+        typedef std::shared_ptr<const FrameHeader> ConstFramePtr;
+    }
+}
 
 const int Num_4x4_Blocks_Wide[BLOCK_SIZES_ALL] = {
     1, 1, 2, 2, 2, 4, 4, 4, 8, 8, 8,

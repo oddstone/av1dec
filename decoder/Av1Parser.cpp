@@ -78,7 +78,7 @@
 #define ROUND2(x, n) ((n == 0) ? x : ((x + (1 << (n - 1))) >> n))
 #endif
 
-namespace YamiParser {
+namespace Yami {
 namespace Av1 {
     bool obu_extension_header::parse(BitReader& br)
     {

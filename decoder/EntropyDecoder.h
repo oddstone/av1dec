@@ -50,7 +50,7 @@ private:
     int decode_unsigned_subexp_with_ref_bool(int mx, int k, int r );
     int decode_subexp_bool(int numSyms, int k);
     uint32_t readNS(int n);
-    std::unique_ptr<YamiParser::Av1::SymbolDecoder> m_symbol;
+    std::unique_ptr<Yami::Av1::SymbolDecoder> m_symbol;
 
     aom_cdf_prob txb_skip_cdf[TX_SIZES][TXB_SKIP_CONTEXTS][CDF_SIZE(2)];
     aom_cdf_prob eob_extra_cdf[TX_SIZES][PLANE_TYPES][EOB_COEF_CONTEXTS]

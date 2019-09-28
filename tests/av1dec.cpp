@@ -29,34 +29,34 @@ void writeFrame(FILE* fp, std::shared_ptr<YuvFrame>& frame)
 
 int main(int argc, char** argv)
 {
-	if (argc != 4 || strcmp(argv[1], "-i")) {
-		usage(argv[0]);
-		return -1;
-	}
-	SharedPtr<DecodeInput> input(DecodeInput::create(argv[2]));
-	if (!input) {
-		printf("can't open input %s", argv[1]);
-		return -1;
-	}
+    if (argc != 4 || strcmp(argv[1], "-i")) {
+        usage(argv[0]);
+        return -1;
+    }
+    SharedPtr<DecodeInput> input(DecodeInput::create(argv[2]));
+    if (!input) {
+        printf("can't open input %s", argv[1]);
+        return -1;
+    }
     FILE* out = fopen(argv[3], "wb");
     if (!out) {
         printf("can't open %s for write");
         return -1;
     }
 
-	VideoDecodeBuffer buf;
-	YamiParser::Av1::Decoder decoder;
-	while (input->getNextDecodeUnit(buf)) {
-		printf("%d\r\n", buf.size);
-		decoder.decode(buf.data, buf.size);
+    VideoDecodeBuffer buf;
+    Yami::Av1::Decoder decoder;
+    while (input->getNextDecodeUnit(buf)) {
+        printf("%d\r\n", buf.size);
+        decoder.decode(buf.data, buf.size);
         std::shared_ptr<YuvFrame> frame;
         while ((frame = decoder.getOutput())) {
             writeFrame(out, frame);
         }
 
-	}
+    }
     fclose(out);
-	//getchar();
+    //getchar();
     return 0;
 }
 
