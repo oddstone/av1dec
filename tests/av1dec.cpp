@@ -8,9 +8,9 @@ void usage(const char* app)
     printf("%s -i input output", app);
 }
 
-void writeFrame(FILE* fp, std::shared_ptr<YuvFrame>& frame)
+void writeFrame(FILE* fp, std::shared_ptr<Yami::YuvFrame>& frame)
 {
-    for (int p = 0; p < YuvFrame::MAX_PLANES; p++) {
+    for (int p = 0; p < Yami::YuvFrame::MAX_PLANES; p++) {
         uint8_t* start = frame->data[p];
         int stride = frame->strides[p];
         int width = frame->width;
@@ -49,7 +49,7 @@ int main(int argc, char** argv)
     while (input->getNextDecodeUnit(buf)) {
         printf("%d\r\n", buf.size);
         decoder.decode(buf.data, buf.size);
-        std::shared_ptr<YuvFrame> frame;
+        std::shared_ptr<Yami::YuvFrame> frame;
         while ((frame = decoder.getOutput())) {
             writeFrame(out, frame);
         }
