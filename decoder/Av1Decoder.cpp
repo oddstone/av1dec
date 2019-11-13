@@ -98,6 +98,7 @@ namespace Av1 {
         FrameHeader& h = *m_frame;
         if (h.show_existing_frame)
             return frame;
+
         LoopFilter filter(m_frame);
         filter.filter(frame);
 

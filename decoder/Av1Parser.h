@@ -338,8 +338,8 @@ namespace Av1 {
     private:
         void read_lr_unit(EntropyDecoder& entropy,
             int plane, int unitRow, int unitCol);
-        int unitRows;
-        int unitCols;
+        int unitRows[MAX_PLANES];
+        int unitCols[MAX_PLANES];
     };
 
     struct FrameHeader {

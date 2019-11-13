@@ -570,15 +570,16 @@ namespace Av1 {
             READ_BITS(frame_type, 2);
             FrameIsIntra = (frame_type == INTRA_ONLY_FRAME || frame_type == KEY_FRAME);
             READ(show_frame);
+            if (show_frame && m_sequence->decoder_model_info_present_flag && !m_sequence->equal_picture_interval) {
+                ASSERT(0 && "temporal_point_info");
+            }
             if (show_frame) {
-                showable_frame = false;
+                showable_frame = frame_type != KEY_FRAME;
             } else {
                 READ(showable_frame);
             }
-            if (frame_type == KEY_FRAME && show_frame) {
-                memset(RefValid, 0, sizeof(RefValid));
-            }
-            if (frame_type == SWITCH_FRAME) {
+            if (frame_type == SWITCH_FRAME
+                || (frame_type == KEY_FRAME && show_frame)) {
                 error_resilient_mode = true;
             } else {
                 READ(error_resilient_mode);
@@ -1256,21 +1257,21 @@ namespace Av1 {
                     int subX = (plane == 0) ? 0 : seq.subsampling_x;
                     int subY = (plane == 0) ? 0 : seq.subsampling_y;
                     int unitSize = LoopRestorationSize[ plane ];
-                    unitRows = count_units_in_frame( unitSize, ROUND2(frame.FrameHeight, subY) );
-                    unitCols = count_units_in_frame( unitSize, ROUND2(frame.UpscaledWidth, subX) );
-                    LrType[plane].assign(unitRows, std::vector<RestorationType>(unitCols));
+                    unitRows[plane] = count_units_in_frame( unitSize, ROUND2(frame.FrameHeight, subY) );
+                    unitCols[plane] = count_units_in_frame( unitSize, ROUND2(frame.UpscaledWidth, subX) );
+                    LrType[plane].assign(unitRows[plane], std::vector<RestorationType>(unitCols[plane]));
 
                     {
                         std::vector<std::vector<int8_t>> v1(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
-                        std::vector<std::vector<std::vector<int8_t>>> v2(unitCols, v1);
-                        LrWiener[plane].assign(unitRows, v2);
+                        std::vector<std::vector<std::vector<int8_t>>> v2(unitCols[plane], v1);
+                        LrWiener[plane].assign(unitRows[plane], v2);
                         RefLrWiener[plane].assign(MAX_PASSES, std::vector<int8_t>(MAX_WIENER_COEFFS));
                     }
                     {
-                        LrSgrSet[plane].assign(unitRows, std::vector<uint8_t>(unitCols));
+                        LrSgrSet[plane].assign(unitRows[plane], std::vector<uint8_t>(unitCols[plane]));
                         std::vector<int8_t> v1(MAX_PASSES);
-                        std::vector<std::vector<int8_t>> v2(unitCols, v1);
-                        LrSgrXqd[plane].assign(unitRows, v2);
+                        std::vector<std::vector<int8_t>> v2(unitCols[plane], v1);
+                        LrSgrXqd[plane].assign(unitRows[plane], v2);
                         RefSgrXqd[plane].resize(MAX_PASSES);
                     }
                 }
@@ -1294,7 +1295,7 @@ namespace Av1 {
                 int subY = (plane == 0) ? 0 : seq.subsampling_y;
                 int unitSize = LoopRestorationSize[ plane ];
                 int unitRowStart = ( r * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize;
-                int unitRowEnd = std::min( unitRows, ( (r + h) * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize);
+                int unitRowEnd = std::min( unitRows[plane], ( (r + h) * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize);
                 int numerator;
                 int denominator;
                 if (frame.use_superres ) {
@@ -1305,7 +1306,7 @@ namespace Av1 {
                     denominator = unitSize;
                 }
                 int unitColStart = (c * numerator + denominator - 1 ) / denominator;
-                int unitColEnd = std::min( unitCols, ( (c + w) * numerator + denominator - 1 ) / denominator);
+                int unitColEnd = std::min( unitCols[plane], ( (c + w) * numerator + denominator - 1 ) / denominator);
                 for (int unitRow = unitRowStart; unitRow < unitRowEnd; unitRow++ ) {
                     for (int unitCol = unitColStart; unitCol < unitColEnd; unitCol++ ) {
                         read_lr_unit(*tile.m_entropy, plane, unitRow, unitCol);

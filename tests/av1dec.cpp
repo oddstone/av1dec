@@ -25,6 +25,7 @@ void writeFrame(FILE* fp, std::shared_ptr<Yami::YuvFrame>& frame)
         }
 
     }
+    fflush(fp);
 }
 
 int main(int argc, char** argv)
