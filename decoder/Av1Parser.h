@@ -222,6 +222,7 @@ namespace Av1 {
         TX_MODE_SELECT = 2,
     };
     const static uint8_t NUM_REF_FRAMES = 8;
+    const static uint8_t REFS_PER_FRAME = 7;
     const static uint8_t PRIMARY_REF_NONE = 7;
     const static uint16_t MAX_TILE_WIDTH = 4096;
     const static uint32_t MAX_TILE_AREA = 4906 * 2304;
@@ -342,9 +343,62 @@ namespace Av1 {
         int unitCols[MAX_PLANES];
     };
 
+    struct Mv {
+        int16_t mv[2];
+    };
+
+    class RefFrame {
+    public:
+            RefFrame()
+                : RefValid(false)
+            {
+            }
+
+            bool RefValid;
+            uint32_t RefFrameId;
+            uint32_t RefUpscaledWidth;
+            uint32_t RefFrameWidth;
+            uint32_t RefFrameHeight;
+            uint32_t RefRenderWidth;
+            uint32_t RefRenderHeight;
+            uint32_t RefMiCols;
+            uint32_t RefMiRows;
+            uint8_t RefFrameType;
+            int RefSubsamplingX;
+            int RefSubsamplingY;
+            uint8_t RefBitDepth;
+            uint8_t RefOrderHint;
+            uint8_t SavedOrderHints[NUM_REF_FRAMES];
+
+            //FrameStore
+            std::vector<std::vector<uint8_t>> SavedRefFrames;
+            std::vector<std::vector<Mv>> SavedMvs;
+            //SavedGmParams
+            //SavedSegmentIds;
+
+    };
+
+    class RefInfo {
+    public:
+        std::vector<RefFrame> m_refs;
+        RefInfo()
+        {
+            m_refs.resize(NUM_REF_FRAMES);
+        }
+        void resetRefs()
+        {
+            for (auto& r : m_refs) {
+                r.RefValid = false;
+                r.RefOrderHint = 0;
+            }
+        }
+
+    };
+
     struct FrameHeader {
         friend class Block;
         friend class TransformBlock;
+        friend class SetFrameRefs;
         bool show_existing_frame;
         uint8_t frame_to_show_map_idx;
         uint8_t refresh_frame_flags;
@@ -352,21 +406,26 @@ namespace Av1 {
         bool FrameIsIntra;
         bool show_frame;
         bool showable_frame;
-        bool RefValid[NUM_REF_FRAMES];
-        uint8_t RefOrderHint[NUM_REF_FRAMES];
         bool error_resilient_mode;
         bool disable_cdf_update;
         bool allow_screen_content_tools;
         bool force_integer_mv;
         uint32_t PrevFrameID;
         uint32_t current_frame_id;
-        uint32_t RefFrameId[NUM_REF_FRAMES];
         bool frame_size_override_flag;
-        uint8_t order_hint;
+        uint8_t OrderHint;
         uint8_t primary_ref_frame;
         bool allow_high_precision_mv;
         bool use_ref_frame_mvs;
         bool allow_intrabc;
+
+        //for inter frame
+        bool frame_refs_short_signaling;
+        uint8_t last_frame_idx;
+        uint8_t gold_frame_idx;
+        uint8_t ref_frame_idx[REFS_PER_FRAME];
+        uint8_t OrderHints[REFS_PER_FRAME];
+        bool RefFrameSignBias[REFS_PER_FRAME];
 
         //frame_size()
         uint32_t FrameWidth;
@@ -375,6 +434,9 @@ namespace Av1 {
         //compute_image_size()
         uint32_t MiCols;
         uint32_t MiRows;
+
+        uint32_t w8;
+        uint32_t h8;
 
         //cols and rows align to super block size
         uint32_t AlignedMiCols;
@@ -388,6 +450,9 @@ namespace Av1 {
         //render_size()
         uint32_t RenderWidth;
         uint32_t RenderHeight;
+
+        uint8_t interpolation_filter;
+        bool is_motion_mode_switchable;
 
         bool disable_frame_end_update_cdf;
 
@@ -428,6 +493,9 @@ namespace Av1 {
         std::vector<std::vector<TX_SIZE>> LoopfilterTxSizes[MAX_PLANES];
         std::vector<std::vector<uint8_t>> SegmentIds;
         std::vector<std::vector<uint8_t>> DeltaLFs[FRAME_LF_COUNT];
+        std::vector<std::vector<uint8_t>> MfRefFrames;
+        std::vector<std::vector<Mv>> MfMvs;
+        std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;
         //std::vector<std::vector<uint32_t>> PaletteSizes[2];
         //PaletteColors
 
@@ -444,15 +512,20 @@ namespace Av1 {
 
 
         FrameHeader(ConstSequencePtr&);
-        bool parse(BitReader& br);
+        bool parse(BitReader& br, RefInfo&);
         int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
 
     private:
         void setup_past_independence();
-        void mark_ref_frames(uint8_t idLen);
-        bool parseFrameSize(BitReader& br);
-        bool parseSuperresParams(BitReader& br);
-        bool parseRenderSize(BitReader& br);
+        int8_t get_relative_dist(uint8_t a, uint8_t b);
+        void mark_ref_frames(uint8_t idLen, RefInfo& refInfo);
+        void set_frame_refs(const RefInfo& refInfo);
+        bool frame_size(BitReader& br);
+        bool superres_params(BitReader& br);
+        bool render_size(BitReader& br);
+        void compute_image_size();
+        bool frame_size_with_refs(BitReader& br, const RefInfo& refInfo);
+        bool read_interpolation_filter(BitReader& br);
         bool parseTileInfo(BitReader& br);
         bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
         bool parseQuantizationParams(BitReader& br);
@@ -463,11 +536,19 @@ namespace Av1 {
         //bool frame_reference_mode();
         //bool skip_mode_params( )
         void initGeometry();
+
+        //for inter predict
+        void motion_field_estimation(const RefInfo& refInfo);
+        bool get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv);
+        bool mvProject(const RefInfo& refInfo, uint8_t src, int dstSign);
+        Mv get_mv_projection(const Mv& mv, int numerator, int denominator);
+
         const static uint8_t SUPERRES_DENOM_MIN = 9;
 
         const static uint8_t SUPERRES_DENOM_BITS = 3;
         const static uint8_t TX_MODES = 3;
     };
+
 
     class Parser {
     public:
@@ -475,14 +556,16 @@ namespace Av1 {
         bool parseSequenceHeader(BitReader& br);
         bool parseTemporalDelimiter(BitReader& br);
         std::shared_ptr<FrameHeader> parseFrameHeader(BitReader& br);
-        bool parseTileGroup(BitReader& br,       const FramePtr& frame, TileGroup& group);
+        bool parseTileGroup(BitReader& br, const FramePtr& frame, TileGroup& group);
         bool parseMetadata(BitReader& br);
         bool parsePadding(BitReader& br);
         FramePtr parseFrame(BitReader& br, TileGroup& group);
         bool praseReserved(BitReader& br);
+        void finishFrame();
         std::shared_ptr<SequenceHeader> m_sequence;
         std::shared_ptr<FrameHeader> m_frame;
     private:
+        RefInfo m_refInfo;
         void skipTrailingBits(BitReader& br);
         bool m_seenFrameHeader;
     };

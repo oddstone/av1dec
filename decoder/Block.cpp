@@ -396,7 +396,6 @@ namespace Yami {
             RefFrame[0] = INTRA_FRAME;
             RefFrame[1] = NONE_FRAME;
 
-            bool use_intrabc;
             if (m_frame.allow_intrabc) {
                 ASSERT(0 && "intrabc");
             } else {
@@ -428,10 +427,67 @@ namespace Yami {
                 filter_intra_mode_info();
             }
         }
-
+        /*
+        void Block::inter_segment_id(bool preSkip)
+        {
+            if (m_frame.m_segmentation.segmentation_enabled ) {
+                predictedSegmentId = get_segment_id( )
+            if ( segmentation_update_map ) {
+            if ( preSkip && !SegIdPreSkip ) {
+            segment_id = 0
+            return
+            }
+            if ( !preSkip ) {
+            if ( skip ) {
+            seg_id_predicted = 0
+            for ( i = 0; i < Num_4x4_Blocks_Wide[ MiSize ]; i++ )
+            AboveSegPredContext[ MiCol + i ] = seg_id_predicted
+            for ( i = 0; i < Num_4x4_Blocks_High[ MiSize ]; i++ )
+            LeftSegPredContext[ MiRow + i ] = seg_id_predicted
+            read_segment_id( )
+            return
+            }
+            }
+            if ( segmentation_temporal_update == 1 ) {
+            seg_id_predicted S()
+            if ( seg_id_predicted )
+            segment_id = predictedSegmentId
+            else
+            read_segment_id( )
+            for ( i = 0; i < Num_4x4_Blocks_Wide[ MiSize ]; i++ )
+            AboveSegPredContext[ MiCol + i ] = seg_id_predicted
+            for ( i = 0; i < Num_4x4_Blocks_High[ MiSize ]; i++ )
+            LeftSegPredContext[ MiRow + i ] = seg_id_predicted
+            } else {
+            read_segment_id( )
+            AV1 Bitstream & Decoding Process Specification
+            Section: Syntax structures Page 72 of 669
+            }
+            } else {
+            segment_id = predictedSegmentId
+            }
+            } else {
+            segment_id = 0
+            }
+            }
+        }
+        */
         void Block::inter_frame_mode_info()
         {
-            ASSERT(0);
+            use_intrabc = false;
+            LeftRefFrame[ 0 ] = AvailL ? m_frame.RefFrames[ MiRow ][ MiCol-1 ][ 0 ] : INTRA_FRAME;
+            AboveRefFrame[ 0 ] = AvailU ? m_frame.RefFrames[ MiRow-1 ][ MiCol ][ 0 ] : INTRA_FRAME;
+            LeftRefFrame[ 1 ] = AvailL ? m_frame.RefFrames[ MiRow ][ MiCol-1 ][ 1 ] : NONE_FRAME;
+            AboveRefFrame[ 1 ] = AvailU ? m_frame.RefFrames[ MiRow-1 ][ MiCol ][ 1 ] : NONE_FRAME;
+            LeftIntra = LeftRefFrame[ 0 ] <= INTRA_FRAME;
+            AboveIntra = AboveRefFrame[ 0 ] <= INTRA_FRAME;
+            LeftSingle = LeftRefFrame[ 1 ] <= INTRA_FRAME;
+            AboveSingle = AboveRefFrame[ 1 ] <= INTRA_FRAME;
+            skip = false;
+
+            //inter_segment_id(true);
+
+
         }
 
         void Block::mode_info()

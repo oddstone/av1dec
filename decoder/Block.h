@@ -100,10 +100,19 @@ namespace Yami {
             FILTER_INTRA_MODE filter_intra_mode;
             TX_SIZE TxSize;
             int RefFrame[2];
+            bool use_intrabc;
             uint32_t sbMask;
 
             int MaxLumaW;
             int MaxLumaH;
+
+            //for inter
+            uint8_t LeftRefFrame[2];
+            uint8_t AboveRefFrame[2];
+            bool LeftIntra;
+            bool AboveIntra;
+            bool LeftSingle;
+            bool AboveSingle;
 
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;

@@ -3,6 +3,7 @@
 #endif
 
 #include <algorithm>
+#include <functional>
 #include <string.h>
 
 #include "Av1Parser.h"
@@ -439,7 +440,7 @@ namespace Av1 {
         ConstSequencePtr seq = m_sequence;
         m_frame.reset(new FrameHeader(seq));
         frame = m_frame;
-        if (!m_frame->parse(br)) {
+        if (!m_frame->parse(br, m_refInfo)) {
             frame.reset();
         }
         /* if (show_existing_frame) */
@@ -499,7 +500,7 @@ namespace Av1 {
 
     void FrameHeader::initGeometry()
     {
-        
+
         YModes.assign(AlignedMiRows, std::vector<PREDICTION_MODE>(AlignedMiCols));
         UVModes.assign(AlignedMiRows, std::vector<UV_PREDICTION_MODE>(AlignedMiCols));
         RefFrames.resize(AlignedMiRows);
@@ -519,6 +520,8 @@ namespace Av1 {
         for (int i = 0; i < FRAME_LF_COUNT; i++) {
             DeltaLFs[i].assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
         }
+        MfRefFrames.assign(MiRows, std::vector<uint8_t>(MiCols));
+        MfMvs.assign(MiRows, std::vector<Mv>(MiCols));
     }
 
     bool FrameHeader::loop_filter_params(BitReader& br)
@@ -542,7 +545,324 @@ namespace Av1 {
         m_segmentation.setup_past_independence();
     }
 
-    bool FrameHeader::parse(BitReader& br)
+    class SetFrameRefs
+    {
+        const uint8_t INVALID_REF = 0xff;
+    public:
+        SetFrameRefs(FrameHeader& frame, const RefInfo& refInfo)
+            : ref_frame_idx(frame.ref_frame_idx)
+            , last_frame_idx(frame.last_frame_idx)
+            , gold_frame_idx(frame.gold_frame_idx)
+            , curFrameHint(1 << (frame.m_sequence->OrderHintBits - 1))
+            , OrderHint(frame.OrderHint)
+        {
+            usedFrame.resize(NUM_REF_FRAMES);
+            for (auto& b : usedFrame)
+                b = false;
+
+            memset(ref_frame_idx, INVALID_REF, sizeof(*ref_frame_idx)*REFS_PER_FRAME);
+            ref_frame_idx[ LAST_FRAME - LAST_FRAME ] = last_frame_idx;
+            ref_frame_idx[ GOLDEN_FRAME - LAST_FRAME ] = gold_frame_idx;
+
+
+            usedFrame[ last_frame_idx ] = true;
+            usedFrame[ gold_frame_idx ] = true;
+
+            shiftedOrderHints.resize(NUM_REF_FRAMES);
+            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+                const RefFrame& ref = refInfo.m_refs[i];
+                shiftedOrderHints[i] = curFrameHint + frame.get_relative_dist(ref.RefOrderHint, OrderHint );
+            }
+            setRef(ALTREF_FRAME, std::bind(&SetFrameRefs::find_latest_backward, this ));
+            setRef(BWDREF_FRAME, std::bind(&SetFrameRefs::find_earliest_backward, this ));
+            setRef(ALTREF2_FRAME, std::bind(&SetFrameRefs::find_earliest_backward, this));
+
+            setOtherRefs();
+            setRemainingRefs();
+
+        }
+    private:
+        void setRemainingRefs()
+        {
+            uint8_t ref = INVALID_REF;
+            uint8_t earliestOrderHint;
+            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+                uint8_t hint = shiftedOrderHints[i];
+                if ( ref == INVALID_REF || hint < earliestOrderHint ) {
+                    ref = i;
+                    earliestOrderHint = hint;
+                }
+            }
+            for (int i = 0; i < REFS_PER_FRAME; i++ ) {
+                if ( ref_frame_idx[ i ] == INVALID_REF ) {
+                    ref_frame_idx[ i ] = ref;
+
+                }
+            }
+        }
+        void setOtherRefs()
+        {
+            uint8_t Ref_Frame_List[ REFS_PER_FRAME - 2 ] = {
+                LAST2_FRAME, LAST3_FRAME, BWDREF_FRAME, ALTREF2_FRAME, ALTREF_FRAME
+            };
+
+            for (int i = 0; i < REFS_PER_FRAME - 2; i++ ) {
+                uint8_t refFrame = Ref_Frame_List[i];
+                if (ref_frame_idx[ refFrame - LAST_FRAME ] == INVALID_REF) {
+                    setRef(refFrame, std::bind(std::bind(&SetFrameRefs::find_latest_forward, this)));
+                }
+            }
+        }
+        void setRef(uint8_t index, std::function<uint8_t()> find)
+        {
+            uint8_t ref = find();
+            if ( ref != INVALID_REF) {
+                ref_frame_idx[ index - LAST_FRAME ] = ref;
+                usedFrame[ ref ] = true;
+            }
+        }
+
+        uint8_t find_latest_backward()
+        {
+            uint8_t ref = INVALID_REF;
+            uint8_t latestOrderHint;
+            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+                uint8_t hint = shiftedOrderHints[i];
+                if (! usedFrame[i]
+                    && hint >= curFrameHint
+                    &&( ref == INVALID_REF || hint >= latestOrderHint ) )
+                {
+                    ref = i;
+                    latestOrderHint = hint;
+                }
+            }
+            return ref;
+        }
+        uint8_t find_earliest_backward() {
+            uint8_t ref = INVALID_REF;
+            uint8_t earliestOrderHint;
+            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+                uint8_t hint = shiftedOrderHints[i];
+                if ( !usedFrame[ i ]
+                    && hint >= curFrameHint
+                    && ( ref == INVALID_REF || hint < earliestOrderHint ) ) {
+                    ref = i;
+                    earliestOrderHint = hint;
+                }
+            }
+            return ref;
+        }
+        uint8_t find_latest_forward() {
+            uint8_t ref = INVALID_REF;
+            uint8_t latestOrderHint;
+            for (int i = 0; i < NUM_REF_FRAMES; i++) {
+                uint8_t hint = shiftedOrderHints[i];
+                if (!usedFrame[i] &&
+                    hint < curFrameHint &&
+                    (ref == INVALID_REF || hint >= latestOrderHint)) {
+                    ref = i;
+                    latestOrderHint = hint;
+                }
+            }
+            return ref;
+        }
+
+        uint8_t* ref_frame_idx;
+        std::vector<bool> usedFrame;;
+        uint8_t OrderHintBits;
+        std::vector<uint8_t> shiftedOrderHints;
+        uint8_t last_frame_idx;
+        uint8_t gold_frame_idx;
+        uint8_t curFrameHint;
+        uint8_t OrderHint;
+    };
+
+    int8_t FrameHeader::get_relative_dist(uint8_t a, uint8_t b )
+    {
+        if (!m_sequence->enable_order_hint) {
+            return 0;
+        }
+        int8_t diff = a - b;
+        uint8_t m = 1 << (m_sequence->OrderHintBits - 1);
+        diff = (diff & (m - 1)) - (diff & m);
+        return diff;
+    }
+
+    void FrameHeader::set_frame_refs(const RefInfo& refInfo)
+    {
+        SetFrameRefs refs(*this, refInfo);
+    }
+
+    bool FrameHeader::frame_size_with_refs(BitReader& br, const RefInfo& refInfo)
+    {
+        bool found_ref;
+        for (int i = 0; i < REFS_PER_FRAME; i++ ) {
+            READ(found_ref);
+            if ( found_ref) {
+                const RefFrame& ref = refInfo.m_refs[ref_frame_idx[i]];
+                UpscaledWidth = ref.RefUpscaledWidth;
+                FrameWidth = UpscaledWidth;
+                FrameHeight = ref.RefFrameHeight;
+                RenderWidth = ref.RefRenderWidth;
+                RenderHeight = ref.RefRenderHeight;
+                break;
+            }
+        }
+        if (!found_ref) {
+            if (!frame_size(br))
+                return false;
+            if (!render_size(br))
+                return false;
+       } else {
+            if (!superres_params(br))
+                return false;
+            compute_image_size();
+       }
+        return true;
+
+    }
+    bool FrameHeader::read_interpolation_filter(BitReader& br)
+    {
+        bool is_filter_switchable;
+        READ(is_filter_switchable);
+        if (is_filter_switchable) {
+            interpolation_filter = SWITCHABLE;
+        } else {
+            READ_BITS(interpolation_filter, 2);
+        }
+        return true;
+    }
+
+    Mv FrameHeader::get_mv_projection(const Mv& mv, int numerator, int denominator)
+    {
+        const int Div_Mult[32] = {
+            0, 16384, 8192, 5461, 4096, 3276, 2730, 2340, 2048, 1820, 1638,
+            1489, 1365, 1260, 1170, 1092, 1024, 963, 910, 862, 819, 780,
+            744, 712, 682, 655, 630, 606, 585, 564, 546, 528
+        };
+        Mv projMv;
+        int clippedDenominator = std::min(MAX_FRAME_DISTANCE, denominator );
+        int clippedNumerator = CLIP3( -MAX_FRAME_DISTANCE, MAX_FRAME_DISTANCE, numerator );
+        for (int i = 0; i < 2;  i++) {
+            int16_t scaled = ROUND2SIGNED(mv.mv[i] * clippedNumerator * Div_Mult[ clippedDenominator ], 14 );
+            projMv.mv[i] = CLIP3( -(1 << 14) + 1, (1 << 14) - 1, scaled );
+        }
+        return std::move(projMv);
+    }
+
+    bool project(int& v8, int delta, int dstSign, int max8, int maxOff8 ) {
+        int base8 = (v8 >> 3) << 3;
+        int offset8;
+        if ( delta >= 0 ) {
+            offset8 = delta >> ( 3 + 1 + MI_SIZE_LOG2 );
+        } else {
+            offset8 = -( ( -delta ) >> ( 3 + 1 + MI_SIZE_LOG2 ) );
+        }
+        v8 += dstSign * offset8;
+
+        bool posValid;
+        if ( v8 < 0 ||
+            v8 >= max8 ||
+            v8 < base8 - maxOff8 ||
+            v8 >= base8 + 8 + maxOff8 ) {
+            posValid = false;
+        }
+        return false;
+    }
+
+    bool FrameHeader::get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv)
+    {
+        static const int MAX_OFFSET_WIDTH = 8;
+        static const int MAX_OFFSET_HEIGHT = 0;
+        PosX8 = x8;
+        PosY8 = y8;
+        return  project(PosX8,projMv.mv[1], dstSign, w8, MAX_OFFSET_WIDTH)
+            && project(PosY8, projMv.mv[0], dstSign, h8, MAX_OFFSET_HEIGHT);
+    }
+    bool FrameHeader::mvProject(const RefInfo& refInfo, uint8_t src, int dstSign)
+    {
+        uint8_t srcIdx = ref_frame_idx[ src - LAST_FRAME ];
+        const RefFrame& ref = refInfo.m_refs[srcIdx];
+        if (ref.RefMiCols != MiCols
+            || ref.RefMiRows != MiRows
+            || FrameIsIntra )
+            return false;
+        int PosX8;
+        int PosY8;
+        for (uint32_t y8 = 0; y8 < h8; y8++ ) {
+            for ( uint32_t x8 = 0; x8 < w8; x8++ ) {
+                uint32_t row = 2 * y8 + 1;
+                uint32_t col = 2 * x8 + 1;
+                uint8_t srcRef = ref.SavedRefFrames[ row ][ col ];
+                if ( srcRef > INTRA_FRAME ) {
+                    int8_t refToCur = get_relative_dist( OrderHints[ src ], OrderHint );
+                    int8_t refOffset = get_relative_dist( OrderHints[ src ], ref.SavedOrderHints[srcRef]);
+                    bool posValid = std::abs( refToCur ) <= MAX_FRAME_DISTANCE
+                        && std::abs( refOffset ) <= MAX_FRAME_DISTANCE
+                        && refOffset > 0;
+                    if ( posValid ) {
+                        const Mv& mv = ref.SavedMvs[ row ][ col ];
+                        Mv projMv = get_mv_projection( mv, refToCur * dstSign, refOffset );
+                        posValid = get_block_position( PosX8, PosY8, x8, y8, dstSign, projMv );
+                        if ( posValid ) {
+                            for (uint8_t dst = LAST_FRAME; dst <= ALTREF_FRAME; dst++ ) {
+                                int8_t refToDst = get_relative_dist( OrderHint, OrderHints[ dst ] );
+                                projMv = get_mv_projection( mv, refToDst, refOffset );
+                                MotionFieldMvs[ dst ][ PosY8 ][ PosX8 ] = projMv;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    void FrameHeader::motion_field_estimation(const RefInfo& refInfo)
+    {
+        Mv mv;
+        mv.mv[0] = mv.mv[1] = -1 << 15;
+        MotionFieldMvs.resize(TOTAL_REFS_PER_FRAME);
+        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++ ) {
+            MotionFieldMvs[ref].resize(h8);
+            for (uint32_t y = 0; y < h8 ; y++ ) {
+                MotionFieldMvs[ref][y].assign((size_t)w8, mv);
+                /*for (uint32_t x = 0; x < w8; x++ ) {
+                    MotionFieldMvs[ref][y][x] = mv);
+                }*/
+            }
+        }
+        uint8_t lastIdx = ref_frame_idx[0];
+        uint8_t curGoldOrderHint = OrderHints[ GOLDEN_FRAME ];
+        uint8_t lastAltOrderHint = refInfo.m_refs[lastIdx].SavedOrderHints[ ALTREF_FRAME ];
+        bool useLast = (lastAltOrderHint != curGoldOrderHint);
+        if (useLast) {
+            mvProject(refInfo, LAST_FRAME, -1);
+        }
+        const int MFMV_STACK_SIZE = 3;
+        int refStamp = MFMV_STACK_SIZE - 2;
+        uint8_t refHints[] = {BWDREF_FRAME, ALTREF2_FRAME, ALTREF_FRAME};
+        for (int i = 0; i < 3; i++) {
+            uint8_t refHint = refHints[i];
+            bool use = get_relative_dist(refHint, OrderHint ) > 0;
+            if (refHint == ALTREF_FRAME && use) {
+                use = (refStamp >= 0);
+            }
+            if (use) {
+                bool projOutput = mvProject(refInfo, refHint, 1);
+                if (projOutput) {
+                    refStamp -= 1;
+                }
+           }
+        }
+        if (refStamp >= 0) {
+            mvProject(refInfo, LAST2_FRAME, -1);
+        }
+    }
+
+
+    bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     {
         const SequenceHeader& sequence = *m_sequence;
         const static uint8_t allFrames = (1 << NUM_REF_FRAMES) - 1;
@@ -586,10 +906,7 @@ namespace Av1 {
             }
         }
         if (frame_type == KEY_FRAME && show_frame) {
-            for (int i = 0; i < NUM_REF_FRAMES; i++) {
-                RefValid[i] = false;
-                RefOrderHint[i] = 0;
-            }
+            refInfo.resetRefs();
         }
         READ(disable_cdf_update);
         if (sequence.seq_force_screen_content_tools == SELECT_SCREEN_CONTENT_TOOLS) {
@@ -613,7 +930,7 @@ namespace Av1 {
         if (sequence.frame_id_numbers_present_flag) {
             PrevFrameID = current_frame_id;
             READ_BITS(current_frame_id, idLen);
-            mark_ref_frames(idLen);
+            mark_ref_frames(idLen, refInfo);
         }
         if (frame_type == SWITCH_FRAME) {
             frame_size_override_flag = true;
@@ -622,7 +939,7 @@ namespace Av1 {
         } else {
             READ(frame_size_override_flag);
         }
-        READ_BITS(order_hint, sequence.OrderHintBits);
+        READ_BITS(OrderHint, sequence.OrderHintBits);
         if (FrameIsIntra || error_resilient_mode) {
             primary_ref_frame = PRIMARY_REF_NONE;
         } else {
@@ -640,15 +957,66 @@ namespace Av1 {
             READ(refresh_frame_flags);
         }
         if (FrameIsIntra) {
-            if (!parseFrameSize(br))
+            if (!frame_size(br))
                 return false;
-            if (!parseRenderSize(br))
+            if (!render_size(br))
                 return false;
             if (allow_screen_content_tools && UpscaledWidth == FrameWidth) {
                 READ(allow_intrabc);
             }
         } else {
-            ASSERT(0);
+            if (!sequence.enable_order_hint ) {
+                frame_refs_short_signaling = false;
+            } else {
+                READ(frame_refs_short_signaling);
+                if ( frame_refs_short_signaling ) {
+                    READ_BITS(last_frame_idx, 3);
+                    READ_BITS(gold_frame_idx, 3);
+                    set_frame_refs(refInfo);
+                }
+           }
+            for (int i = 0; i < REFS_PER_FRAME; i++ ) {
+                if (!frame_refs_short_signaling )
+                    READ_BITS(ref_frame_idx[ i ], 3);
+                if (m_sequence->frame_id_numbers_present_flag ) {
+                    int n = m_sequence->delta_frame_id_length_minus2 + 2;
+                    ASSERT(0);
+                }
+            }
+            if ( frame_size_override_flag && !error_resilient_mode ) {
+                if (!frame_size_with_refs(br, refInfo))
+                    return false;
+            } else {
+                if (!frame_size(br))
+                    return false;
+                if (!render_size(br))
+                    return false;
+
+            }
+            if ( force_integer_mv ) {
+                allow_high_precision_mv = false;
+            } else {
+                READ(allow_high_precision_mv);
+            }
+            if (!read_interpolation_filter(br))
+                return false;
+            READ(is_motion_mode_switchable);
+            if ( error_resilient_mode || !sequence.enable_ref_frame_mvs ) {
+                use_ref_frame_mvs = false;
+            } else {
+                READ(use_ref_frame_mvs);
+            }
+            for (int i = 0; i < REFS_PER_FRAME; i++ ) {
+                uint8_t refFrame = LAST_FRAME + i;
+                const RefFrame ref = refInfo.m_refs[ref_frame_idx[i]];
+                uint8_t hint = ref.RefOrderHint;
+                OrderHints[ refFrame ] = hint;
+                if ( !sequence.enable_order_hint ) {
+                    RefFrameSignBias[ refFrame ] = false;
+                } else {
+                    RefFrameSignBias[ refFrame ] = get_relative_dist( hint, OrderHint) > 0;
+                }
+            }
         }
         if (sequence.reduced_still_picture_header || disable_cdf_update) {
             disable_frame_end_update_cdf = true;
@@ -662,7 +1030,7 @@ namespace Av1 {
             ASSERT(0);
         }
         if (use_ref_frame_mvs)
-            ASSERT(0);
+            motion_field_estimation(refInfo);
         if (!parseTileInfo(br))
             return false;
         if (!m_quant.parse(br, *m_sequence)) {
@@ -724,23 +1092,40 @@ namespace Av1 {
         return true;
     }
 
-    void FrameHeader::mark_ref_frames(uint8_t idLen)
+    void FrameHeader::mark_ref_frames(uint8_t idLen, RefInfo& refInfo)
     {
         const SequenceHeader& sequence = *m_sequence;
         uint8_t diffLen = sequence.delta_frame_id_length_minus2 + 2;
         for (int i = 0; i < NUM_REF_FRAMES; i++) {
-            if (current_frame_id > (1 << diffLen)) {
-                if (RefFrameId[i] > current_frame_id || RefFrameId[i] < (current_frame_id - (1 << diffLen)))
-                    RefValid[i] = false;
-            } else {
-                if (RefFrameId[i] > current_frame_id || RefFrameId[i] < ((1 << idLen) + current_frame_id - (1 << diffLen)))
-                    RefValid[i] = false;
-            }
+            RefFrame& ref = refInfo.m_refs[i];
+            if (ref.RefValid) {
+                if (current_frame_id > (1 << diffLen)) {
+                    if (ref.RefFrameId > current_frame_id || ref.RefFrameId < (current_frame_id - (1 << diffLen)))
+                        ref.RefValid = false;
+                } else {
+                    if (ref.RefFrameId > current_frame_id || ref.RefFrameId < ((1 << idLen) + current_frame_id - (1 << diffLen)))
+                        ref.RefValid = false;
+                }
+           }
         }
     }
 
+
 #define ROOF(b, a) ((b + (a -1)) & ~(a-1))
-    bool FrameHeader::parseFrameSize(BitReader& br)
+    void FrameHeader::compute_image_size()
+    {
+        MiCols = 2 * ((FrameWidth + 7) >> 3);
+        MiRows = 2 * ((FrameHeight + 7) >> 3);
+
+        w8 = MiCols >> 1;
+        h8 = MiRows >> 1;
+
+        uint32_t align = m_sequence->use_128x128_superblock ? 128 : 64;
+        AlignedMiCols = ROOF(FrameWidth, align) >> 2;
+        AlignedMiRows = ROOF(FrameHeight, align) >> 2;
+    }
+
+    bool FrameHeader::frame_size(BitReader& br)
     {
         const SequenceHeader& sequence = *m_sequence;
         if (frame_size_override_flag) {
@@ -753,15 +1138,13 @@ namespace Av1 {
             FrameWidth = sequence.max_frame_width_minus_1 + 1;
             FrameHeight = sequence.max_frame_height_minus_1 + 1;
         }
-        MiCols = 2 * ((FrameWidth + 7) >> 3);
-        MiRows = 2 * ((FrameHeight + 7) >> 3);
 
-        uint32_t align = sequence.use_128x128_superblock ? 128 : 64;
-        AlignedMiCols = ROOF(FrameWidth, align) >> 2;
-        AlignedMiRows = ROOF(FrameHeight, align) >> 2;
-        return parseSuperresParams(br);
+        if (!superres_params(br))
+            return false;
+        compute_image_size();
+        return true;
     }
-    bool FrameHeader::parseSuperresParams(BitReader& br)
+    bool FrameHeader::superres_params(BitReader& br)
     {
         const SequenceHeader& sequence = *m_sequence;
         if (sequence.enable_superres) {
@@ -781,7 +1164,7 @@ namespace Av1 {
         return true;
     }
 
-    bool FrameHeader::parseRenderSize(BitReader& br)
+    bool FrameHeader::render_size(BitReader& br)
     {
         bool render_and_frame_size_different;
         READ(render_and_frame_size_different);
@@ -1009,6 +1392,37 @@ namespace Av1 {
         while (br.getPos() & 7)
             br.skip(1);
         return;
+    }
+
+    void Parser::finishFrame()
+    {
+        if (!m_frame)
+            return;
+        FrameHeader& frame = *m_frame;
+        for (int i = 0; i < NUM_REF_FRAMES; i++) {
+            if (frame.refresh_frame_flags & (1 << i)) {
+                RefFrame& ref = m_refInfo.m_refs[i];
+                ref.RefValid = true;
+                ref.RefFrameId = frame.current_frame_id;
+                ref.RefUpscaledWidth = frame.UpscaledWidth;
+                ref.RefFrameWidth = frame.FrameWidth;
+                ref.RefFrameHeight = frame.FrameHeight;
+                ref.RefRenderWidth = frame.RenderWidth;
+                ref.RefRenderHeight = frame.RenderHeight;
+                ref.RefMiCols = frame.MiCols;
+                ref.RefMiRows = frame.MiRows;
+                ref.RefFrameType = frame.frame_type;
+                ref.RefSubsamplingX = m_sequence->subsampling_x;
+                ref.RefSubsamplingY = m_sequence->subsampling_y;
+                ref.RefBitDepth = m_sequence->BitDepth;
+                for (int j = 0; j < REFS_PER_FRAME; j++) {
+                    ref.SavedOrderHints[j + LAST_FRAME] = frame.OrderHints[j + LAST_FRAME];
+                }
+                ref.SavedRefFrames = frame.MfRefFrames;
+                ref.SavedMvs = frame.MfMvs;
+
+            }
+        }
     }
 
     bool Segmentation::parse(BitReader& br)

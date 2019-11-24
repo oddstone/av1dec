@@ -90,6 +90,7 @@ namespace Av1 {
         }
         std::shared_ptr<YuvFrame> filtered = decode_frame_wrapup(frame);
         m_output.push_back(filtered);
+        m_parser->finishFrame();
         return true;
     }
 
@@ -117,6 +118,7 @@ namespace Av1 {
         if (!h.use_superres)
             return frame;
         ASSERT(0);
+        return frame;
     }
 
     std::shared_ptr<YuvFrame> Decoder::getOutput()
