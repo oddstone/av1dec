@@ -32,9 +32,9 @@ namespace Yami {
             void inter_frame_mode_info();
 
             uint8_t getSkipCtx();
-            bool readSkip();
+            bool read_skip();
 
-            void readCdef();
+            void read_cdef();
             void read_delta_qindex(bool readDeltas);
             void read_delta_lf(bool readDeltas);
 
@@ -66,6 +66,35 @@ namespace Yami {
             void transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x, int y);
             void residual();
 
+            //for inter
+            void inter_segment_id(bool preSkip);
+            bool read_skip_mode();
+            uint8_t getIsInterCtx();
+            void read_is_inter();
+            void inter_block_mode_info();
+            void intra_block_mode_info();
+            void read_ref_frames();
+            bool seg_feature_active(SEG_LVL_FEATURE feature);
+            int16_t getSegFeature(SEG_LVL_FEATURE feature);
+            uint8_t getCompModeCtx();
+            uint8_t getCompReferenceTypeCtx();
+
+            uint8_t count_refs(uint8_t frameType);
+            uint8_t ref_count_ctx(uint8_t counts0, uint8_t counts1);
+
+            uint8_t getUniCompRefCtx();
+            uint8_t getUniCompRefP1Ctx();
+            uint8_t getUniCompRefP2Ctx();
+            uint8_t getCompRefCtx();
+            uint8_t getCompRefP1Ctx();
+            uint8_t getCompRefP2Ctx();
+            uint8_t getSingleRefP1Ctx();
+            uint8_t getCompBwdRefCtx();
+            uint8_t getCompBwdRefP1Ctx();
+
+            void readCompReference();
+            void readSingleReference();
+
             FrameHeader& m_frame;
             const SequenceHeader& m_sequence;
             Tile& m_tile;
@@ -87,6 +116,7 @@ namespace Yami {
             bool is_inter;
             uint8_t segment_id;
             bool Lossless;
+            bool skip_mode;
             bool skip;
             PREDICTION_MODE YMode;
             int8_t AngleDeltaY;
@@ -99,7 +129,7 @@ namespace Yami {
             bool use_filter_intra;
             FILTER_INTRA_MODE filter_intra_mode;
             TX_SIZE TxSize;
-            int RefFrame[2];
+            uint8_t RefFrame[2];
             bool use_intrabc;
             uint32_t sbMask;
 
@@ -116,6 +146,7 @@ namespace Yami {
 
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;
+
         };
 
         inline bool is_directional_mode(PREDICTION_MODE mode)

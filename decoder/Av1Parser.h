@@ -242,14 +242,7 @@ namespace Av1 {
         uint8_t qm_v;
         bool parse(BitReader& br, const SequenceHeader& seq);
     };
-    enum SEG_LVL_FEATURE {
-        SEG_LVL_ALT_Q,
-        SEG_LVL_ALT_LF_Y_V,
-        SEG_LVL_REF_FRAME = 5,
-        SEG_LVL_SKIP,
-        SEG_LVL_GLOBALMV,
-        SEG_LVL_MAX,
-    };
+
     static const int MAX_LOOP_FILTER = 63;
     static const int Segmentation_Feature_Bits[SEG_LVL_MAX] = { 8, 6, 6, 6, 6, 3, 0, 0 };
     static const int Segmentation_Feature_Signed[SEG_LVL_MAX] = { 1, 1, 1, 1, 1, 0, 0, 0 };
@@ -476,6 +469,11 @@ namespace Av1 {
 
         TXMode TxMode;
 
+        //for inter
+        bool reference_select;
+        bool skip_mode_present;
+        uint8_t SkipModeFrame[2];
+
         const static int MAX_PLANES = 3;
 
         std::vector<uint32_t> MiColStarts;
@@ -533,8 +531,8 @@ namespace Av1 {
         bool cdef_params(BitReader& br);
         bool lr_params(BitReader& br);
         bool read_tx_mode(BitReader& br);
-        //bool frame_reference_mode();
-        //bool skip_mode_params( )
+        bool frame_reference_mode(BitReader& br);
+        bool skip_mode_params(BitReader& br, const RefInfo& refInfo);
         void initGeometry();
 
         //for inter predict

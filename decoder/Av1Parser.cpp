@@ -861,6 +861,78 @@ namespace Av1 {
         }
     }
 
+    bool FrameHeader::frame_reference_mode(BitReader& br)
+    {
+        if ( FrameIsIntra ) {
+            reference_select = false;
+        } else {
+           READ(reference_select);
+        }
+        return true;
+    }
+
+    bool FrameHeader::skip_mode_params(BitReader& br, const RefInfo& refInfo)
+    {
+        const uint8_t INVALID_REF = 0xff;
+        bool skipModeAllowed;
+        if (FrameIsIntra || !reference_select || !m_sequence->enable_order_hint) {
+            skipModeAllowed = false;
+        } else {
+            uint8_t forwardIdx = INVALID_REF;
+            uint8_t backwardIdx = INVALID_REF;
+            uint8_t refHint;
+            uint8_t forwardHint;
+            uint8_t backwardHint;
+            for (uint8_t i = 0; i < REFS_PER_FRAME; i++) {
+                const RefFrame& ref = refInfo.m_refs[ref_frame_idx[i]];
+                refHint = ref.RefOrderHint;
+                if (get_relative_dist(refHint, OrderHint) < 0) {
+                    if (forwardIdx == INVALID_REF || get_relative_dist(refHint, forwardHint) > 0) {
+                        forwardIdx = i;
+                        forwardHint = refHint;
+                    }
+                } else if (get_relative_dist(refHint, OrderHint) > 0) {
+                    if (backwardIdx == INVALID_REF || get_relative_dist(refHint, backwardHint) < 0) {
+                        backwardIdx = i;
+                        backwardHint = refHint;
+                    }
+                }
+            }
+            if (forwardIdx == INVALID_REF) {
+                skipModeAllowed = false;
+            } else if (backwardIdx != INVALID_REF) {
+                skipModeAllowed = true;
+                SkipModeFrame[0] = LAST_FRAME + std::min(forwardIdx, backwardIdx);
+                SkipModeFrame[1] = LAST_FRAME + std::max(forwardIdx, backwardIdx);
+            } else {
+                uint8_t secondForwardIdx = INVALID_REF;
+                uint8_t secondForwardHint;
+                for (uint8_t i = 0; i < REFS_PER_FRAME; i++) {
+                    const RefFrame& ref = refInfo.m_refs[ref_frame_idx[i]];
+                    refHint = ref.RefOrderHint;
+                    if (get_relative_dist(refHint, forwardHint) < 0) {
+                        if (secondForwardIdx == INVALID_REF || get_relative_dist(refHint, secondForwardHint) > 0) {
+                            secondForwardIdx = i;
+                            secondForwardHint = refHint;
+                        }
+                    }
+                }
+                if (secondForwardIdx == INVALID_REF) {
+                    skipModeAllowed = false;
+                } else {
+                    skipModeAllowed = true;
+                    SkipModeFrame[0] = LAST_FRAME + std::min(forwardIdx, secondForwardIdx);
+                    SkipModeFrame[1] = LAST_FRAME + std::max(forwardIdx, secondForwardIdx);
+                }
+            }
+        }
+        if (skipModeAllowed) {
+            READ(skip_mode_present);
+        } else {
+            skip_mode_present = false;
+        }
+        return true;
+    }
 
     bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     {
@@ -1077,8 +1149,10 @@ namespace Av1 {
         if (!read_tx_mode(br))
             return false;
 
-        /* frame_reference_mode() */
-        /* skip_mode_params() */
+        if (!frame_reference_mode(br))
+            return false;
+        if (!skip_mode_params(br, refInfo))
+            return false;
         if (FrameIsIntra || error_resilient_mode || !enable_warped_motion)
             allow_warped_motion = false;
         else

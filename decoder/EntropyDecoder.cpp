@@ -198,7 +198,6 @@ namespace Yami {
             return (int8_t)m_symbol->read(cfl_alpha_cdf[ctx], CFL_ALPHABET_SIZE) + 1;
         }
 
-
         bool EntropyDecoder::readUseFilterIntra(BLOCK_SIZE bSize)
         {
             return m_symbol->read(filter_intra_cdfs[bSize], 2);
@@ -299,6 +298,72 @@ namespace Yami {
             return readLiteral(SGRPROJ_PARAMS_BITS);
         }
 
+        bool EntropyDecoder::readIsInter(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(intra_inter_cdf[ctx], 2);
+        }
+
+        const static uint8_t Size_Group[ BLOCK_SIZES_ALL ] = {
+            0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3,
+            3, 3, 3, 3, 3, 0, 0, 1, 1, 2, 2
+        };
+
+        PREDICTION_MODE EntropyDecoder::readYMode(BLOCK_SIZE MiSize)
+        {
+            uint8_t ctx = Size_Group[MiSize];
+            return (PREDICTION_MODE)m_symbol->read(y_mode_cdf[ctx], INTRA_MODES);
+        }
+
+        CompMode EntropyDecoder::readCompMode(uint8_t ctx)
+        {
+            return (CompMode)m_symbol->read(comp_inter_cdf[ctx], 2);
+        }
+
+        COMP_REFERENCE_TYPE EntropyDecoder::readCompReferenceType(uint8_t ctx)
+        {
+            return (COMP_REFERENCE_TYPE)m_symbol->read(comp_ref_type_cdf[ctx], 2);
+        }
+
+        bool EntropyDecoder::readUniCompRef(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(uni_comp_ref_cdf[ctx][0], 2);
+        }
+
+        bool EntropyDecoder::readUniCompRefP1(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(uni_comp_ref_cdf[ctx][1], 2);
+        }
+
+        bool EntropyDecoder::readUniCompRefP2(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(uni_comp_ref_cdf[ctx][2], 2);
+        }
+
+        bool EntropyDecoder::readCompRef(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(comp_ref_cdf[ctx][0], 2);
+        }
+
+        bool EntropyDecoder::readCompRefP1(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(comp_ref_cdf[ctx][1], 2);
+        }
+
+        bool EntropyDecoder::readCompRefP2(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(comp_ref_cdf[ctx][2], 2);
+        }
+
+        bool EntropyDecoder::readCompBwdRef(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(comp_bwdref_cdf[ctx][0], 2);
+        }
+
+        bool EntropyDecoder::readCompBwdRefP1(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(comp_bwdref_cdf[ctx][1], 2);
+        }
+
         bool EntropyDecoder::readUe(uint32_t& v)
         {
             uint8_t len = 0;
@@ -386,5 +451,6 @@ namespace Yami {
                 return v;
             return (v << 1) - m + readLiteral(1);
         }
-    }
+
+}
 }

@@ -42,6 +42,20 @@ namespace Yami {
             bool readUseSgrproj();
             uint8_t readLrSgrSet();
             RestorationType readRestorationType();
+            //for inter
+            bool readIsInter(uint8_t ctx);
+            PREDICTION_MODE readYMode(BLOCK_SIZE MiSize);
+            CompMode readCompMode(uint8_t ctx);
+            COMP_REFERENCE_TYPE readCompReferenceType(uint8_t ctx);
+            bool readUniCompRef(uint8_t ctx);
+            bool readUniCompRefP1(uint8_t ctx);
+            bool readUniCompRefP2(uint8_t ctx);
+            bool readCompRef(uint8_t ctx);
+            bool readCompRefP1(uint8_t ctx);
+            bool readCompRefP2(uint8_t ctx);
+            bool readCompBwdRef(uint8_t ctx);
+            bool readCompBwdRefP1(uint8_t ctx);
+
             bool readUe(uint32_t& v);
             uint32_t readLiteral(uint32_t n);
             int decode_signed_subexp_with_ref_bool(int low, int high, int k, int r);

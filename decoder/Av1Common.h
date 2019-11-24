@@ -176,4 +176,18 @@ static const int Sgr_Params[ (1 << SGRPROJ_PARAMS_BITS) ][ 4 ] = {
     { 0, 0, 1, 11 }, { 0, 0, 1, 14 }, { 2, 30, 0, 0 }, { 2, 75, 0, 0 }
 };
 
+enum SEG_LVL_FEATURE {
+  SEG_LVL_ALT_Q,
+  SEG_LVL_ALT_LF_Y_V,
+  SEG_LVL_REF_FRAME = 5,
+  SEG_LVL_SKIP,
+  SEG_LVL_GLOBALMV,
+  SEG_LVL_MAX,
+};
+
+enum CompMode {
+  SINGLE_REFERENCE,
+  COMPOUND_REFERENCE,
+};
+
 #endif
