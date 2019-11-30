@@ -364,6 +364,12 @@ namespace Yami {
             return (bool)m_symbol->read(comp_bwdref_cdf[ctx][1], 2);
         }
 
+        bool EntropyDecoder::readSingleRef(uint8_t ctx, int n)
+        {
+            return (bool)m_symbol->read(single_ref_cdf[ctx][n - 1], 2);
+        }
+
+
         bool EntropyDecoder::readUe(uint32_t& v)
         {
             uint8_t len = 0;

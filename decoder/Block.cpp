@@ -597,20 +597,6 @@ namespace Av1 {
             return 2;
     }
 
-    uint8_t Block::getSingleRefP1Ctx()
-    {
-        uint8_t fwdCount, bwdCount;
-        fwdCount = count_refs(LAST_FRAME );
-        fwdCount += count_refs(LAST2_FRAME );
-        fwdCount += count_refs(LAST3_FRAME );
-        fwdCount += count_refs(GOLDEN_FRAME );
-        bwdCount = count_refs(BWDREF_FRAME );
-        bwdCount += count_refs(ALTREF2_FRAME);
-        bwdCount += count_refs(ALTREF_FRAME);
-        uint8_t ctx = ref_count_ctx( fwdCount, bwdCount );
-        return ctx;
-    }
-
     uint8_t Block::getUniCompRefCtx()
     {
         return getSingleRefP1Ctx();
@@ -712,9 +698,68 @@ namespace Av1 {
         }
 
     }
+
+    uint8_t Block::getSingleRefP1Ctx()
+    {
+        uint8_t fwdCount, bwdCount;
+        fwdCount = count_refs(LAST_FRAME );
+        fwdCount += count_refs(LAST2_FRAME );
+        fwdCount += count_refs(LAST3_FRAME );
+        fwdCount += count_refs(GOLDEN_FRAME );
+        bwdCount = count_refs(BWDREF_FRAME );
+        bwdCount += count_refs(ALTREF2_FRAME);
+        bwdCount += count_refs(ALTREF_FRAME);
+        uint8_t ctx = ref_count_ctx( fwdCount, bwdCount );
+        return ctx;
+    }
+
+    uint8_t Block::getSingleRefP2Ctx()
+    {
+        return getCompBwdRefCtx();
+    }
+
+    uint8_t Block::getSingleRefP3Ctx()
+    {
+        return getCompRefCtx();
+    }
+
+    uint8_t Block::getSingleRefP4Ctx()
+    {
+        return getCompRefP1Ctx();
+    }
+
+    uint8_t Block::getSingleRefP5Ctx()
+    {
+        return getCompRefP2Ctx();
+    }
+
+    uint8_t Block::getSingleRefP6Ctx()
+    {
+        return getCompBwdRefP1Ctx();
+    }
+
     void Block::readSingleReference()
     {
-
+        bool single_ref_p1 = m_entropy.readSingleRef(getSingleRefP1Ctx(), 1);
+        if (single_ref_p1) {
+            bool single_ref_p2 = m_entropy.readSingleRef(getSingleRefP2Ctx(), 2);
+            if (!single_ref_p2) {
+                bool single_ref_p6 = m_entropy.readSingleRef(getSingleRefP6Ctx(), 6);
+                RefFrame[0] = single_ref_p6 ? ALTREF2_FRAME : BWDREF_FRAME;
+            } else {
+                RefFrame[ 0 ] = ALTREF_FRAME;
+            }
+        } else {
+            bool single_ref_p3 = m_entropy.readSingleRef(getSingleRefP3Ctx(), 3);
+            if (single_ref_p3) {
+                bool single_ref_p5 = m_entropy.readSingleRef(getSingleRefP5Ctx(), 5);
+                RefFrame[ 0 ] = single_ref_p5 ? GOLDEN_FRAME : LAST3_FRAME;
+            } else {
+                bool single_ref_p4 = m_entropy.readSingleRef(getSingleRefP4Ctx(), 4);
+                RefFrame[ 0 ] = single_ref_p4 ? LAST2_FRAME : LAST_FRAME;
+            }
+        }
+        RefFrame[ 1 ] = NONE_FRAME;
     }
     void Block::read_ref_frames()
     {
@@ -743,11 +788,233 @@ namespace Av1 {
         }
     }
 
+
+    class Block::FindMvStack {
+    public:
+        FindMvStack(Block &block)
+            : m_block(block)
+            , m_tile(block.m_tile)
+            , m_frame(block.m_frame)
+            , MiRow(block.MiRow)
+            , MiCol(block.MiCol)
+        {
+
+
+        }
+        void find_mv_stack(bool isCompound)
+        {
+            setupGlobalMV(0);
+            if (isCompound)
+                setupGlobalMV(1);
+            FoundMatch = false;
+
+
+        }
+    private:
+        static bool has_newmv(PREDICTION_MODE mode )
+        {
+            return (mode == NEWMV
+                || mode == NEW_NEWMV
+                || mode == NEAR_NEWMV
+                || mode == NEW_NEARMV
+                || mode == NEAREST_NEWMV
+                || mode == NEW_NEARESTMV);
+        }
+        void searchStack(uint32_t mvRow, uint32_t mvCol, int candList, uint32_t weight)
+        {
+            Mv candMv;
+            PREDICTION_MODE candMode = m_frame.YModes[mvRow][mvCol];
+            BLOCK_SIZE candSize = m_frame.MiSizes[mvRow][mvCol];
+            bool large = std::min( Block_Width[ candSize ],Block_Height[ candSize ] ) >= 8;
+            if ((candMode == GLOBALMV || candMode == GLOBAL_GLOBALMV)
+                && m_frame.GmType[m_block.RefFrame[0]] > TRANSLATION
+                && large) {
+                candMv = GlobalMvs[0];
+            } else {
+                candMv = m_frame.Mvs[mvRow][mvCol][candList];
+            }
+            lower_mv_precision(candMv);
+            if (has_newmv(candMode))
+                NewMvCount++;
+            FoundMatch = true;
+            int idx;
+            for (idx = 0; idx < NumMvFound; idx++) {
+                if (candMv == RefStackMv[idx][0]) {
+                    break;
+                }
+            }
+            if (idx < NumMvFound) {
+                WeightStack[idx] += weight;
+            } else if (idx < MAX_REF_MV_STACK_SIZE){
+                RefStackMv[NumMvFound][0] = candMv;
+                WeightStack[NumMvFound] = weight;
+                NumMvFound++;
+            }
+        }
+        void searchCompoundStack(uint32_t mvRow, uint32_t mvCol, uint32_t weight)
+        {
+            std::vector<Mv> candMvs = m_frame.Mvs[mvRow][mvCol];
+            PREDICTION_MODE candMode = m_frame.YModes[mvRow][mvCol];
+            BLOCK_SIZE candSize = m_frame.MiSizes[mvRow][mvCol];
+            if (candMode == GLOBAL_GLOBALMV) {
+                for (int i = 0; i <= 1; i++) {
+                    if (m_frame.GmType[m_block.RefFrame[i]] > TRANSLATION) {
+                        candMvs[i] = GlobalMvs[i];
+                    }
+                }
+            }
+            lower_mv_precision(candMvs[0]);
+            lower_mv_precision(candMvs[1]);
+            if (has_newmv(candMode))
+                NewMvCount++;
+
+            FoundMatch = true;
+            int idx;
+            for (idx = 0; idx < NumMvFound; idx++) {
+                if (candMvs[0] == RefStackMv[idx][0]
+                    && candMvs[1] == RefStackMv[idx][1]) {
+                    break;
+                }
+            }
+            if (idx < NumMvFound) {
+                WeightStack[idx] += weight;
+            } else if (idx < MAX_REF_MV_STACK_SIZE) {
+                RefStackMv[NumMvFound][0] = candMvs[0];
+                RefStackMv[NumMvFound][1] = candMvs[1];
+                NumMvFound++;
+            }
+
+
+        }
+        void add_ref_mv_candidate(uint32_t mvRow, uint32_t mvCol, bool isCompound, uint32_t weight)
+        {
+            if (!m_frame.IsInters[mvRow][mvCol])
+                return;
+            if (!isCompound) {
+                for (int candList = 0; candList <= 0; candList++) {
+                    if (m_frame.RefFrames[mvRow][mvCol][candList] == m_block.RefFrame[0]) {
+                        searchStack(mvRow, mvCol, candList, weight);
+                    }
+                }
+            } else {
+                if (m_frame.RefFrames[mvRow][mvCol][0] == m_block.RefFrame[0]
+                    || m_frame.RefFrames[mvRow][mvCol][1] == m_block.RefFrame[1]) {
+                    searchCompoundStack(mvRow, mvCol, weight);
+                }
+            }
+
+        }
+        void scanRow(int deltaRow, bool isCompound)
+        {
+            int deltaCol = 0;
+            uint32_t bw4 = m_block.bw4;
+            uint32_t end4 = std::min(std::min(bw4, m_frame.MiCols - m_block.MiCol ), (uint32_t)16);
+            bool useStep16 = (bw4 >= 16);
+            if (std::abs(deltaRow)) {
+                deltaRow += MiRow & 1;
+                deltaCol = 1 - (MiCol & 1);
+            }
+            uint32_t i = 0;
+            while ( i < end4 ) {
+                uint32_t mvRow = MiRow + deltaRow;
+                uint32_t mvCol = MiCol + deltaCol + i;
+                if ( !m_tile.is_inside(mvRow,mvCol) )
+                    break;
+                int len = std::min((int)bw4, Num_4x4_Blocks_Wide[ m_frame.MiSizes[ mvRow ][ mvCol ] ]);
+                if ( std::abs(deltaRow) > 1 )
+                    len = std::max(2, len);
+                if ( useStep16 )
+                    len =std::max(4, len);
+                uint32_t weight = len * 2;
+                add_ref_mv_candidate( mvRow, mvCol, isCompound, weight);
+                i += len;
+            }
+
+
+        }
+        void scanCol(int deltaCol, bool isCompound)
+        {
+            //scanLine(0, deltaCol, isCompound);
+        }
+        void lower_mv_precision(Mv& mv)
+        {
+            int16_t* candMv = &mv.mv[0];
+            for (int i = 0; i < 2; i++) {
+                if (m_frame.force_integer_mv ) {
+                    int a = std::abs( candMv[ i ] );
+                    int aInt = (a + 3) >> 3;
+                    if ( candMv[ i ] > 0 )
+                        candMv[ i ] = aInt << 3;
+                    else
+                        candMv[ i ] = -( aInt << 3 );
+                } else {
+                    if ( candMv[ i ] & 1 ) {
+                        if ( candMv[ i ] > 0 )
+                            candMv[ i ]--;
+                        else
+                            candMv[ i ]++;
+                    }
+                }
+            }
+
+        }
+        void setupGlobalMV(uint8_t refList)
+        {
+            Mv& mv = GlobalMvs[refList];
+            GlobalMotionType typ;
+            uint8_t ref = m_block.RefFrame[refList];
+            if (ref != INTRA_FRAME)
+                typ = IDENTITY;
+            if (ref == INTRA_FRAME || typ == IDENTITY) {
+                mv.mv[0] = mv.mv[1] = 0;
+            } else if (typ == TRANSLATION) {
+                mv.mv[0] = m_frame.gm_params[ref][0] >> (WARPEDMODEL_PREC_BITS - 3);
+                mv.mv[1] = m_frame.gm_params[ref][1] >> (WARPEDMODEL_PREC_BITS - 3);
+            } else {
+                int x = MiCol * MI_SIZE + m_block.bw4 * 2 - 1;
+                int y = MiRow * MI_SIZE + m_block.bh4 * 2 - 1;
+                int xc = (m_frame.gm_params[ref][2] - (1 << WARPEDMODEL_PREC_BITS)) * x +
+                    m_frame.gm_params[ref][3] * y +
+                    m_frame.gm_params[ref][0];
+                int yc = m_frame.gm_params[ref][4] * x +
+                    (m_frame.gm_params[ref][5] - (1 << WARPEDMODEL_PREC_BITS)) * y +
+                    m_frame.gm_params[ref][1];
+                if (m_frame.allow_high_precision_mv ) {
+                    mv.mv[0] = ROUND2SIGNED(yc, WARPEDMODEL_PREC_BITS - 3);
+                    mv.mv[1] = ROUND2SIGNED(xc, WARPEDMODEL_PREC_BITS - 3);
+                } else {
+                    mv.mv[0] = ROUND2SIGNED(yc, WARPEDMODEL_PREC_BITS - 2) * 2;
+                    mv.mv[1] = ROUND2SIGNED(xc, WARPEDMODEL_PREC_BITS - 2) * 2;
+                }
+            }
+            lower_mv_precision(mv);
+        }
+        Block &m_block;
+        FrameHeader &m_frame;
+        Tile &m_tile;
+        Mv RefStackMv[MAX_REF_MV_STACK_SIZE][2];
+        uint32_t WeightStack[MAX_REF_MV_STACK_SIZE];
+        int NumMvFound = 0;
+        int NewMvCount = 0;
+        Mv GlobalMvs[2];
+        uint32_t MiCol;
+        uint32_t MiRow;
+        bool FoundMatch;
+    };
+
+    void Block::find_mv_stack(bool isCompound)
+    {
+        FindMvStack find(*this);
+        find.find_mv_stack(isCompound);
+    }
+
     void Block::inter_block_mode_info()
     {
         PaletteSizeY = 0;
         PaletteSizeUV = 0;
         read_ref_frames();
+        bool isCompound = RefFrame[ 1 ] > INTRA_FRAME;
+        find_mv_stack(isCompound);
     }
 
     void Block::intra_block_mode_info()

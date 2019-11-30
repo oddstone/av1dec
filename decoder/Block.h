@@ -12,12 +12,12 @@ struct YuvFrame;
 namespace Yami {
     namespace Av1 {
         class SymbolDecoder;
-
-
         class TransformBlock;
+        class FindMvStack;
 
         class Block : public BlockTree {
             friend class TransformBlock;
+            class FindMvStack;
 
         public:
             Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize);
@@ -85,15 +85,27 @@ namespace Yami {
             uint8_t getUniCompRefCtx();
             uint8_t getUniCompRefP1Ctx();
             uint8_t getUniCompRefP2Ctx();
+
             uint8_t getCompRefCtx();
             uint8_t getCompRefP1Ctx();
             uint8_t getCompRefP2Ctx();
-            uint8_t getSingleRefP1Ctx();
             uint8_t getCompBwdRefCtx();
             uint8_t getCompBwdRefP1Ctx();
 
+            uint8_t getSingleRefP1Ctx();
+            uint8_t getSingleRefP2Ctx();
+            uint8_t getSingleRefP3Ctx();
+            uint8_t getSingleRefP4Ctx();
+            uint8_t getSingleRefP5Ctx();
+            uint8_t getSingleRefP6Ctx();
+
+
             void readCompReference();
             void readSingleReference();
+
+            void lower_mv_precision(Mv& mv);
+            Mv setupGlobalMV(uint8_t refList);
+            void find_mv_stack(bool isCompound);
 
             FrameHeader& m_frame;
             const SequenceHeader& m_sequence;

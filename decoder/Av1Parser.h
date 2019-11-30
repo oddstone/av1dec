@@ -336,10 +336,6 @@ namespace Av1 {
         int unitCols[MAX_PLANES];
     };
 
-    struct Mv {
-        int16_t mv[2];
-    };
-
     class RefFrame {
     public:
             RefFrame()
@@ -475,6 +471,9 @@ namespace Av1 {
         uint8_t SkipModeFrame[2];
 
         const static int MAX_PLANES = 3;
+        GlobalMotionType  GmType[NUM_REF_FRAMES];
+        int gm_params[NUM_REF_FRAMES][6];
+
 
         std::vector<uint32_t> MiColStarts;
         std::vector<uint32_t> MiRowStarts;
@@ -494,6 +493,7 @@ namespace Av1 {
         std::vector<std::vector<uint8_t>> MfRefFrames;
         std::vector<std::vector<Mv>> MfMvs;
         std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;
+        std::vector<std::vector<std::vector<Mv>>> Mvs;
         //std::vector<std::vector<uint32_t>> PaletteSizes[2];
         //PaletteColors
 
@@ -540,6 +540,10 @@ namespace Av1 {
         bool get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv);
         bool mvProject(const RefInfo& refInfo, uint8_t src, int dstSign);
         Mv get_mv_projection(const Mv& mv, int numerator, int denominator);
+
+        bool read_global_param(GlobalMotionType type, uint8_t ref, int idx);
+
+        bool global_motion_params(BitReader& br);
 
         const static uint8_t SUPERRES_DENOM_MIN = 9;
 

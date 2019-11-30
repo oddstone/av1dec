@@ -190,4 +190,22 @@ enum CompMode {
   COMPOUND_REFERENCE,
 };
 
+#define WARPEDMODEL_PREC_BITS 16
+
+enum GlobalMotionType {
+  IDENTITY,
+  ROTZOOM,
+  TRANSLATION,
+  AFFINE,
+};
+
+struct Mv {
+    int16_t mv[2];
+    bool operator==(const Mv& rhs)
+    {
+        return rhs.mv[0] == mv[0]
+            && rhs.mv[1] == mv[1];
+    }
+};
+
 #endif

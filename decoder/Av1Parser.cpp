@@ -520,8 +520,12 @@ namespace Av1 {
         for (int i = 0; i < FRAME_LF_COUNT; i++) {
             DeltaLFs[i].assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
         }
-        MfRefFrames.assign(MiRows, std::vector<uint8_t>(MiCols));
-        MfMvs.assign(MiRows, std::vector<Mv>(MiCols));
+        MfRefFrames.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+        MfMvs.assign(AlignedMiRows, std::vector<Mv>(AlignedMiCols));
+        Mvs.resize(AlignedMiRows);
+        for (int i = 0; i < AlignedMiRows; i++) {
+            Mvs[i].resize(AlignedMiCols, std::vector<Mv>(2));
+        }
     }
 
     bool FrameHeader::loop_filter_params(BitReader& br)
@@ -934,6 +938,60 @@ namespace Av1 {
         return true;
     }
 
+    bool FrameHeader::read_global_param(GlobalMotionType type, uint8_t ref, int idx)
+    {
+        ASSERT(0);
+        return true;
+    }
+
+    bool FrameHeader::global_motion_params(BitReader& br)
+    {
+        for (uint8_t  ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++ ) {
+            GmType[ ref ] = IDENTITY;
+            for (int i = 0; i < 6; i++ ) {
+                gm_params[ ref ][ i ] = ( ( i % 3 == 2 ) ?
+                                          1 << WARPEDMODEL_PREC_BITS : 0 );
+            }
+        }
+        if ( FrameIsIntra )
+            return true;
+        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++ ) {
+            GlobalMotionType type;
+            bool is_global;
+            READ(is_global);
+            if ( is_global ) {
+                bool is_rot_zoom;
+                READ(is_rot_zoom);
+                if ( is_rot_zoom ) {
+                    type = ROTZOOM;
+                } else {
+                    bool is_translation;
+                    READ(is_translation);
+                    type = is_translation ? TRANSLATION : AFFINE;
+                }
+            } else {
+                type = IDENTITY;
+            }
+            GmType[ref] = type;
+            if ( type >= ROTZOOM ) {
+                read_global_param(type,ref,2);
+                read_global_param(type,ref,3);
+                if ( type == AFFINE ) {
+                    read_global_param(type,ref,4);
+                    read_global_param(type, ref, 5);
+                } else {
+                    gm_params[ref][4] = -gm_params[ref][3];
+                    gm_params[ref][5] = gm_params[ref][2];
+                }
+            }
+            if ( type >= TRANSLATION ) {
+                read_global_param(type,ref,0);
+                read_global_param(type,ref,1);
+            }
+        }
+        return true;
+    }
+
     bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     {
         const SequenceHeader& sequence = *m_sequence;
@@ -1158,7 +1216,8 @@ namespace Av1 {
         else
             READ(allow_warped_motion);
         READ(reduced_tx_set);
-        /* global_motion_params() */
+        if (!global_motion_params(br))
+            return false;
         if (show_frame || showable_frame) {
             /* film_grain_params()*/
         }

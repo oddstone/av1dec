@@ -47,14 +47,18 @@ namespace Yami {
             PREDICTION_MODE readYMode(BLOCK_SIZE MiSize);
             CompMode readCompMode(uint8_t ctx);
             COMP_REFERENCE_TYPE readCompReferenceType(uint8_t ctx);
+
             bool readUniCompRef(uint8_t ctx);
             bool readUniCompRefP1(uint8_t ctx);
             bool readUniCompRefP2(uint8_t ctx);
+
             bool readCompRef(uint8_t ctx);
             bool readCompRefP1(uint8_t ctx);
             bool readCompRefP2(uint8_t ctx);
             bool readCompBwdRef(uint8_t ctx);
             bool readCompBwdRefP1(uint8_t ctx);
+
+            bool readSingleRef(uint8_t ctx, int n);
 
             bool readUe(uint32_t& v);
             uint32_t readLiteral(uint32_t n);
