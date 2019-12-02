@@ -369,6 +369,30 @@ namespace Yami {
             return (bool)m_symbol->read(single_ref_cdf[ctx][n - 1], 2);
         }
 
+        uint8_t EntropyDecoder::readCompoundMode(uint8_t ctx)
+        {
+            return (uint8_t)m_symbol->read(inter_compound_mode_cdf[ctx], INTER_COMPOUND_MODES);
+        }
+
+        bool EntropyDecoder::readNewMv(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(newmv_cdf[ctx], 2);
+        }
+
+        bool EntropyDecoder::readZeroMv(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(zeromv_cdf[ctx], 2);
+        }
+
+        bool EntropyDecoder::readRefMv(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(refmv_cdf[ctx], 2);
+        }
+
+        bool EntropyDecoder::readDrlMode(uint8_t ctx)
+        {
+            return (bool)m_symbol->read(drl_cdf[ctx], 2);
+        }
 
         bool EntropyDecoder::readUe(uint32_t& v)
         {

@@ -77,7 +77,7 @@ namespace Yami {
 
         }
 
-        bool Tile::is_inside(uint32_t r, uint32_t c)
+        bool Tile::is_inside(uint32_t r, uint32_t c) const
         {
             return (c >= MiColStart && c < MiColEnd && r >= MiRowStart && r < MiRowEnd);
         }

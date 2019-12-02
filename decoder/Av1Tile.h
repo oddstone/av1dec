@@ -159,11 +159,6 @@ namespace Yami {
         };
 
         class Tile {
-            uint32_t MiRowStart;
-            uint32_t MiRowEnd;
-            uint32_t MiColStart;
-            uint32_t MiColEnd;
-            uint32_t CurrentQIndex;
             friend class Block;
             friend class BlockDecoded;
             friend class TransformBlock;
@@ -180,15 +175,16 @@ namespace Yami {
             std::unique_ptr<EntropyDecoder> m_entropy;
 
         private:
-            //bool decodePartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
             bool decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize);
-            //    PARTITION_TYPE readPartition(uint32_t r, uint32_t c, bool AvailU, bool AvailL, BLOCK_SIZE bSize);
-
-        private:
-            bool is_inside(uint32_t r, uint32_t c);
+            bool is_inside(uint32_t r, uint32_t c) const;
             void clear_above_context();
             void clear_left_context();
 
+            uint32_t MiRowStart;
+            uint32_t MiRowEnd;
+            uint32_t MiColStart;
+            uint32_t MiColEnd;
+            uint32_t CurrentQIndex;
 
             BlockDecoded m_decoded;
 

@@ -156,9 +156,12 @@ namespace Yami {
             bool LeftSingle;
             bool AboveSingle;
 
+            uint8_t RefMvIdx;
+
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;
 
+            bool has_nearmv() const;
         };
 
         inline bool is_directional_mode(PREDICTION_MODE mode)

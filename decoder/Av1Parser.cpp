@@ -505,7 +505,7 @@ namespace Av1 {
         UVModes.assign(AlignedMiRows, std::vector<UV_PREDICTION_MODE>(AlignedMiCols));
         RefFrames.resize(AlignedMiRows);
         for (int i = 0; i < AlignedMiRows; i++) {
-            RefFrames[i].assign(AlignedMiCols, std::vector<int>(2));
+            RefFrames[i].assign(AlignedMiCols, std::vector<int>(2, NONE_FRAME));
         }
         TxTypes.assign(AlignedMiRows, std::vector<TX_TYPE>(AlignedMiCols));
         IsInters.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));

@@ -60,6 +60,12 @@ namespace Yami {
 
             bool readSingleRef(uint8_t ctx, int n);
 
+            uint8_t readCompoundMode(uint8_t ctx);
+            bool readNewMv(uint8_t ctx);
+            bool readZeroMv(uint8_t ctx);
+            bool readRefMv(uint8_t ctx);
+            bool readDrlMode(uint8_t ctx);
+
             bool readUe(uint32_t& v);
             uint32_t readLiteral(uint32_t n);
             int decode_signed_subexp_with_ref_bool(int low, int high, int k, int r);

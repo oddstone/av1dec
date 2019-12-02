@@ -208,4 +208,5 @@ struct Mv {
     }
 };
 
+#define MV_BORDER 128
 #endif
