@@ -67,6 +67,8 @@ namespace Yami {
             av1_copy(cfl_sign_cdf, default_cfl_sign_cdf);
             av1_copy(cfl_alpha_cdf, default_cfl_alpha_cdf);
             av1_copy(intrabc_cdf, default_intrabc_cdf);
+            av1_copy(&nmv_context[0], &default_nmv_context);
+            av1_copy(&nmv_context[1], &default_nmv_context);
 
             initCoefCdf(baseQ);
         }
@@ -394,7 +396,55 @@ namespace Yami {
             return (bool)m_symbol->read(drl_cdf[ctx], 2);
         }
 
-        bool EntropyDecoder::readUe(uint32_t& v)
+        MV_JOINT_TYPE EntropyDecoder::readMvJoint(uint8_t ctx)
+        {
+            return (MV_JOINT_TYPE)m_symbol->read(nmv_context[ctx].joints_cdf, MV_JOINTS);
+
+        }
+
+        bool EntropyDecoder::readMvSign(uint8_t ctx, uint8_t comp)
+        {
+            return (bool)m_symbol->read(nmv_context[ctx].comps[comp].sign_cdf, 2);
+        }
+
+        MV_CLASS_TYPE EntropyDecoder::readMvClass(uint8_t ctx, uint8_t comp)
+        {
+            return (MV_CLASS_TYPE)m_symbol->read(nmv_context[ctx].comps[comp].classes_cdf, MV_CLASSES);
+        }
+
+        int EntropyDecoder::readMvClass0Bit(uint8_t ctx, uint8_t comp)
+        {
+            return m_symbol->read(nmv_context[ctx].comps[comp].class0_cdf, 2);
+        }
+
+        int EntropyDecoder::readMvBit(int i, uint8_t ctx, uint8_t comp)
+        {
+            return m_symbol->read(nmv_context[ctx].comps[comp].bits_cdf[i], 2);
+        }
+
+        int EntropyDecoder::readMvClass0Fr(int mv_class0_bit, uint8_t ctx, uint8_t comp)
+        {
+            return m_symbol->read(nmv_context[ctx].comps[comp].class0_fp_cdf[mv_class0_bit], MV_FP_SIZE);
+        }
+
+        int EntropyDecoder::readMvClass0Hp(uint8_t ctx, uint8_t comp)
+        {
+            return m_symbol->read(nmv_context[ctx].comps[comp].class0_hp_cdf, 2);
+        }
+
+        int EntropyDecoder::readMvFr(uint8_t ctx, uint8_t comp)
+        {
+            return m_symbol->read(nmv_context[ctx].comps[comp].fp_cdf, MV_FP_SIZE);
+        }
+
+        int EntropyDecoder::readMvHp(uint8_t ctx, uint8_t comp)
+        {
+            return m_symbol->read(nmv_context[ctx].comps[comp].hp_cdf, 2);
+        }
+
+
+
+bool EntropyDecoder::readUe(uint32_t& v)
         {
             uint8_t len = 0;
             uint8_t bit = 0;

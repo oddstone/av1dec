@@ -625,6 +625,59 @@ typedef uint16_t aom_cdf_prob;
 
 #endif
 
+/* Symbols for coding which components are zero jointly */
+#define MV_JOINTS 4
+enum MV_JOINT_TYPE {
+    MV_JOINT_ZERO = 0,   /* Zero vector */
+    MV_JOINT_HNZVZ = 1,  /* Vert zero, hor nonzero */
+    MV_JOINT_HZVNZ = 2,  /* Hor zero, vert nonzero */
+    MV_JOINT_HNZVNZ = 3, /* Both components nonzero */
+} ;
+
+/* Symbols for coding magnitude class of nonzero components */
+#define MV_CLASSES 11
+enum MV_CLASS_TYPE {
+    MV_CLASS_0 = 0,   /* (0, 2]     integer pel */
+    MV_CLASS_1 = 1,   /* (2, 4]     integer pel */
+    MV_CLASS_2 = 2,   /* (4, 8]     integer pel */
+    MV_CLASS_3 = 3,   /* (8, 16]    integer pel */
+    MV_CLASS_4 = 4,   /* (16, 32]   integer pel */
+    MV_CLASS_5 = 5,   /* (32, 64]   integer pel */
+    MV_CLASS_6 = 6,   /* (64, 128]  integer pel */
+    MV_CLASS_7 = 7,   /* (128, 256] integer pel */
+    MV_CLASS_8 = 8,   /* (256, 512] integer pel */
+    MV_CLASS_9 = 9,   /* (512, 1024] integer pel */
+    MV_CLASS_10 = 10, /* (1024,2048] integer pel */
+} ;
+
+#define CLASS0_BITS 1 /* bits at integer precision for class 0 */
+#define CLASS0_SIZE (1 << CLASS0_BITS)
+#define MV_OFFSET_BITS (MV_CLASSES + CLASS0_BITS - 2)
+#define MV_BITS_CONTEXTS 6
+#define MV_FP_SIZE 4
+
+#define MV_MAX_BITS (MV_CLASSES + CLASS0_BITS + 2)
+#define MV_MAX ((1 << MV_MAX_BITS) - 1)
+#define MV_VALS ((MV_MAX << 1) + 1)
+
+#define MV_IN_USE_BITS 14
+#define MV_UPP (1 << MV_IN_USE_BITS)
+#define MV_LOW (-(1 << MV_IN_USE_BITS))
+typedef struct {
+    aom_cdf_prob classes_cdf[CDF_SIZE(MV_CLASSES)];
+    aom_cdf_prob class0_fp_cdf[CLASS0_SIZE][CDF_SIZE(MV_FP_SIZE)];
+    aom_cdf_prob fp_cdf[CDF_SIZE(MV_FP_SIZE)];
+    aom_cdf_prob sign_cdf[CDF_SIZE(2)];
+    aom_cdf_prob class0_hp_cdf[CDF_SIZE(2)];
+    aom_cdf_prob hp_cdf[CDF_SIZE(2)];
+    aom_cdf_prob class0_cdf[CDF_SIZE(CLASS0_SIZE)];
+    aom_cdf_prob bits_cdf[MV_OFFSET_BITS][CDF_SIZE(2)];
+} nmv_component;
+
+typedef struct {
+    aom_cdf_prob joints_cdf[CDF_SIZE(MV_JOINTS)];
+    nmv_component comps[2];
+} NmvContext;
 
 #ifdef __cplusplus
 }  // extern "C"

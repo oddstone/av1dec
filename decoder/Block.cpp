@@ -798,6 +798,8 @@ namespace Av1 {
         uint8_t getRefMvCtx() const;
         int getNumMvFound() const;
         uint8_t getDrlModeCtx(uint8_t idx) const;
+        Mv RefStackMv[MAX_REF_MV_STACK_SIZE][2];
+        Mv GlobalMvs[2];
     private:
         int16_t clamp_mv_row(int16_t mvec, int border );
         int16_t clamp_mv_col(int16_t mvec, int border );
@@ -820,11 +822,11 @@ namespace Av1 {
         const Block &m_block;
         const FrameHeader &m_frame;
         const Tile &m_tile;
-        Mv RefStackMv[MAX_REF_MV_STACK_SIZE][2];
+
         uint32_t WeightStack[MAX_REF_MV_STACK_SIZE];
         int NumMvFound = 0;
         int NewMvCount = 0;
-        Mv GlobalMvs[2];
+
         const uint32_t MiCol;
         const uint32_t MiRow;
         const uint32_t bw4;
@@ -893,6 +895,138 @@ namespace Av1 {
                     }
                     RefMvIdx = idx + 1;
                 }
+            }
+        }
+        assignMv(find, isCompound);
+    }
+
+    PREDICTION_MODE Block::get_mode(int refList)
+    {
+        PREDICTION_MODE compMode;
+        if ( refList == 0 ) {
+            if ( YMode < NEAREST_NEARESTMV )
+                compMode = YMode;
+            else if ( YMode == NEW_NEWMV || YMode == NEW_NEARESTMV || YMode == NEW_NEARMV )
+                compMode = NEWMV;
+            else if ( YMode == NEAREST_NEARESTMV || YMode == NEAREST_NEWMV )
+                compMode = NEARESTMV;
+            else if ( YMode == NEAR_NEARMV || YMode == NEAR_NEWMV )
+                compMode = NEARMV;
+            else
+                compMode = GLOBALMV;
+        } else {
+            if ( YMode == NEW_NEWMV || YMode == NEAREST_NEWMV || YMode == NEAR_NEWMV )
+                compMode = NEWMV;
+            else if ( YMode == NEAREST_NEARESTMV || YMode == NEW_NEARESTMV )
+                compMode = NEARESTMV;
+            else if ( YMode == NEAR_NEARMV || YMode == NEW_NEARMV )
+                compMode = NEARMV;
+            else
+                compMode = GLOBALMV;
+        }
+        return compMode;
+    }
+    int16_t Block::read_mv_component(uint8_t ctx, uint8_t comp)
+    {
+        bool mv_sign = m_entropy.readMvSign(ctx, comp);
+        int mag;
+        int d;
+        MV_CLASS_TYPE mv_class = m_entropy.readMvClass(ctx, comp);
+        if (mv_class == MV_CLASS_0) {
+            int mv_class0_bit = m_entropy.readMvClass0Bit(ctx, comp);
+            int mv_class0_fr;
+            int mv_class0_hp;
+            if (m_frame.force_integer_mv)
+                mv_class0_fr = 3;
+            else
+                mv_class0_fr = m_entropy.readMvClass0Fr(mv_class0_bit, ctx, comp);
+            if (m_frame.allow_high_precision_mv)
+                mv_class0_hp = m_entropy.readMvClass0Hp(ctx, comp);
+            else
+                mv_class0_hp = 1;
+            mag = ( ( mv_class0_bit << 3 ) | ( mv_class0_fr << 1 ) | mv_class0_hp ) + 1;
+        } else {
+            for (int i = 0; i < mv_class; i++) {
+                int mv_bit = m_entropy.readMvBit(i, ctx, comp);
+                d |= mv_bit << i;
+            }
+            mag = CLASS0_SIZE << (mv_class + 2);
+            int mv_fr;
+            int mv_hp;
+            if (m_frame.force_integer_mv)
+                mv_fr = 3;
+            else
+                mv_fr = m_entropy.readMvFr(ctx, comp);
+            if (m_frame.allow_high_precision_mv)
+                mv_hp = m_entropy.readMvHp(ctx, comp);
+            else
+                mv_hp = 1;
+            mag += ((d << 3) | (mv_fr << 1) | mv_hp) + 1;
+        }
+
+        return mv_sign ? -mag : mag;
+    }
+    void Block::read_mv(Mv PredMv[2], int ref )
+    {
+        int16_t diffMv[2];
+        diffMv[ 0 ] = diffMv[ 1 ] = 0;
+
+        uint8_t MvCtx;
+        if ( use_intrabc ) {
+            MvCtx = MV_INTRABC_CONTEXT;
+        } else {
+            MvCtx = 0;
+        }
+        MV_JOINT_TYPE mv_joint = m_entropy.readMvJoint(MvCtx);
+        if (mv_joint == MV_JOINT_HZVNZ || mv_joint == MV_JOINT_HNZVNZ )
+            diffMv[ 0 ] = read_mv_component(MvCtx,  0 );
+        if ( mv_joint == MV_JOINT_HNZVZ || mv_joint == MV_JOINT_HNZVNZ )
+            diffMv[ 1 ] = read_mv_component(MvCtx, 1 );
+        m_mv[ref].mv[ 0 ] = PredMv[ref].mv[0] + diffMv[ 0 ];
+        m_mv[ref].mv[ 1 ] = PredMv[ref].mv[ 1 ] + diffMv[ 1 ];
+    }
+
+    void Block::assignMv(const FindMvStack& find,  bool isCompound)
+    {
+        PREDICTION_MODE compMode;
+        Mv PredMv[2];
+        m_mv.resize(1 + isCompound);
+        for (int i = 0; i < 1 + isCompound; i++ ) {
+            if ( use_intrabc ) {
+                compMode = NEWMV;
+            } else {
+                compMode = get_mode( i );
+            }
+            if ( use_intrabc ) {
+                ASSERT(0);
+                /*
+                PredMv[ 0 ] = RefStackMv[ 0 ][ 0 ];
+                if ( PredMv[ 0 ][ 0 ] == 0 && PredMv[ 0 ][ 1 ] == 0 ) {
+                    PredMv[ 0 ] = RefStackMv[ 1 ][ 0 ]
+                }
+                if ( PredMv[ 0 ][ 0 ] == 0 && PredMv[ 0 ][ 1 ] == 0 ) {
+                    sbSize = use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64
+                    sbSize4 = Num_4x4_Blocks_High[ sbSize ]
+                    if ( MiRow - sbSize4 < MiRowStart ) {
+                        PredMv[ 0 ][ 0 ] = 0
+                        PredMv[ 0 ][ 1 ] = -(sbSize4 * MI_SIZE + INTRABC_DELAY_PIXELS) * 8
+                    } else {
+                        PredMv[ 0 ][ 0 ] = -(sbSize4 * MI_SIZE * 8)
+                        PredMv[ 0 ][ 1 ] = 0
+                    }
+                }*/
+            } else if ( compMode == GLOBALMV ) {
+                PredMv[ i ] = find.GlobalMvs[ i ];
+            } else {
+                uint8_t pos = ( compMode == NEARESTMV ) ? 0 : RefMvIdx;
+                if ( compMode == NEWMV && find.getNumMvFound() <= 1 )
+                    pos = 0;
+                PredMv[ i ] = find.RefStackMv[ pos ][ i ];
+            }
+            if ( compMode == NEWMV ) {
+                read_mv(PredMv, i );
+            } else {
+                m_mv[ i ] = PredMv[ i ];
             }
         }
     }

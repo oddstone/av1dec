@@ -66,6 +66,19 @@ namespace Yami {
             bool readRefMv(uint8_t ctx);
             bool readDrlMode(uint8_t ctx);
 
+            MV_JOINT_TYPE readMvJoint(uint8_t ctx);
+            bool readMvSign(uint8_t ctx, uint8_t comp);
+            MV_CLASS_TYPE readMvClass(uint8_t ctx, uint8_t comp);
+            int readMvClass0Bit(uint8_t ctx, uint8_t comp);
+            int readMvBit(int i, uint8_t ctx, uint8_t comp);
+            int readMvClass0Fr(int mv_class0_bit, uint8_t ctx, uint8_t comp);
+            int readMvClass0Hp(uint8_t ctx, uint8_t comp);
+            int readMvFr(uint8_t ctx, uint8_t comp);
+            int readMvHp(uint8_t ctx, uint8_t comp);
+
+
+
+
             bool readUe(uint32_t& v);
             uint32_t readLiteral(uint32_t n);
             int decode_signed_subexp_with_ref_bool(int low, int high, int k, int r);
@@ -169,6 +182,8 @@ namespace Yami {
                 [CDF_SIZE(TX_TYPES)];
             aom_cdf_prob cfl_sign_cdf[CDF_SIZE(CFL_JOINT_SIGNS)];
             aom_cdf_prob cfl_alpha_cdf[CFL_ALPHA_CONTEXTS][CDF_SIZE(CFL_ALPHABET_SIZE)];
+
+            NmvContext nmv_context[2];
         };
     }
 }

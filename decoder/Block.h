@@ -103,9 +103,10 @@ namespace Yami {
             void readCompReference();
             void readSingleReference();
 
-            void lower_mv_precision(Mv& mv);
-            Mv setupGlobalMV(uint8_t refList);
-            void find_mv_stack(bool isCompound);
+            int16_t read_mv_component(uint8_t MvCtx, uint8_t comp);
+            void read_mv(Mv PredMv[2], int ref );
+            void assignMv(const FindMvStack& find,  bool isCompound);
+            PREDICTION_MODE get_mode(int refList);
 
             FrameHeader& m_frame;
             const SequenceHeader& m_sequence;
@@ -157,6 +158,7 @@ namespace Yami {
             bool AboveSingle;
 
             uint8_t RefMvIdx;
+            std::vector<Mv> m_mv;
 
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;

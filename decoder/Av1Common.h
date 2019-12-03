@@ -209,4 +209,6 @@ struct Mv {
 };
 
 #define MV_BORDER 128
+
+#define MV_INTRABC_CONTEXT 1
 #endif
