@@ -76,6 +76,11 @@ namespace Yami {
             int readMvFr(uint8_t ctx, uint8_t comp);
             int readMvHp(uint8_t ctx, uint8_t comp);
 
+            bool readInterIntra(BLOCK_SIZE MiSize);
+            INTERINTRA_MODE readInterIntraMode(BLOCK_SIZE MiSize);
+            bool readWedgeInterIntra(BLOCK_SIZE MiSize);
+            uint8_t readWedgeIndex(BLOCK_SIZE MiSize);
+
 
 
 

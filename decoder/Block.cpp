@@ -897,7 +897,87 @@ namespace Av1 {
                 }
             }
         }
-        assignMv(find, isCompound);
+        assign_mv(find, isCompound);
+        read_interintra_mode(isCompound);
+        read_motion_mode( isCompound );
+    }
+
+    bool Block::has_overlappable_candidates()
+    {
+        if ( AvailU ) {
+            for (uint32_t x4 = MiCol; x4 < std::min( m_frame.MiCols, MiCol + bw4 ); x4 += 2 ) {
+                if (m_frame.RefFrames[ MiRow - 1 ][ x4 | 1 ][ 0 ] > INTRA_FRAME )
+                    return true;
+            }
+        }
+        if ( AvailL ) {
+            for (uint32_t y4 = MiRow; y4 < std::min(m_frame.MiRows, MiRow + bh4 ); y4 += 2 ) {
+                if (m_frame.RefFrames[ y4 | 1 ][ MiCol - 1 ][ 0 ] > INTRA_FRAME )
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    void Block::read_motion_mode(bool isCompound)
+    {
+        if ( skip_mode ) {
+            motion_mode = SIMPLE_TRANSLATION;
+            return;
+        }
+        if ( !m_frame.is_motion_mode_switchable ) {
+            motion_mode = SIMPLE_TRANSLATION;
+            return;
+        }
+        if (std::min( Block_Width[ MiSize ],
+                  Block_Height[ MiSize ] ) < 8 ) {
+            motion_mode = SIMPLE_TRANSLATION;
+            return;
+        }
+        if ( !m_frame.force_integer_mv &&
+            ( YMode == GLOBALMV || YMode == GLOBAL_GLOBALMV ) ) {
+            if (m_frame.GmType[ RefFrame[ 0 ] ] > TRANSLATION ) {
+                motion_mode = SIMPLE_TRANSLATION;
+                return;
+            }
+        }
+        if ( isCompound || RefFrame[ 1 ] == INTRA_FRAME || !has_overlappable_candidates()) {
+            motion_mode = SIMPLE_TRANSLATION;
+            return;
+        }
+        ASSERT(0);
+        /*
+        find_warp_samples();
+        if ( force_integer_mv || NumSamples == 0 ||
+            !allow_warped_motion || is_scaled( RefFrame[0] ) ) {
+            use_obmc S()
+            motion_mode = use_obmc ? OBMC : SIMPLE_TRANSLATION;
+        } else {
+            motion_mode
+        }*/
+
+    }
+
+    void Block::read_interintra_mode(bool isCompound)
+    {
+        if ( !skip_mode && m_sequence.enable_interintra_compound && !isCompound &&
+            MiSize >= BLOCK_8X8 && MiSize <= BLOCK_32X32) {
+            interintra = m_entropy.readInterIntra(MiSize);
+            if ( interintra ) {
+                INTERINTRA_MODE interintra_mode = m_entropy.readInterIntraMode(MiSize);
+                RefFrame[1] = INTRA_FRAME;
+                AngleDeltaY = 0;
+                AngleDeltaUV = 0;
+                use_filter_intra = 0;
+                wedge_interintra = m_entropy.readWedgeInterIntra(MiSize);
+                if ( wedge_interintra ) {
+                    wedge_index = m_entropy.readWedgeIndex(MiSize);
+                    wedge_sign = 0;
+                }
+            }
+        } else {
+            interintra = false;
+        }
     }
 
     PREDICTION_MODE Block::get_mode(int refList)
@@ -986,7 +1066,7 @@ namespace Av1 {
         m_mv[ref].mv[ 1 ] = PredMv[ref].mv[ 1 ] + diffMv[ 1 ];
     }
 
-    void Block::assignMv(const FindMvStack& find,  bool isCompound)
+    void Block::assign_mv(const FindMvStack& find, bool isCompound)
     {
         PREDICTION_MODE compMode;
         Mv PredMv[2];

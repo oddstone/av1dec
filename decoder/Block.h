@@ -105,8 +105,11 @@ namespace Yami {
 
             int16_t read_mv_component(uint8_t MvCtx, uint8_t comp);
             void read_mv(Mv PredMv[2], int ref );
-            void assignMv(const FindMvStack& find,  bool isCompound);
+            void assign_mv(const FindMvStack& find, bool isCompound);
             PREDICTION_MODE get_mode(int refList);
+            void read_interintra_mode(bool isCompound);
+            void read_motion_mode(bool isCompound);
+            bool has_overlappable_candidates();
 
             FrameHeader& m_frame;
             const SequenceHeader& m_sequence;
@@ -159,6 +162,11 @@ namespace Yami {
 
             uint8_t RefMvIdx;
             std::vector<Mv> m_mv;
+            bool interintra;
+            bool wedge_interintra;
+            uint8_t wedge_index;
+            uint8_t wedge_sign;
+            MOTION_MODE motion_mode;
 
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;

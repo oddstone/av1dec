@@ -442,9 +442,32 @@ namespace Yami {
             return m_symbol->read(nmv_context[ctx].comps[comp].hp_cdf, 2);
         }
 
+        bool EntropyDecoder::readInterIntra(BLOCK_SIZE MiSize)
+        {
+            uint8_t ctx = Size_Group[MiSize] - 1;
+            return (bool)m_symbol->read(interintra_cdf[ctx], 2);
+        }
+
+        INTERINTRA_MODE EntropyDecoder::readInterIntraMode(BLOCK_SIZE MiSize)
+        {
+            uint8_t ctx = Size_Group[MiSize] - 1;
+            return (INTERINTRA_MODE)m_symbol->read(interintra_mode_cdf[ctx], INTERINTRA_MODES);
+        }
+
+        bool EntropyDecoder::readWedgeInterIntra(BLOCK_SIZE MiSize)
+        {
+            return (bool)m_symbol->read(wedge_interintra_cdf[MiSize], 2);
+        }
+
+        uint8_t EntropyDecoder::readWedgeIndex(BLOCK_SIZE MiSize)
+        {
+            return (uint8_t)m_symbol->read(wedge_idx_cdf[MiSize], 16);
+        }
 
 
-bool EntropyDecoder::readUe(uint32_t& v)
+
+
+        bool EntropyDecoder::readUe(uint32_t& v)
         {
             uint8_t len = 0;
             uint8_t bit = 0;
