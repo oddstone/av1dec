@@ -71,6 +71,7 @@ namespace Yami {
             bool read_skip_mode();
             uint8_t getIsInterCtx();
             void read_is_inter();
+            bool needs_interp_filter();
             void inter_block_mode_info();
             void intra_block_mode_info();
             void read_ref_frames();
@@ -78,6 +79,7 @@ namespace Yami {
             int16_t getSegFeature(SEG_LVL_FEATURE feature);
             uint8_t getCompModeCtx();
             uint8_t getCompReferenceTypeCtx();
+            uint8_t getInterpFilterCtx();
 
             uint8_t count_refs(uint8_t frameType);
             uint8_t ref_count_ctx(uint8_t counts0, uint8_t counts1);
@@ -110,6 +112,11 @@ namespace Yami {
             void read_interintra_mode(bool isCompound);
             void read_motion_mode(bool isCompound);
             bool has_overlappable_candidates();
+            void read_compound_type(bool isCompound);
+            uint8_t getCompGroupIdxCtx();
+            uint8_t getCompoundIdxCtx();
+
+            uint8_t getInterpFilterCtx(int dir);
 
             FrameHeader& m_frame;
             const SequenceHeader& m_sequence;
@@ -167,6 +174,13 @@ namespace Yami {
             uint8_t wedge_index;
             uint8_t wedge_sign;
             MOTION_MODE motion_mode;
+            
+            bool comp_group_idx;
+            bool compound_idx;
+            COMPOUND_TYPE compound_type;
+            bool mask_type;
+
+            InterpFilter interp_filter[2];
 
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;

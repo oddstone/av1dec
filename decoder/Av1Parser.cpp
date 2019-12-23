@@ -526,6 +526,12 @@ namespace Av1 {
         for (int i = 0; i < AlignedMiRows; i++) {
             Mvs[i].resize(AlignedMiCols, std::vector<Mv>(2));
         }
+        CompGroupIdxs.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+        CompoundIdxs.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+        InterpFilters.resize(AlignedMiRows);
+        for (auto& i : InterpFilters) {
+            i.assign(AlignedMiCols, std::vector<InterpFilter>(2));
+        }
     }
 
     bool FrameHeader::loop_filter_params(BitReader& br)
@@ -692,6 +698,11 @@ namespace Av1 {
         return diff;
     }
 
+    int8_t FrameHeader::get_relative_dist(uint8_t ref)
+    {
+        return get_relative_dist(OrderHints[ref], OrderHint);
+    }
+
     void FrameHeader::set_frame_refs(const RefInfo& refInfo)
     {
         SetFrameRefs refs(*this, refInfo);
@@ -832,9 +843,6 @@ namespace Av1 {
             MotionFieldMvs[ref].resize(h8);
             for (uint32_t y = 0; y < h8 ; y++ ) {
                 MotionFieldMvs[ref][y].assign((size_t)w8, mv);
-                /*for (uint32_t x = 0; x < w8; x++ ) {
-                    MotionFieldMvs[ref][y][x] = mv);
-                }*/
             }
         }
         uint8_t lastIdx = ref_frame_idx[0];

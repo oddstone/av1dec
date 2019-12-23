@@ -81,6 +81,18 @@ namespace Yami {
             bool readWedgeInterIntra(BLOCK_SIZE MiSize);
             uint8_t readWedgeIndex(BLOCK_SIZE MiSize);
 
+            bool readCompGroupIdx(uint8_t ctx);
+
+            bool readCompoundIdx(uint8_t ctx);
+
+            COMPOUND_TYPE readCompoundType(BLOCK_SIZE MiSize);
+
+            bool readWedgeSign();
+
+            bool readMaskType();
+
+            InterpFilter readInterpFilter(uint8_t ctx);
+
 
 
 
@@ -121,7 +133,7 @@ namespace Yami {
 
             aom_cdf_prob inter_compound_mode_cdf[INTER_MODE_CONTEXTS]
                 [CDF_SIZE(INTER_COMPOUND_MODES)];
-            aom_cdf_prob compound_type_cdf[BLOCK_SIZES_ALL][CDF_SIZE(COMPOUND_TYPES - 1)];
+            aom_cdf_prob compound_type_cdf[BLOCK_SIZES_ALL][CDF_SIZE(COMPOUND_TYPES)];
             aom_cdf_prob wedge_idx_cdf[BLOCK_SIZES_ALL][CDF_SIZE(16)];
             aom_cdf_prob interintra_cdf[BLOCK_SIZE_GROUPS][CDF_SIZE(2)];
             aom_cdf_prob wedge_interintra_cdf[BLOCK_SIZES_ALL][CDF_SIZE(2)];

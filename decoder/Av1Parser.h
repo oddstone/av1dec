@@ -263,6 +263,7 @@ namespace Av1 {
         uint8_t LastActiveSegId;
         bool seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE) const;
         void setup_past_independence();
+
     private:
         void resetFeatures();
     };
@@ -290,6 +291,7 @@ namespace Av1 {
         int8_t loop_filter_mode_deltas[LOOP_FILTER_MODE_DELTA_COUNT];
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
         void setup_past_independence();
+
     private:
         void resetDeltas();
     };
@@ -310,7 +312,7 @@ namespace Av1 {
 
     struct LoopRestorationpParams {
         bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
-        void read_lr(Tile& tile,    int r, int c, BLOCK_SIZE bSize);
+        void read_lr(Tile& tile, int r, int c, BLOCK_SIZE bSize);
         void resetRefs(int NumPlanes);
 
         static const int MAX_PLANES = 3;
@@ -338,33 +340,32 @@ namespace Av1 {
 
     class RefFrame {
     public:
-            RefFrame()
-                : RefValid(false)
-            {
-            }
+        RefFrame()
+            : RefValid(false)
+        {
+        }
 
-            bool RefValid;
-            uint32_t RefFrameId;
-            uint32_t RefUpscaledWidth;
-            uint32_t RefFrameWidth;
-            uint32_t RefFrameHeight;
-            uint32_t RefRenderWidth;
-            uint32_t RefRenderHeight;
-            uint32_t RefMiCols;
-            uint32_t RefMiRows;
-            uint8_t RefFrameType;
-            int RefSubsamplingX;
-            int RefSubsamplingY;
-            uint8_t RefBitDepth;
-            uint8_t RefOrderHint;
-            uint8_t SavedOrderHints[NUM_REF_FRAMES];
+        bool RefValid;
+        uint32_t RefFrameId;
+        uint32_t RefUpscaledWidth;
+        uint32_t RefFrameWidth;
+        uint32_t RefFrameHeight;
+        uint32_t RefRenderWidth;
+        uint32_t RefRenderHeight;
+        uint32_t RefMiCols;
+        uint32_t RefMiRows;
+        uint8_t RefFrameType;
+        int RefSubsamplingX;
+        int RefSubsamplingY;
+        uint8_t RefBitDepth;
+        uint8_t RefOrderHint;
+        uint8_t SavedOrderHints[NUM_REF_FRAMES];
 
-            //FrameStore
-            std::vector<std::vector<uint8_t>> SavedRefFrames;
-            std::vector<std::vector<Mv>> SavedMvs;
-            //SavedGmParams
-            //SavedSegmentIds;
-
+        //FrameStore
+        std::vector<std::vector<uint8_t>> SavedRefFrames;
+        std::vector<std::vector<Mv>> SavedMvs;
+        //SavedGmParams
+        //SavedSegmentIds;
     };
 
     class RefInfo {
@@ -381,7 +382,6 @@ namespace Av1 {
                 r.RefOrderHint = 0;
             }
         }
-
     };
 
     struct FrameHeader {
@@ -471,14 +471,13 @@ namespace Av1 {
         uint8_t SkipModeFrame[2];
 
         const static int MAX_PLANES = 3;
-        GlobalMotionType  GmType[NUM_REF_FRAMES];
+        GlobalMotionType GmType[NUM_REF_FRAMES];
         int gm_params[NUM_REF_FRAMES][6];
-
 
         std::vector<uint32_t> MiColStarts;
         std::vector<uint32_t> MiRowStarts;
         std::vector<std::vector<PREDICTION_MODE>> YModes;
-        std::vector<std::vector< UV_PREDICTION_MODE>> UVModes;
+        std::vector<std::vector<UV_PREDICTION_MODE>> UVModes;
         std::vector<std::vector<std::vector<int>>> RefFrames;
         std::vector<std::vector<TX_TYPE>> TxTypes;
         std::vector<std::vector<bool>> IsInters;
@@ -494,20 +493,22 @@ namespace Av1 {
         std::vector<std::vector<Mv>> MfMvs;
         std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;
         std::vector<std::vector<std::vector<Mv>>> Mvs;
-        //std::vector<std::vector<uint32_t>> PaletteSizes[2];
-        //PaletteColors
+        std::vector<std::vector<uint8_t>> CompGroupIdxs;
+        std::vector<std::vector<uint8_t>> CompoundIdxs;
+        std::vector<std::vector<std::vector<InterpFilter>>> InterpFilters;
+            //std::vector<std::vector<uint32_t>> PaletteSizes[2];
+            //PaletteColors
 
-		Quantization m_quant;
-		Segmentation m_segmentation;
-		DeltaQ m_deltaQ;
-		DeltaLf m_deltaLf;
-		LoopFilterParams m_loopFilter;
-		CdefParams m_cdef;
-		LoopRestorationpParams m_loopRestoration;
+            Quantization m_quant;
+        Segmentation m_segmentation;
+        DeltaQ m_deltaQ;
+        DeltaLf m_deltaLf;
+        LoopFilterParams m_loopFilter;
+        CdefParams m_cdef;
+        LoopRestorationpParams m_loopRestoration;
         ConstSequencePtr m_sequence;
 
         const static uint8_t SUPERRES_NUM = 8;
-
 
         FrameHeader(ConstSequencePtr&);
         bool parse(BitReader& br, RefInfo&);
@@ -516,6 +517,7 @@ namespace Av1 {
     private:
         void setup_past_independence();
         int8_t get_relative_dist(uint8_t a, uint8_t b);
+        int8_t get_relative_dist(uint8_t ref);
         void mark_ref_frames(uint8_t idLen, RefInfo& refInfo);
         void set_frame_refs(const RefInfo& refInfo);
         bool frame_size(BitReader& br);
@@ -551,7 +553,6 @@ namespace Av1 {
         const static uint8_t TX_MODES = 3;
     };
 
-
     class Parser {
     public:
         Parser();
@@ -566,6 +567,7 @@ namespace Av1 {
         void finishFrame();
         std::shared_ptr<SequenceHeader> m_sequence;
         std::shared_ptr<FrameHeader> m_frame;
+
     private:
         RefInfo m_refInfo;
         void skipTrailingBits(BitReader& br);
