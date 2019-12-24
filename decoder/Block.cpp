@@ -9,7 +9,7 @@
 #include <limits>
 
 namespace Yami {
-namespace Av1 {
+    namespace Av1 {
     Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
         : m_frame(*tile.m_frame)
         , m_sequence(*tile.m_sequence)
@@ -42,7 +42,8 @@ namespace Av1 {
                 AvailUChroma = tile.is_inside(r - 2, c);
             if (subsampling_x && bw4 == 1)
                 AvailLChroma = tile.is_inside(r, c - 2);
-        } else {
+        }
+        else {
             AvailUChroma = false;
             AvailLChroma = false;
         }
@@ -58,7 +59,46 @@ namespace Av1 {
         return m_frame.m_segmentation.segmentation_enabled ? m_frame.get_qindex(true, segment_id) : m_frame.m_quant.base_q_idx;
     }
 
-    void Block::compute_prediction()
+    class Block::PredictInter {
+    public:
+        PredictInter(const Block& block, YuvFrame& yuv);
+        void predict_inter(int plane, int x, int y, int w, int h, int candRow, int candCol);
+
+    private:
+        const Block& m_block;
+        const FrameHeader& m_frame;
+        const SequenceHeader& m_sequence;
+        YuvFrame& m_yuv;
+        bool isCompound;
+        int InterRound0;
+        int InterRound1;
+        int InterPostRound;
+    };
+
+    Block::PredictInter::PredictInter(const Block& block, YuvFrame& yuv)
+        : m_block(block)
+        , m_frame(block.m_frame)
+        , m_sequence(block.m_sequence)
+        , m_yuv(yuv)
+    {
+    }
+
+    void Block::PredictInter::predict_inter(int plane, int x, int y, int w, int h, int candRow, int candCol)
+    {
+        isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
+        roundingVariablesDerivation(isCompound, m_sequence.BitDepth, InterRound0, InterRound1, InterPostRound);
+        if (!plane && m_block.motion_mode == LOCALWARP) {
+            ASSERT(0);
+        }
+        int refList = 0;
+        int refFrame = m_frame.RefFrames[candRow][candCol][refList];
+        if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV) && m_frame.GmType[refFrame] > TRANSLATION) {
+            ASSERT(0);
+        }
+    }
+  
+
+    void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame)
     {
 
         uint32_t subBlockMiRow = MiRow & sbMask;
@@ -193,7 +233,7 @@ namespace Av1 {
         read_block_tx_size();
         if (skip)
             reset_block_context();
-        bool isCompund = RefFrame[1] > INTRA_FRAME;
+        bool isCompound = RefFrame[1] > INTRA_FRAME;
 
         uint32_t r = MiRow;
         uint32_t c = MiCol;
@@ -209,22 +249,18 @@ namespace Av1 {
                         m_frame.CompGroupIdxs[r + y][c + x] = comp_group_idx;
                         m_frame.CompoundIdxs[r + y][c + x] = compound_idx;
                     }
-                    for (int dir = 0; dir < 2; dir++ ) {
+                    for (int dir = 0; dir < 2; dir++) {
                         m_frame.InterpFilters[r + y][c + x][dir] = interp_filter[dir];
                     }
-                    /*for ( refList = 0; refList < 1 + isCompound; refList++ ) {
-                        Mvs[ r + y ][ c + x ][ refList ] = Mv[ refList ]
-                    }*/
+                    for (int refList = 0; refList < 1 + isCompound; refList++) {
+                        m_frame.Mvs[r + y][c + x][refList] = m_mv[refList];
+                    }
                 }
             }
         }
-
-        compute_prediction();
         residual();
         for (int y = 0; y < bh4; y++) {
             for (int x = 0; x < bw4; x++) {
-                if (((r + y) >= 288) || ((c + x) >= 1920 / 4))
-                    printf("done");
                 m_frame.IsInters[r + y][c + x] = is_inter;
                 //SkipModes[r + y][c + x] = skip_mode
                 m_frame.Skips[r + y][c + x] = skip;
@@ -794,6 +830,7 @@ namespace Av1 {
     class Block::FindMvStack {
     public:
         FindMvStack(Block& block);
+
         void find_mv_stack();
         uint8_t getCompoundModeCtx() const;
         uint8_t getNewMvCtx() const;
@@ -822,6 +859,11 @@ namespace Av1 {
         void lower_mv_precision(Mv& mv);
         void setupGlobalMV(uint8_t refList);
 
+        void temporalScan();
+        void extraSearch();
+        void add_tpl_ref_mv(int deltaRow, int deltaCol);
+        void add_extra_mv_candidate(int mvRow, int mvCol);
+
         const Block& m_block;
         const FrameHeader& m_frame;
         const Tile& m_tile;
@@ -840,6 +882,8 @@ namespace Av1 {
         uint8_t NewMvContext;
         uint8_t RefMvContext;
         uint8_t ZeroMvContext;
+        std::vector<Mv> RefIdMvs[2];
+        std::vector<Mv> RefDiffMvs[2];
     };
 
     bool Block::needs_interp_filter()
@@ -859,11 +903,10 @@ namespace Av1 {
 
     uint8_t Block::getInterpFilterCtx(int dir)
     {
-        uint8_t ctx = ((dir & 1) * 2 + (RefFrame[1] > INTRA_FRAME))* 4;
+        uint8_t ctx = ((dir & 1) * 2 + (RefFrame[1] > INTRA_FRAME)) * 4;
         uint8_t leftType = 3;
         uint8_t aboveType = 3;
-        if (AvailL)
-        {
+        if (AvailL) {
             if (m_frame.RefFrames[MiRow][MiCol - 1][0] == RefFrame[0] || m_frame.RefFrames[MiRow][MiCol - 1][1] == RefFrame[0])
                 leftType = m_frame.InterpFilters[MiRow][MiCol - 1][dir];
         }
@@ -1391,6 +1434,7 @@ namespace Av1 {
 
     bool Block::decode(std::shared_ptr<YuvFrame>& frame)
     {
+        compute_prediction(frame);
         for (auto& t : m_transformBlocks) {
             if (!t->decode(frame))
                 return false;
@@ -1406,6 +1450,195 @@ namespace Av1 {
             || YMode == NEW_NEARMV);
     }
 
+    void Block::FindMvStack::add_tpl_ref_mv(int deltaRow, int deltaCol)
+    {
+        int mvRow = (MiRow + deltaRow) | 1;
+        int mvCol = (MiCol + deltaCol) | 1;
+        if (!m_tile.is_inside(mvRow, mvCol))
+            return;
+        int x8 = mvCol >> 1;
+        int y8 = mvRow >> 1;
+
+        if (deltaRow == 0 && deltaCol == 0) {
+            ZeroMvContext = 1;
+        }
+        if (!isCompound) {
+            Mv candMv = m_frame.MotionFieldMvs[m_block.RefFrame[0]][y8][x8];
+            if (candMv.mv[0] == -1 << 15)
+                return;
+            lower_mv_precision(candMv);
+            if (deltaRow == 0 && deltaCol == 0) {
+                if (std::abs(candMv.mv[0] - GlobalMvs[0].mv[0]) >= 16 || std::abs(candMv.mv[1] - GlobalMvs[0].mv[1]) >= 16)
+                    ZeroMvContext = 1;
+                else
+                    ZeroMvContext = 0;
+            }
+            int idx;
+            for (idx = 0; idx < NumMvFound; idx++) {
+                if (candMv.mv[0] == RefStackMv[idx][0].mv[0] && candMv.mv[1] == RefStackMv[idx][0].mv[1])
+                    break;
+            }
+            if (idx < NumMvFound) {
+                WeightStack[idx] += 2;
+            } else if (NumMvFound < MAX_REF_MV_STACK_SIZE) {
+                RefStackMv[NumMvFound][0] = candMv;
+                WeightStack[NumMvFound] = 2;
+                NumMvFound += 1;
+            }
+        } else {
+            Mv candMv0 = m_frame.MotionFieldMvs[m_block.RefFrame[0]][y8][x8];
+            if (candMv0.mv[0] == -1 << 15)
+                return;
+            Mv candMv1 = m_frame.MotionFieldMvs[m_block.RefFrame[1]][y8][x8];
+            if (candMv1.mv[0] == -1 << 15)
+                return;
+            lower_mv_precision(candMv0);
+            lower_mv_precision(candMv1);
+            if (deltaRow == 0 && deltaCol == 0) {
+                if (std::abs(candMv0.mv[0] - GlobalMvs[0].mv[0]) >= 16 || std::abs(candMv0.mv[1] - GlobalMvs[0].mv[1]) >= 16 || std::abs(candMv1.mv[0] - GlobalMvs[1].mv[0]) >= 16 || std::abs(candMv1.mv[1] - GlobalMvs[1].mv[1]) >= 16)
+                    ZeroMvContext = 1;
+                else
+                    ZeroMvContext = 0;
+            }
+            int idx;
+            for (idx = 0; idx < NumMvFound; idx++) {
+                if (candMv0.mv[0] == RefStackMv[idx][0].mv[0]
+                    && candMv0.mv[1] == RefStackMv[idx][0].mv[1]
+                    && candMv1.mv[0] == RefStackMv[idx][1].mv[0]
+                    && candMv1.mv[1] == RefStackMv[idx][1].mv[1])
+                    break;
+            }
+            if (idx < NumMvFound) {
+                WeightStack[idx] += 2;
+            } else if (NumMvFound < MAX_REF_MV_STACK_SIZE) {
+                RefStackMv[NumMvFound][0] = candMv0;
+                RefStackMv[NumMvFound][1] = candMv1;
+                WeightStack[NumMvFound] = 2;
+                NumMvFound += 1;
+            }
+        }
+    }
+
+    void Block::FindMvStack::temporalScan()
+    {
+        int stepW4 = (bw4 >= 16) ? 4 : 2;
+        int stepH4 = (bh4 >= 16) ? 4 : 2;
+        for (int deltaRow = 0; deltaRow < std::min((int)bh4, 16); deltaRow += stepH4) {
+            for (int deltaCol = 0; deltaCol < std::min((int)bw4, 16); deltaCol += stepW4) {
+                add_tpl_ref_mv(deltaRow, deltaCol);
+            }
+        }
+    }
+
+    void Block::FindMvStack::add_extra_mv_candidate(int mvRow, int mvCol)
+    {
+        if (isCompound) {
+            for (int candList = 0; candList < 2; candList++) {
+                int candRef = m_frame.RefFrames[mvRow][mvCol][candList];
+                if (candRef > INTRA_FRAME) {
+                    for (int list = 0; list < 2; list++) {
+                        Mv candMv = m_frame.Mvs[mvRow][mvCol][candList];
+                        if (candRef == m_block.RefFrame[list] && RefIdMvs[list].size() < 2) {
+                            RefIdMvs[list].push_back(candMv);
+                        } else if (RefDiffMvs[list].size() < 2) {
+                            if (m_frame.RefFrameSignBias[candRef] != m_frame.RefFrameSignBias[m_block.RefFrame[list]]) {
+                                candMv.mv[0] *= -1;
+                                candMv.mv[1] *= -1;
+                            }
+                            RefDiffMvs[list].push_back(candMv);
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int candList = 0; candList < 2; candList++) {
+                int candRef = m_frame.RefFrames[mvRow][mvCol][candList];
+                if (candRef > INTRA_FRAME) {
+                    Mv candMv = m_frame.Mvs[mvRow][mvCol][candList];
+                    if (m_frame.RefFrameSignBias[candRef] != m_frame.RefFrameSignBias[m_block.RefFrame[0]]) {
+                        candMv.mv[0] *= -1;
+                        candMv.mv[1] *= -1;
+                    }
+                    int idx;
+                    for (idx = 0; idx < NumMvFound; idx++) {
+                        if (candMv == RefStackMv[idx][0])
+                            break;
+                    }
+                    if (idx == NumMvFound) {
+                        RefStackMv[idx][0] = candMv;
+                        WeightStack[idx] = 2;
+                        NumMvFound++;
+                    }
+                }
+            }
+        }
+    }
+    void Block::FindMvStack::extraSearch()
+    {
+
+        for (int list = 0; list < 2; list++) {
+            RefIdMvs[list].clear();
+            RefDiffMvs[list].clear();
+        }
+        int w4 = std::min(16, (int)bw4);
+        int h4 = std::min(16, (int)bh4);
+        w4 = std::min(w4, (int)(m_frame.MiCols - MiCol));
+        h4 = std::min(h4, (int)(m_frame.MiRows - MiRow));
+        int num4x4 = std::min(w4, h4);
+        for (int pass = 0; pass < 2; pass++) {
+            int idx = 0;
+            while (idx < num4x4 && NumMvFound < 2) {
+                int mvRow, mvCol;
+                if (pass == 0) {
+                    mvRow = MiRow - 1;
+                    mvCol = MiCol + idx;
+                } else {
+                    mvRow = MiRow + idx;
+                    mvCol = MiCol - 1;
+                }
+                if (!m_tile.is_inside(mvRow, mvCol))
+                    break;
+                add_extra_mv_candidate(mvRow, mvCol);
+                if (pass == 0) {
+                    idx += Num_4x4_Blocks_Wide[m_frame.MiSizes[mvRow][mvCol]];
+                } else {
+                    idx += Num_4x4_Blocks_High[m_frame.MiSizes[mvRow][mvCol]];
+                }
+            }
+        }
+        if (isCompound) {
+            std::vector<Mv> combinedMvs[2];
+            for (int list = 0; list < 2; list++) {
+                for (size_t idx = 0; idx < RefIdMvs[list].size(); idx++) {
+                    combinedMvs[list].push_back(RefIdMvs[list][idx]);
+                }
+                for (int idx = 0; idx < RefDiffMvs[list].size() && combinedMvs[list].size() < 2; idx++) {
+                    combinedMvs[list].push_back(RefDiffMvs[list][idx]);
+                }
+                while (combinedMvs[list].size() < 2) {
+                    combinedMvs[list].push_back(GlobalMvs[list]);
+                }
+            }
+            if (NumMvFound == 1) {
+                if (combinedMvs[0][0] == RefStackMv[0][0] && combinedMvs[1][0] == RefStackMv[0][1]) {
+                    RefStackMv[NumMvFound][0] = combinedMvs[0][1];
+                    RefStackMv[NumMvFound][1] = combinedMvs[1][1];
+                } else {
+                    RefStackMv[NumMvFound][0] = combinedMvs[0][0];
+                    RefStackMv[NumMvFound][1] = combinedMvs[1][0];
+                }
+                WeightStack[NumMvFound] = 2;
+                NumMvFound++;
+            } else {
+                for (int idx = 0; idx < 2; idx++) {
+                    RefStackMv[NumMvFound][0] = combinedMvs[0][idx];
+                    RefStackMv[NumMvFound][1] = combinedMvs[1][idx];
+                    WeightStack[NumMvFound] = 2;
+                    NumMvFound++;
+                }
+            }
+        }
+    }
     void Block::FindMvStack::find_mv_stack()
     {
         setupGlobalMV(0);
@@ -1435,7 +1668,7 @@ namespace Av1 {
         }
         ZeroMvContext = 0;
         if (m_frame.use_ref_frame_mvs) {
-            ASSERT(0);
+            temporalScan();
         }
         FoundMatch = false;
         scanPoint(-1, -1);
@@ -1471,7 +1704,7 @@ namespace Av1 {
         sort(0, numNearest);
         sort(numNearest, NumMvFound);
         if (NumMvFound < 2) {
-            ASSERT(0);
+            extraSearch();
         }
         generateDrlCtxStack();
         generateRefAndNewMvContext(CloseMatches, numNew, TotalMatches);
@@ -1607,7 +1840,7 @@ namespace Av1 {
     }
     int16_t Block::FindMvStack::clamp_mv_col(int16_t mvec, int border)
     {
-        int mbToLeftEdge = -((MiCol * MI_SIZE) * 8);
+        int mbToLeftEdge = -(int)((MiCol * MI_SIZE) * 8);
         int mbToRightEdge = ((m_frame.MiCols - bw4 - MiCol) * MI_SIZE) * 8;
         return CLIP3(mbToLeftEdge - border, mbToRightEdge + border, mvec);
     }

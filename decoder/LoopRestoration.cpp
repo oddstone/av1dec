@@ -4,22 +4,6 @@
 
 namespace Yami {
     namespace Av1 {
-        const static int FILTER_BITS = 7;
-
-        static void RoundingVariablesDerivation(
-            bool isCompound, int BitDepth,
-            int& InterRound0, int& InterRound1, int& InterPostRound)
-        {
-            InterRound0 = 3;
-            InterRound1 = isCompound ? 7 : 11;
-            if (BitDepth == 12) {
-                InterRound0 += 2;
-                if (!isCompound) {
-                    InterRound1 -= 2;
-                }
-            }
-            InterPostRound = 2 * FILTER_BITS - (InterRound0 + InterRound1);
-        }
 
         static int count_units_in_frame(int unitSize, int frameSize) {
             return std::max((frameSize + (unitSize >> 1)) / unitSize, 1);
@@ -55,7 +39,7 @@ namespace Yami {
                 PlaneEndX[p] = ROUND2(m_frame->UpscaledWidth, subX) - 1;
                 PlaneEndY[p] = ROUND2(m_frame->FrameHeight, subY) - 1;
             }
-            RoundingVariablesDerivation(0, m_sequence.BitDepth,
+            roundingVariablesDerivation(0, m_sequence.BitDepth,
                 InterRound0, InterRound1, InterPostRound);
 
             std::shared_ptr<YuvFrame> LrFrame = YuvFrame::create(UpscaledCdefFrame);

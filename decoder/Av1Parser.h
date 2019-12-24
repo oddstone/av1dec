@@ -573,6 +573,23 @@ namespace Av1 {
         void skipTrailingBits(BitReader& br);
         bool m_seenFrameHeader;
     };
+
+    const static int FILTER_BITS = 7;
+
+    inline static void roundingVariablesDerivation(
+        bool isCompound, int BitDepth,
+        int& InterRound0, int& InterRound1, int& InterPostRound)
+    {
+        InterRound0 = 3;
+        InterRound1 = isCompound ? 7 : 11;
+        if (BitDepth == 12) {
+            InterRound0 += 2;
+            if (!isCompound) {
+                InterRound1 -= 2;
+            }
+        }
+        InterPostRound = 2 * FILTER_BITS - (InterRound0 + InterRound1);
+    }
 }
 }
 

@@ -13,11 +13,11 @@ namespace Yami {
     namespace Av1 {
         class SymbolDecoder;
         class TransformBlock;
-        class FindMvStack;
 
         class Block : public BlockTree {
             friend class TransformBlock;
             class FindMvStack;
+            class PredictInter;
 
         public:
             Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize);
@@ -47,7 +47,7 @@ namespace Yami {
             void palette_tokens();
             void read_block_tx_size();
             void read_tx_size(bool allowSelect);
-            void compute_prediction();
+            void compute_prediction(std::shared_ptr<YuvFrame>& frame);
 
             void reset_block_context();
             BLOCK_SIZE get_plane_residual_size(int subsize, int plane);
