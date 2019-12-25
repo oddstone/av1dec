@@ -6,8 +6,8 @@
 #include <functional>
 #include <string.h>
 
-#include "Av1Parser.h"
 #include "Av1Common.h"
+#include "Av1Parser.h"
 #include "SymbolDecoder.h"
 #include "log.h"
 
@@ -492,7 +492,7 @@ namespace Av1 {
         return true;
     }
 
-    FrameHeader::FrameHeader(ConstSequencePtr&      sequence)
+    FrameHeader::FrameHeader(ConstSequencePtr& sequence)
     {
         memset(this, 0, offsetof(FrameHeader, MiColStarts));
         m_sequence = sequence;
@@ -555,9 +555,9 @@ namespace Av1 {
         m_segmentation.setup_past_independence();
     }
 
-    class SetFrameRefs
-    {
+    class SetFrameRefs {
         const uint8_t INVALID_REF = 0xff;
+
     public:
         SetFrameRefs(FrameHeader& frame, const RefInfo& refInfo)
             : ref_frame_idx(frame.ref_frame_idx)
@@ -570,55 +570,53 @@ namespace Av1 {
             for (auto& b : usedFrame)
                 b = false;
 
-            memset(ref_frame_idx, INVALID_REF, sizeof(*ref_frame_idx)*REFS_PER_FRAME);
-            ref_frame_idx[ LAST_FRAME - LAST_FRAME ] = last_frame_idx;
-            ref_frame_idx[ GOLDEN_FRAME - LAST_FRAME ] = gold_frame_idx;
+            memset(ref_frame_idx, INVALID_REF, sizeof(*ref_frame_idx) * REFS_PER_FRAME);
+            ref_frame_idx[LAST_FRAME - LAST_FRAME] = last_frame_idx;
+            ref_frame_idx[GOLDEN_FRAME - LAST_FRAME] = gold_frame_idx;
 
-
-            usedFrame[ last_frame_idx ] = true;
-            usedFrame[ gold_frame_idx ] = true;
+            usedFrame[last_frame_idx] = true;
+            usedFrame[gold_frame_idx] = true;
 
             shiftedOrderHints.resize(NUM_REF_FRAMES);
-            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+            for (int i = 0; i < NUM_REF_FRAMES; i++) {
                 const RefFrame& ref = refInfo.m_refs[i];
-                shiftedOrderHints[i] = curFrameHint + frame.get_relative_dist(ref.RefOrderHint, OrderHint );
+                shiftedOrderHints[i] = curFrameHint + frame.get_relative_dist(ref.RefOrderHint, OrderHint);
             }
-            setRef(ALTREF_FRAME, std::bind(&SetFrameRefs::find_latest_backward, this ));
-            setRef(BWDREF_FRAME, std::bind(&SetFrameRefs::find_earliest_backward, this ));
+            setRef(ALTREF_FRAME, std::bind(&SetFrameRefs::find_latest_backward, this));
+            setRef(BWDREF_FRAME, std::bind(&SetFrameRefs::find_earliest_backward, this));
             setRef(ALTREF2_FRAME, std::bind(&SetFrameRefs::find_earliest_backward, this));
 
             setOtherRefs();
             setRemainingRefs();
-
         }
+
     private:
         void setRemainingRefs()
         {
             uint8_t ref = INVALID_REF;
             uint8_t earliestOrderHint;
-            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+            for (int i = 0; i < NUM_REF_FRAMES; i++) {
                 uint8_t hint = shiftedOrderHints[i];
-                if ( ref == INVALID_REF || hint < earliestOrderHint ) {
+                if (ref == INVALID_REF || hint < earliestOrderHint) {
                     ref = i;
                     earliestOrderHint = hint;
                 }
             }
-            for (int i = 0; i < REFS_PER_FRAME; i++ ) {
-                if ( ref_frame_idx[ i ] == INVALID_REF ) {
-                    ref_frame_idx[ i ] = ref;
-
+            for (int i = 0; i < REFS_PER_FRAME; i++) {
+                if (ref_frame_idx[i] == INVALID_REF) {
+                    ref_frame_idx[i] = ref;
                 }
             }
         }
         void setOtherRefs()
         {
-            uint8_t Ref_Frame_List[ REFS_PER_FRAME - 2 ] = {
+            uint8_t Ref_Frame_List[REFS_PER_FRAME - 2] = {
                 LAST2_FRAME, LAST3_FRAME, BWDREF_FRAME, ALTREF2_FRAME, ALTREF_FRAME
             };
 
-            for (int i = 0; i < REFS_PER_FRAME - 2; i++ ) {
+            for (int i = 0; i < REFS_PER_FRAME - 2; i++) {
                 uint8_t refFrame = Ref_Frame_List[i];
-                if (ref_frame_idx[ refFrame - LAST_FRAME ] == INVALID_REF) {
+                if (ref_frame_idx[refFrame - LAST_FRAME] == INVALID_REF) {
                     setRef(refFrame, std::bind(std::bind(&SetFrameRefs::find_latest_forward, this)));
                 }
             }
@@ -626,9 +624,9 @@ namespace Av1 {
         void setRef(uint8_t index, std::function<uint8_t()> find)
         {
             uint8_t ref = find();
-            if ( ref != INVALID_REF) {
-                ref_frame_idx[ index - LAST_FRAME ] = ref;
-                usedFrame[ ref ] = true;
+            if (ref != INVALID_REF) {
+                ref_frame_idx[index - LAST_FRAME] = ref;
+                usedFrame[ref] = true;
             }
         }
 
@@ -636,40 +634,39 @@ namespace Av1 {
         {
             uint8_t ref = INVALID_REF;
             uint8_t latestOrderHint;
-            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+            for (int i = 0; i < NUM_REF_FRAMES; i++) {
                 uint8_t hint = shiftedOrderHints[i];
-                if (! usedFrame[i]
+                if (!usedFrame[i]
                     && hint >= curFrameHint
-                    &&( ref == INVALID_REF || hint >= latestOrderHint ) )
-                {
+                    && (ref == INVALID_REF || hint >= latestOrderHint)) {
                     ref = i;
                     latestOrderHint = hint;
                 }
             }
             return ref;
         }
-        uint8_t find_earliest_backward() {
+        uint8_t find_earliest_backward()
+        {
             uint8_t ref = INVALID_REF;
             uint8_t earliestOrderHint;
-            for (int i = 0; i < NUM_REF_FRAMES; i++ ) {
+            for (int i = 0; i < NUM_REF_FRAMES; i++) {
                 uint8_t hint = shiftedOrderHints[i];
-                if ( !usedFrame[ i ]
+                if (!usedFrame[i]
                     && hint >= curFrameHint
-                    && ( ref == INVALID_REF || hint < earliestOrderHint ) ) {
+                    && (ref == INVALID_REF || hint < earliestOrderHint)) {
                     ref = i;
                     earliestOrderHint = hint;
                 }
             }
             return ref;
         }
-        uint8_t find_latest_forward() {
+        uint8_t find_latest_forward()
+        {
             uint8_t ref = INVALID_REF;
             uint8_t latestOrderHint;
             for (int i = 0; i < NUM_REF_FRAMES; i++) {
                 uint8_t hint = shiftedOrderHints[i];
-                if (!usedFrame[i] &&
-                    hint < curFrameHint &&
-                    (ref == INVALID_REF || hint >= latestOrderHint)) {
+                if (!usedFrame[i] && hint < curFrameHint && (ref == INVALID_REF || hint >= latestOrderHint)) {
                     ref = i;
                     latestOrderHint = hint;
                 }
@@ -678,7 +675,8 @@ namespace Av1 {
         }
 
         uint8_t* ref_frame_idx;
-        std::vector<bool> usedFrame;;
+        std::vector<bool> usedFrame;
+        ;
         uint8_t OrderHintBits;
         std::vector<uint8_t> shiftedOrderHints;
         uint8_t last_frame_idx;
@@ -687,7 +685,7 @@ namespace Av1 {
         uint8_t OrderHint;
     };
 
-    int8_t FrameHeader::get_relative_dist(uint8_t a, uint8_t b )
+    int8_t FrameHeader::get_relative_dist(uint8_t a, uint8_t b)
     {
         if (!m_sequence->enable_order_hint) {
             return 0;
@@ -711,9 +709,9 @@ namespace Av1 {
     bool FrameHeader::frame_size_with_refs(BitReader& br, const RefInfo& refInfo)
     {
         bool found_ref;
-        for (int i = 0; i < REFS_PER_FRAME; i++ ) {
+        for (int i = 0; i < REFS_PER_FRAME; i++) {
             READ(found_ref);
-            if ( found_ref) {
+            if (found_ref) {
                 const RefFrame& ref = refInfo.m_refs[ref_frame_idx[i]];
                 UpscaledWidth = ref.RefUpscaledWidth;
                 FrameWidth = UpscaledWidth;
@@ -728,13 +726,12 @@ namespace Av1 {
                 return false;
             if (!render_size(br))
                 return false;
-       } else {
+        } else {
             if (!superres_params(br))
                 return false;
             compute_image_size();
-       }
+        }
         return true;
-
     }
     bool FrameHeader::read_interpolation_filter(BitReader& br)
     {
@@ -756,30 +753,44 @@ namespace Av1 {
             744, 712, 682, 655, 630, 606, 585, 564, 546, 528
         };
         Mv projMv;
-        int clippedDenominator = std::min(MAX_FRAME_DISTANCE, denominator );
-        int clippedNumerator = CLIP3( -MAX_FRAME_DISTANCE, MAX_FRAME_DISTANCE, numerator );
-        for (int i = 0; i < 2;  i++) {
-            int16_t scaled = ROUND2SIGNED(mv.mv[i] * clippedNumerator * Div_Mult[ clippedDenominator ], 14 );
-            projMv.mv[i] = CLIP3( -(1 << 14) + 1, (1 << 14) - 1, scaled );
+        int clippedDenominator = std::min(MAX_FRAME_DISTANCE, denominator);
+        int clippedNumerator = CLIP3(-MAX_FRAME_DISTANCE, MAX_FRAME_DISTANCE, numerator);
+        for (int i = 0; i < 2; i++) {
+            int16_t scaled = ROUND2SIGNED(mv.mv[i] * clippedNumerator * Div_Mult[clippedDenominator], 14);
+            projMv.mv[i] = CLIP3(-(1 << 14) + 1, (1 << 14) - 1, scaled);
         }
         return std::move(projMv);
     }
+    void FrameHeader::getScale(uint8_t refIdx, uint32_t& xScale, uint32_t& yScale) const
+    {
+        const RefFrame& ref = m_refInfo.m_refs[refIdx];
+        xScale = ((ref.RefUpscaledWidth << REF_SCALE_SHIFT) + (FrameWidth / 2)) / FrameWidth;
+        yScale = ((ref.RefFrameHeight << REF_SCALE_SHIFT) + (FrameHeight / 2)) / FrameHeight;
+    }
 
-    bool project(int& v8, int delta, int dstSign, int max8, int maxOff8 ) {
+    bool FrameHeader::is_scaled(int refFrame) const
+    {
+        uint32_t xScale, yScale;
+        uint8_t refIdx = ref_frame_idx[refFrame - LAST_FRAME];
+        getScale(refIdx, xScale, yScale);
+
+        const static uint32_t noScale = 1 << REF_SCALE_SHIFT;
+        return xScale != noScale || yScale != noScale;
+    }
+
+    bool project(int& v8, int delta, int dstSign, int max8, int maxOff8)
+    {
         int base8 = (v8 >> 3) << 3;
         int offset8;
-        if ( delta >= 0 ) {
-            offset8 = delta >> ( 3 + 1 + MI_SIZE_LOG2 );
+        if (delta >= 0) {
+            offset8 = delta >> (3 + 1 + MI_SIZE_LOG2);
         } else {
-            offset8 = -( ( -delta ) >> ( 3 + 1 + MI_SIZE_LOG2 ) );
+            offset8 = -((-delta) >> (3 + 1 + MI_SIZE_LOG2));
         }
         v8 += dstSign * offset8;
 
         bool posValid;
-        if ( v8 < 0 ||
-            v8 >= max8 ||
-            v8 < base8 - maxOff8 ||
-            v8 >= base8 + 8 + maxOff8 ) {
+        if (v8 < 0 || v8 >= max8 || v8 < base8 - maxOff8 || v8 >= base8 + 8 + maxOff8) {
             posValid = false;
         }
         return false;
@@ -791,39 +802,39 @@ namespace Av1 {
         static const int MAX_OFFSET_HEIGHT = 0;
         PosX8 = x8;
         PosY8 = y8;
-        return  project(PosX8,projMv.mv[1], dstSign, w8, MAX_OFFSET_WIDTH)
+        return project(PosX8, projMv.mv[1], dstSign, w8, MAX_OFFSET_WIDTH)
             && project(PosY8, projMv.mv[0], dstSign, h8, MAX_OFFSET_HEIGHT);
     }
     bool FrameHeader::mvProject(const RefInfo& refInfo, uint8_t src, int dstSign)
     {
-        uint8_t srcIdx = ref_frame_idx[ src - LAST_FRAME ];
+        uint8_t srcIdx = ref_frame_idx[src - LAST_FRAME];
         const RefFrame& ref = refInfo.m_refs[srcIdx];
         if (ref.RefMiCols != MiCols
             || ref.RefMiRows != MiRows
-            || FrameIsIntra )
+            || FrameIsIntra)
             return false;
         int PosX8;
         int PosY8;
-        for (uint32_t y8 = 0; y8 < h8; y8++ ) {
-            for ( uint32_t x8 = 0; x8 < w8; x8++ ) {
+        for (uint32_t y8 = 0; y8 < h8; y8++) {
+            for (uint32_t x8 = 0; x8 < w8; x8++) {
                 uint32_t row = 2 * y8 + 1;
                 uint32_t col = 2 * x8 + 1;
-                uint8_t srcRef = ref.SavedRefFrames[ row ][ col ];
-                if ( srcRef > INTRA_FRAME ) {
-                    int8_t refToCur = get_relative_dist( OrderHints[ src ], OrderHint );
-                    int8_t refOffset = get_relative_dist( OrderHints[ src ], ref.SavedOrderHints[srcRef]);
-                    bool posValid = std::abs( refToCur ) <= MAX_FRAME_DISTANCE
-                        && std::abs( refOffset ) <= MAX_FRAME_DISTANCE
+                uint8_t srcRef = ref.SavedRefFrames[row][col];
+                if (srcRef > INTRA_FRAME) {
+                    int8_t refToCur = get_relative_dist(OrderHints[src], OrderHint);
+                    int8_t refOffset = get_relative_dist(OrderHints[src], ref.SavedOrderHints[srcRef]);
+                    bool posValid = std::abs(refToCur) <= MAX_FRAME_DISTANCE
+                        && std::abs(refOffset) <= MAX_FRAME_DISTANCE
                         && refOffset > 0;
-                    if ( posValid ) {
-                        const Mv& mv = ref.SavedMvs[ row ][ col ];
-                        Mv projMv = get_mv_projection( mv, refToCur * dstSign, refOffset );
-                        posValid = get_block_position( PosX8, PosY8, x8, y8, dstSign, projMv );
-                        if ( posValid ) {
-                            for (uint8_t dst = LAST_FRAME; dst <= ALTREF_FRAME; dst++ ) {
-                                int8_t refToDst = get_relative_dist( OrderHint, OrderHints[ dst ] );
-                                projMv = get_mv_projection( mv, refToDst, refOffset );
-                                MotionFieldMvs[ dst ][ PosY8 ][ PosX8 ] = projMv;
+                    if (posValid) {
+                        const Mv& mv = ref.SavedMvs[row][col];
+                        Mv projMv = get_mv_projection(mv, refToCur * dstSign, refOffset);
+                        posValid = get_block_position(PosX8, PosY8, x8, y8, dstSign, projMv);
+                        if (posValid) {
+                            for (uint8_t dst = LAST_FRAME; dst <= ALTREF_FRAME; dst++) {
+                                int8_t refToDst = get_relative_dist(OrderHint, OrderHints[dst]);
+                                projMv = get_mv_projection(mv, refToDst, refOffset);
+                                MotionFieldMvs[dst][PosY8][PosX8] = projMv;
                             }
                         }
                     }
@@ -839,25 +850,25 @@ namespace Av1 {
         Mv mv;
         mv.mv[0] = mv.mv[1] = -1 << 15;
         MotionFieldMvs.resize(TOTAL_REFS_PER_FRAME);
-        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++ ) {
+        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++) {
             MotionFieldMvs[ref].resize(h8);
-            for (uint32_t y = 0; y < h8 ; y++ ) {
+            for (uint32_t y = 0; y < h8; y++) {
                 MotionFieldMvs[ref][y].assign((size_t)w8, mv);
             }
         }
         uint8_t lastIdx = ref_frame_idx[0];
-        uint8_t curGoldOrderHint = OrderHints[ GOLDEN_FRAME ];
-        uint8_t lastAltOrderHint = refInfo.m_refs[lastIdx].SavedOrderHints[ ALTREF_FRAME ];
+        uint8_t curGoldOrderHint = OrderHints[GOLDEN_FRAME];
+        uint8_t lastAltOrderHint = refInfo.m_refs[lastIdx].SavedOrderHints[ALTREF_FRAME];
         bool useLast = (lastAltOrderHint != curGoldOrderHint);
         if (useLast) {
             mvProject(refInfo, LAST_FRAME, -1);
         }
         const int MFMV_STACK_SIZE = 3;
         int refStamp = MFMV_STACK_SIZE - 2;
-        uint8_t refHints[] = {BWDREF_FRAME, ALTREF2_FRAME, ALTREF_FRAME};
+        uint8_t refHints[] = { BWDREF_FRAME, ALTREF2_FRAME, ALTREF_FRAME };
         for (int i = 0; i < 3; i++) {
             uint8_t refHint = refHints[i];
-            bool use = get_relative_dist(refHint, OrderHint ) > 0;
+            bool use = get_relative_dist(refHint, OrderHint) > 0;
             if (refHint == ALTREF_FRAME && use) {
                 use = (refStamp >= 0);
             }
@@ -866,7 +877,7 @@ namespace Av1 {
                 if (projOutput) {
                     refStamp -= 1;
                 }
-           }
+            }
         }
         if (refStamp >= 0) {
             mvProject(refInfo, LAST2_FRAME, -1);
@@ -875,10 +886,10 @@ namespace Av1 {
 
     bool FrameHeader::frame_reference_mode(BitReader& br)
     {
-        if ( FrameIsIntra ) {
+        if (FrameIsIntra) {
             reference_select = false;
         } else {
-           READ(reference_select);
+            READ(reference_select);
         }
         return true;
     }
@@ -954,23 +965,22 @@ namespace Av1 {
 
     bool FrameHeader::global_motion_params(BitReader& br)
     {
-        for (uint8_t  ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++ ) {
-            GmType[ ref ] = IDENTITY;
-            for (int i = 0; i < 6; i++ ) {
-                gm_params[ ref ][ i ] = ( ( i % 3 == 2 ) ?
-                                          1 << WARPEDMODEL_PREC_BITS : 0 );
+        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++) {
+            GmType[ref] = IDENTITY;
+            for (int i = 0; i < 6; i++) {
+                gm_params[ref][i] = ((i % 3 == 2) ? 1 << WARPEDMODEL_PREC_BITS : 0);
             }
         }
-        if ( FrameIsIntra )
+        if (FrameIsIntra)
             return true;
-        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++ ) {
+        for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++) {
             GlobalMotionType type;
             bool is_global;
             READ(is_global);
-            if ( is_global ) {
+            if (is_global) {
                 bool is_rot_zoom;
                 READ(is_rot_zoom);
-                if ( is_rot_zoom ) {
+                if (is_rot_zoom) {
                     type = ROTZOOM;
                 } else {
                     bool is_translation;
@@ -981,20 +991,20 @@ namespace Av1 {
                 type = IDENTITY;
             }
             GmType[ref] = type;
-            if ( type >= ROTZOOM ) {
-                read_global_param(type,ref,2);
-                read_global_param(type,ref,3);
-                if ( type == AFFINE ) {
-                    read_global_param(type,ref,4);
+            if (type >= ROTZOOM) {
+                read_global_param(type, ref, 2);
+                read_global_param(type, ref, 3);
+                if (type == AFFINE) {
+                    read_global_param(type, ref, 4);
                     read_global_param(type, ref, 5);
                 } else {
                     gm_params[ref][4] = -gm_params[ref][3];
                     gm_params[ref][5] = gm_params[ref][2];
                 }
             }
-            if ( type >= TRANSLATION ) {
-                read_global_param(type,ref,0);
-                read_global_param(type,ref,1);
+            if (type >= TRANSLATION) {
+                read_global_param(type, ref, 0);
+                read_global_param(type, ref, 1);
             }
         }
         return true;
@@ -1103,25 +1113,25 @@ namespace Av1 {
                 READ(allow_intrabc);
             }
         } else {
-            if (!sequence.enable_order_hint ) {
+            if (!sequence.enable_order_hint) {
                 frame_refs_short_signaling = false;
             } else {
                 READ(frame_refs_short_signaling);
-                if ( frame_refs_short_signaling ) {
+                if (frame_refs_short_signaling) {
                     READ_BITS(last_frame_idx, 3);
                     READ_BITS(gold_frame_idx, 3);
                     set_frame_refs(refInfo);
                 }
-           }
-            for (int i = 0; i < REFS_PER_FRAME; i++ ) {
-                if (!frame_refs_short_signaling )
-                    READ_BITS(ref_frame_idx[ i ], 3);
-                if (m_sequence->frame_id_numbers_present_flag ) {
+            }
+            for (int i = 0; i < REFS_PER_FRAME; i++) {
+                if (!frame_refs_short_signaling)
+                    READ_BITS(ref_frame_idx[i], 3);
+                if (m_sequence->frame_id_numbers_present_flag) {
                     int n = m_sequence->delta_frame_id_length_minus2 + 2;
                     ASSERT(0);
                 }
             }
-            if ( frame_size_override_flag && !error_resilient_mode ) {
+            if (frame_size_override_flag && !error_resilient_mode) {
                 if (!frame_size_with_refs(br, refInfo))
                     return false;
             } else {
@@ -1129,9 +1139,8 @@ namespace Av1 {
                     return false;
                 if (!render_size(br))
                     return false;
-
             }
-            if ( force_integer_mv ) {
+            if (force_integer_mv) {
                 allow_high_precision_mv = false;
             } else {
                 READ(allow_high_precision_mv);
@@ -1139,20 +1148,20 @@ namespace Av1 {
             if (!read_interpolation_filter(br))
                 return false;
             READ(is_motion_mode_switchable);
-            if ( error_resilient_mode || !sequence.enable_ref_frame_mvs ) {
+            if (error_resilient_mode || !sequence.enable_ref_frame_mvs) {
                 use_ref_frame_mvs = false;
             } else {
                 READ(use_ref_frame_mvs);
             }
-            for (int i = 0; i < REFS_PER_FRAME; i++ ) {
+            for (int i = 0; i < REFS_PER_FRAME; i++) {
                 uint8_t refFrame = LAST_FRAME + i;
                 const RefFrame ref = refInfo.m_refs[ref_frame_idx[i]];
                 uint8_t hint = ref.RefOrderHint;
-                OrderHints[ refFrame ] = hint;
-                if ( !sequence.enable_order_hint ) {
-                    RefFrameSignBias[ refFrame ] = false;
+                OrderHints[refFrame] = hint;
+                if (!sequence.enable_order_hint) {
+                    RefFrameSignBias[refFrame] = false;
                 } else {
-                    RefFrameSignBias[ refFrame ] = get_relative_dist( hint, OrderHint) > 0;
+                    RefFrameSignBias[refFrame] = get_relative_dist(hint, OrderHint) > 0;
                 }
             }
         }
@@ -1230,6 +1239,7 @@ namespace Av1 {
             /* film_grain_params()*/
         }
         initGeometry();
+        m_refInfo = refInfo;
         return true;
     }
 
@@ -1247,12 +1257,11 @@ namespace Av1 {
                     if (ref.RefFrameId > current_frame_id || ref.RefFrameId < ((1 << idLen) + current_frame_id - (1 << diffLen)))
                         ref.RefValid = false;
                 }
-           }
+            }
         }
     }
 
-
-#define ROOF(b, a) ((b + (a -1)) & ~(a-1))
+#define ROOF(b, a) ((b + (a - 1)) & ~(a - 1))
     void FrameHeader::compute_image_size()
     {
         MiCols = 2 * ((FrameWidth + 7) >> 3);
@@ -1351,7 +1360,7 @@ namespace Av1 {
         for (uint32_t start = 0; start < sbMax; start += step) {
             starts.push_back(start << sbShift);
         }
-        starts.push_back(sbMax<<sbShift);
+        starts.push_back(sbMax << sbShift);
     }
 
     bool FrameHeader::parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)
@@ -1561,7 +1570,6 @@ namespace Av1 {
                 }
                 ref.SavedRefFrames = frame.MfRefFrames;
                 ref.SavedMvs = frame.MfMvs;
-
             }
         }
     }
@@ -1571,8 +1579,7 @@ namespace Av1 {
         READ(segmentation_enabled);
         if (segmentation_enabled) {
             ASSERT(0);
-        }
-        else {
+        } else {
             resetFeatures();
         }
         SegIdPreSkip = false;
@@ -1731,17 +1738,17 @@ namespace Av1 {
     }
     void CdefParams::read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize)
     {
-        uint32_t cdefSize4 = Num_4x4_Blocks_Wide[ BLOCK_64X64 ];
+        uint32_t cdefSize4 = Num_4x4_Blocks_Wide[BLOCK_64X64];
         uint32_t cdefMask4 = ~(cdefSize4 - 1);
         int r = MiRow & cdefMask4;
         int c = MiCol & cdefMask4;
-        if ( cdef_idx[ r ][ c ] == -1 ) {
+        if (cdef_idx[r][c] == -1) {
             uint32_t idx = entropy.readLiteral(cdef_bits);
-            int w4 = Num_4x4_Blocks_Wide[ MiSize ];
-            int h4 = Num_4x4_Blocks_High[ MiSize ];
-            for (int i = r; i < r + h4 ; i += cdefSize4 ) {
-                for (int j = c; j < c + w4 ; j += cdefSize4 ) {
-                    cdef_idx[ i ][ j ] = idx;
+            int w4 = Num_4x4_Blocks_Wide[MiSize];
+            int h4 = Num_4x4_Blocks_High[MiSize];
+            for (int i = r; i < r + h4; i += cdefSize4) {
+                for (int j = c; j < c + w4; j += cdefSize4) {
+                    cdef_idx[i][j] = idx;
                 }
             }
         }
@@ -1751,14 +1758,14 @@ namespace Av1 {
     };
     const static int RESTORATION_TILESIZE_MAX = 256;
 
-    static int count_units_in_frame(int unitSize, int frameSize) {
+    static int count_units_in_frame(int unitSize, int frameSize)
+    {
         return std::max((frameSize + (unitSize >> 1)) / unitSize, 1);
     }
 
     bool LoopRestorationpParams::parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame)
     {
-        if (frame.AllLossless || frame.allow_intrabc ||
-            !seq.enable_restoration ) {
+        if (frame.AllLossless || frame.allow_intrabc || !seq.enable_restoration) {
             FrameRestorationType[0] = RESTORE_NONE;
             FrameRestorationType[1] = RESTORE_NONE;
             FrameRestorationType[2] = RESTORE_NONE;
@@ -1771,35 +1778,35 @@ namespace Av1 {
             uint8_t lr_type;
             READ_BITS(lr_type, 2);
             FrameRestorationType[i] = Remap_Lr_Type[lr_type];
-            if (FrameRestorationType[i] != RESTORE_NONE ) {
+            if (FrameRestorationType[i] != RESTORE_NONE) {
                 UsesLr = true;
-                if ( i > 0 ) {
+                if (i > 0) {
                     usesChromaLr = true;
                 }
             }
         }
         if (UsesLr) {
             uint8_t lr_unit_shift;
-            if (seq.use_128x128_superblock ) {
+            if (seq.use_128x128_superblock) {
                 READ_BITS(lr_unit_shift, 1);
                 lr_unit_shift++;
             } else {
                 READ_BITS(lr_unit_shift, 1);
-                if ( lr_unit_shift ) {
+                if (lr_unit_shift) {
                     uint8_t lr_unit_extra_shift;
                     READ_BITS(lr_unit_extra_shift, 1);
                     lr_unit_shift += lr_unit_extra_shift;
                 }
             }
-            LoopRestorationSize[ 0 ] = RESTORATION_TILESIZE_MAX >> (2 - lr_unit_shift);
+            LoopRestorationSize[0] = RESTORATION_TILESIZE_MAX >> (2 - lr_unit_shift);
             uint8_t lr_uv_shift;
-            if (seq.subsampling_x && seq.subsampling_y && usesChromaLr ) {
+            if (seq.subsampling_x && seq.subsampling_y && usesChromaLr) {
                 READ_BITS(lr_uv_shift, 1);
             } else {
                 lr_uv_shift = 0;
             }
-            LoopRestorationSize[ 1 ] = LoopRestorationSize[ 0 ] >> lr_uv_shift;
-            LoopRestorationSize[ 2 ] = LoopRestorationSize[ 0 ] >> lr_uv_shift;
+            LoopRestorationSize[1] = LoopRestorationSize[0] >> lr_uv_shift;
+            LoopRestorationSize[2] = LoopRestorationSize[0] >> lr_uv_shift;
 
             LrType.resize(seq.NumPlanes);
             LrWiener.resize(seq.NumPlanes);
@@ -1807,13 +1814,13 @@ namespace Av1 {
             LrSgrSet.resize(seq.NumPlanes);
             LrSgrXqd.resize(seq.NumPlanes);
             RefSgrXqd.resize(seq.NumPlanes);
-            for (int plane = 0; plane < seq.NumPlanes; plane++ ) {
-                if ( FrameRestorationType[ plane ] != RESTORE_NONE ) {
+            for (int plane = 0; plane < seq.NumPlanes; plane++) {
+                if (FrameRestorationType[plane] != RESTORE_NONE) {
                     int subX = (plane == 0) ? 0 : seq.subsampling_x;
                     int subY = (plane == 0) ? 0 : seq.subsampling_y;
-                    int unitSize = LoopRestorationSize[ plane ];
-                    unitRows[plane] = count_units_in_frame( unitSize, ROUND2(frame.FrameHeight, subY) );
-                    unitCols[plane] = count_units_in_frame( unitSize, ROUND2(frame.UpscaledWidth, subX) );
+                    int unitSize = LoopRestorationSize[plane];
+                    unitRows[plane] = count_units_in_frame(unitSize, ROUND2(frame.FrameHeight, subY));
+                    unitCols[plane] = count_units_in_frame(unitSize, ROUND2(frame.UpscaledWidth, subX));
                     LrType[plane].assign(unitRows[plane], std::vector<RestorationType>(unitCols[plane]));
 
                     {
@@ -1844,26 +1851,26 @@ namespace Av1 {
         }
         int w = Num_4x4_Blocks_Wide[bSize];
         int h = Num_4x4_Blocks_High[bSize];
-        for (int plane = 0; plane < seq.NumPlanes; plane++ ) {
-            if ( FrameRestorationType[ plane ] != RESTORE_NONE ) {
+        for (int plane = 0; plane < seq.NumPlanes; plane++) {
+            if (FrameRestorationType[plane] != RESTORE_NONE) {
                 int subX = (plane == 0) ? 0 : seq.subsampling_x;
                 int subY = (plane == 0) ? 0 : seq.subsampling_y;
-                int unitSize = LoopRestorationSize[ plane ];
-                int unitRowStart = ( r * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize;
-                int unitRowEnd = std::min( unitRows[plane], ( (r + h) * ( MI_SIZE >> subY) + unitSize - 1 ) / unitSize);
+                int unitSize = LoopRestorationSize[plane];
+                int unitRowStart = (r * (MI_SIZE >> subY) + unitSize - 1) / unitSize;
+                int unitRowEnd = std::min(unitRows[plane], ((r + h) * (MI_SIZE >> subY) + unitSize - 1) / unitSize);
                 int numerator;
                 int denominator;
-                if (frame.use_superres ) {
+                if (frame.use_superres) {
                     numerator = (MI_SIZE >> subX) * frame.SuperresDenom;
                     denominator = unitSize * FrameHeader::SUPERRES_NUM;
                 } else {
                     numerator = MI_SIZE >> subX;
                     denominator = unitSize;
                 }
-                int unitColStart = (c * numerator + denominator - 1 ) / denominator;
-                int unitColEnd = std::min( unitCols[plane], ( (c + w) * numerator + denominator - 1 ) / denominator);
-                for (int unitRow = unitRowStart; unitRow < unitRowEnd; unitRow++ ) {
-                    for (int unitCol = unitColStart; unitCol < unitColEnd; unitCol++ ) {
+                int unitColStart = (c * numerator + denominator - 1) / denominator;
+                int unitColEnd = std::min(unitCols[plane], ((c + w) * numerator + denominator - 1) / denominator);
+                for (int unitRow = unitRowStart; unitRow < unitRowEnd; unitRow++) {
+                    for (int unitCol = unitColStart; unitCol < unitColEnd; unitCol++) {
                         read_lr_unit(*tile.m_entropy, plane, unitRow, unitCol);
                     }
                 }
@@ -1884,10 +1891,10 @@ namespace Av1 {
         int plane, int unitRow, int unitCol)
     {
         RestorationType restoration_type;
-        if ( FrameRestorationType[ plane ] == RESTORE_WIENER ) {
+        if (FrameRestorationType[plane] == RESTORE_WIENER) {
             bool use_wiener = entropy.readUseWiener();
             restoration_type = use_wiener ? RESTORE_WIENER : RESTORE_NONE;
-        } else if ( FrameRestorationType[ plane ] == RESTORE_SGRPROJ ) {
+        } else if (FrameRestorationType[plane] == RESTORE_SGRPROJ) {
             bool use_sgrproj = entropy.readUseSgrproj();
             restoration_type = use_sgrproj ? RESTORE_SGRPROJ : RESTORE_NONE;
         } else {
@@ -1895,54 +1902,52 @@ namespace Av1 {
         }
         LrType[plane][unitRow][unitCol] = restoration_type;
         int firstCoeff;
-        if (restoration_type == RESTORE_WIENER ) {
-            for (int pass = 0; pass < MAX_PASSES; pass++ ) {
-                if ( plane ) {
+        if (restoration_type == RESTORE_WIENER) {
+            for (int pass = 0; pass < MAX_PASSES; pass++) {
+                if (plane) {
                     firstCoeff = 1;
                     LrWiener[plane][unitRow][unitCol][pass][0] = 0;
                 } else {
                     firstCoeff = 0;
                 }
-                for (int j = firstCoeff; j < MAX_WIENER_COEFFS; j++ ) {
-                    int min = Wiener_Taps_Min[ j ];
-                    int max = Wiener_Taps_Max[ j ];
-                    int k = Wiener_Taps_K[ j ];
+                for (int j = firstCoeff; j < MAX_WIENER_COEFFS; j++) {
+                    int min = Wiener_Taps_Min[j];
+                    int max = Wiener_Taps_Max[j];
+                    int k = Wiener_Taps_K[j];
                     int v = entropy.decode_signed_subexp_with_ref_bool(min, max + 1, k, RefLrWiener[plane][pass][j]);
-                    LrWiener[plane][unitRow][unitCol ][ pass ][ j ] = v;
-                    RefLrWiener[ plane ][ pass ][ j ] = v;
+                    LrWiener[plane][unitRow][unitCol][pass][j] = v;
+                    RefLrWiener[plane][pass][j] = v;
                 }
             }
-        } else if ( restoration_type == RESTORE_SGRPROJ ) {
+        } else if (restoration_type == RESTORE_SGRPROJ) {
             uint8_t lr_sgr_set = entropy.readLrSgrSet();
-            LrSgrSet[plane][unitRow][unitCol ] = lr_sgr_set;
-            for (int i = 0; i < 2; i++ ) {
-                int8_t radius = Sgr_Params[ lr_sgr_set ][ i * 2 ];
+            LrSgrSet[plane][unitRow][unitCol] = lr_sgr_set;
+            for (int i = 0; i < 2; i++) {
+                int8_t radius = Sgr_Params[lr_sgr_set][i * 2];
                 int min = Sgrproj_Xqd_Min[i];
                 int max = Sgrproj_Xqd_Max[i];
                 int v;
-                if ( radius ) {
+                if (radius) {
                     v = entropy.decode_signed_subexp_with_ref_bool(min, max + 1,
-                            SGRPROJ_PRJ_SUBEXP_K, RefSgrXqd[ plane ][ i ]);
+                        SGRPROJ_PRJ_SUBEXP_K, RefSgrXqd[plane][i]);
                 } else {
                     v = 0;
-                    if ( i == 1 ) {
-                        v = CLIP3( min, max, (1 << SGRPROJ_PRJ_BITS) -
-                            RefSgrXqd[ plane ][ 0 ] );
+                    if (i == 1) {
+                        v = CLIP3(min, max, (1 << SGRPROJ_PRJ_BITS) - RefSgrXqd[plane][0]);
                     }
                 }
-                LrSgrXqd[ plane ][ unitRow ][ unitCol ][ i ] = v;
-                RefSgrXqd[ plane ][ i ] = v;
+                LrSgrXqd[plane][unitRow][unitCol][i] = v;
+                RefSgrXqd[plane][i] = v;
             }
-
         }
     }
     void LoopRestorationpParams::resetRefs(int NumPlanes)
     {
-        for (int plane = 0; plane < NumPlanes; plane++ ) {
+        for (int plane = 0; plane < NumPlanes; plane++) {
             if (FrameRestorationType[plane] != RESTORE_NONE) {
-                for (int pass = 0; pass < MAX_PASSES; pass++ ) {
+                for (int pass = 0; pass < MAX_PASSES; pass++) {
                     RefSgrXqd[plane][pass] = Sgrproj_Xqd_Mid[pass];
-                    for (int i = 0; i < MAX_WIENER_COEFFS; i++ ) {
+                    for (int i = 0; i < MAX_WIENER_COEFFS; i++) {
                         RefLrWiener[plane][pass][i] = Wiener_Taps_Mid[i];
                     }
                 }

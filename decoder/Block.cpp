@@ -9,7 +9,7 @@
 #include <limits>
 
 namespace Yami {
-    namespace Av1 {
+namespace Av1 {
     Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
         : m_frame(*tile.m_frame)
         , m_sequence(*tile.m_sequence)
@@ -42,8 +42,7 @@ namespace Yami {
                 AvailUChroma = tile.is_inside(r - 2, c);
             if (subsampling_x && bw4 == 1)
                 AvailLChroma = tile.is_inside(r, c - 2);
-        }
-        else {
+        } else {
             AvailUChroma = false;
             AvailLChroma = false;
         }
@@ -65,6 +64,10 @@ namespace Yami {
         void predict_inter(int plane, int x, int y, int w, int h, int candRow, int candCol);
 
     private:
+        uint8_t getUseWarp(int x, int y, int refFrame);
+        void motionVectorScaling(uint8_t refIdx, int plane, int x, int y, const Mv& mv);
+        void blockInterPrediction(int refList, int w, int h, int candRow, int candCol);
+
         const Block& m_block;
         const FrameHeader& m_frame;
         const SequenceHeader& m_sequence;
@@ -73,6 +76,15 @@ namespace Yami {
         int InterRound0;
         int InterRound1;
         int InterPostRound;
+        bool LocalValid = false;
+        bool globaValid = false;
+
+        int startX;
+        int startY;
+        int stepX;
+        int stepY;
+
+        std::vector<std::vector<uint8_t>> preds[2];
     };
 
     Block::PredictInter::PredictInter(const Block& block, YuvFrame& yuv)
@@ -83,6 +95,49 @@ namespace Yami {
     {
     }
 
+    uint8_t Block::PredictInter::getUseWarp(int w, int h, int refFrame)
+    {
+        if (w < 8 || h < 8)
+            return false;
+        if (m_frame.force_integer_mv)
+            return false;
+        if (m_block.motion_mode == LOCALWARP && LocalValid)
+            return true;
+        if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV)
+            && m_frame.GmType[refFrame] > TRANSLATION
+            && !m_frame.is_scaled(refFrame)
+            && globaValid)
+            return 2;
+        return 0;
+    }
+
+    void Block::PredictInter::motionVectorScaling(uint8_t refIdx, int plane, int x, int y, const Mv& mv)
+    {
+        uint32_t xScale, yScale;
+        m_frame.getScale(refIdx, xScale, yScale);
+
+        const static uint8_t halfSample = (1 << (SUBPEL_BITS - 1));
+        uint8_t subX = plane ? m_sequence.subsampling_x : 0;
+        uint8_t subY = plane ? m_sequence.subsampling_y : 0;
+        uint32_t origX = ((x << SUBPEL_BITS) + ((2 * mv.mv[1]) >> subX) + halfSample);
+        uint32_t origY = ((y << SUBPEL_BITS) + ((2 * mv.mv[0]) >> subY) + halfSample);
+        uint32_t baseX = (origX * xScale - (halfSample << REF_SCALE_SHIFT));
+        uint32_t baseY = (origY * yScale - (halfSample << REF_SCALE_SHIFT));
+
+        const static uint8_t off = ((1 << (SCALE_SUBPEL_BITS - SUBPEL_BITS)) / 2);
+
+        startX = (ROUND2SIGNED(baseX, REF_SCALE_SHIFT + SUBPEL_BITS - SCALE_SUBPEL_BITS) + off);
+        startY = (ROUND2SIGNED(baseY, REF_SCALE_SHIFT + SUBPEL_BITS - SCALE_SUBPEL_BITS) + off);
+        stepX = ROUND2SIGNED(xScale, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
+        stepY = ROUND2SIGNED(yScale, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
+    }
+    void Block::PredictInter::blockInterPrediction(int refList, int w, int h, int candRow, int candCol)
+    {
+        std::vector<std::vector<uint8_t>>& pred = preds[refList];
+        pred.assign(h, std::vector<uint8_t>(w));
+
+
+    }
     void Block::PredictInter::predict_inter(int plane, int x, int y, int w, int h, int candRow, int candCol)
     {
         isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
@@ -95,8 +150,25 @@ namespace Yami {
         if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV) && m_frame.GmType[refFrame] > TRANSLATION) {
             ASSERT(0);
         }
+        uint8_t useWarp = getUseWarp(w, h, refFrame);
+        Mv mv = m_frame.Mvs[candRow][candCol][refList];
+        uint8_t refIdx;
+        if (!m_block.use_intrabc) {
+            refIdx = m_frame.ref_frame_idx[refFrame - LAST_FRAME];
+        } else {
+            ASSERT(0);
+        }
+        motionVectorScaling(refIdx, plane, x, y, mv);
+
+        if (m_block.use_intrabc) {
+            ASSERT(0);
+        }
+        if (useWarp) {
+            ASSERT(0);
+        } else {
+            blockInterPrediction(refList, w, h, candRow, candCol);
+        }
     }
-  
 
     void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame)
     {

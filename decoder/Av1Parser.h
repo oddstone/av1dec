@@ -384,6 +384,10 @@ namespace Av1 {
         }
     };
 
+    const static uint8_t REF_SCALE_SHIFT = 14;
+    const static uint8_t SUBPEL_BITS = 4;
+    const static uint8_t SCALE_SUBPEL_BITS = 10;
+
     struct FrameHeader {
         friend class Block;
         friend class TransformBlock;
@@ -499,7 +503,7 @@ namespace Av1 {
             //std::vector<std::vector<uint32_t>> PaletteSizes[2];
             //PaletteColors
 
-            Quantization m_quant;
+        Quantization m_quant;
         Segmentation m_segmentation;
         DeltaQ m_deltaQ;
         DeltaLf m_deltaLf;
@@ -507,6 +511,8 @@ namespace Av1 {
         CdefParams m_cdef;
         LoopRestorationpParams m_loopRestoration;
         ConstSequencePtr m_sequence;
+        RefInfo m_refInfo; //a copy of parsers refInfo
+        
 
         const static uint8_t SUPERRES_NUM = 8;
 
@@ -542,6 +548,9 @@ namespace Av1 {
         bool get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv);
         bool mvProject(const RefInfo& refInfo, uint8_t src, int dstSign);
         Mv get_mv_projection(const Mv& mv, int numerator, int denominator);
+
+        bool is_scaled(int refFrame) const;
+        void getScale(uint8_t refIdx, uint32_t& xScale, uint32_t& yScale) const;
 
         bool read_global_param(GlobalMotionType type, uint8_t ref, int idx);
 
