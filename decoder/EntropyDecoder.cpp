@@ -67,8 +67,8 @@ namespace Av1 {
         av1_copy(cfl_sign_cdf, default_cfl_sign_cdf);
         av1_copy(cfl_alpha_cdf, default_cfl_alpha_cdf);
         av1_copy(intrabc_cdf, default_intrabc_cdf);
-        av1_copy(&nmv_context[0], &default_nmv_context);
-        av1_copy(&nmv_context[1], &default_nmv_context);
+        memcpy(&nmv_context[0], &default_nmv_context, sizeof(default_nmv_context));
+        memcpy(&nmv_context[1], &default_nmv_context, sizeof(default_nmv_context));
 
         initCoefCdf(baseQ);
     }
@@ -210,7 +210,10 @@ namespace Av1 {
         int size = Sizes[maxTxDepth];
         return (uint8_t)m_symbol->read(tx_size_cdf[cat][ctx], size);
     }
-
+    uint8_t EntropyDecoder::readInterTxType(TxSet set, TX_SIZE txSzSqr)
+    {
+        return (uint8_t)m_symbol->read(inter_ext_tx_cdf[1][set], TX_TYPES);
+    }
     uint8_t EntropyDecoder::readIntraTxType(TxSet set, TX_SIZE txSzSqr, PREDICTION_MODE intraDir)
     {
         ASSERT(set == TX_SET_INTRA_1 || set == TX_SET_INTRA_2);

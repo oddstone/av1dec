@@ -444,7 +444,7 @@ namespace Av1 {
         uint32_t RenderWidth;
         uint32_t RenderHeight;
 
-        uint8_t interpolation_filter;
+        InterpFilter interpolation_filter;
         bool is_motion_mode_switchable;
 
         bool disable_frame_end_update_cdf;
@@ -455,6 +455,7 @@ namespace Av1 {
         uint32_t NumTiles;
         uint32_t TileColsLog2;
         uint32_t TileRowsLog2;
+        uint32_t context_update_tile_id;
         uint8_t TileSizeBytes;
 
         bool enable_warped_motion;
@@ -492,7 +493,7 @@ namespace Av1 {
         std::vector<std::vector<BLOCK_SIZE>> MiSizes;
         std::vector<std::vector<TX_SIZE>> LoopfilterTxSizes[MAX_PLANES];
         std::vector<std::vector<uint8_t>> SegmentIds;
-        std::vector<std::vector<uint8_t>> DeltaLFs[FRAME_LF_COUNT];
+        std::vector<std::vector<int8_t>> DeltaLFs[FRAME_LF_COUNT];
         std::vector<std::vector<uint8_t>> MfRefFrames;
         std::vector<std::vector<Mv>> MfMvs;
         std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;

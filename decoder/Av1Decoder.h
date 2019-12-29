@@ -1,6 +1,7 @@
 #ifndef Av1Decoder_h
 #define Av1Decoder_h
 
+#include "Av1Common.h"
 #include <memory>
 #include <deque>
 #include <vector>
@@ -23,11 +24,13 @@ namespace Yami {
         private:
             bool decodeFrame(Tiles tiles);
             std::shared_ptr<YuvFrame> decode_frame_wrapup(const std::shared_ptr<YuvFrame>&);
+            void updateFrameStore(const FrameHeader& h, const std::shared_ptr<YuvFrame> frame);
             std::shared_ptr<YuvFrame> upscaling(const std::shared_ptr<YuvFrame>&);
             std::unique_ptr<Parser> m_parser;
-            std::deque<std::shared_ptr<YuvFrame>>    m_output;
+            std::deque<std::shared_ptr<YuvFrame>> m_output;
             FramePtr m_frame;
             Tiles m_tiles;
+            FrameStore m_store;
         };
     }
 }

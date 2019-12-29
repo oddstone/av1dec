@@ -104,7 +104,7 @@ bool BitReader::readT(T& v, uint32_t nbits)
     uint32_t tmp;
     if (!read(tmp, nbits))
         return false;
-    v = tmp;
+    v = (T)tmp;
     return true;
 }
 

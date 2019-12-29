@@ -168,7 +168,7 @@ namespace Yami {
         public:
             Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum);
             bool parse(const uint8_t* data, uint32_t size);
-            bool decode(std::shared_ptr<YuvFrame>& frame);
+            bool decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
             std::shared_ptr<FrameHeader> m_frame;
             std::shared_ptr<const SequenceHeader> m_sequence;

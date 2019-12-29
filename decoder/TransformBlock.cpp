@@ -1229,7 +1229,10 @@ namespace Yami {
                 return m_frame.TxTypes[y4][x4];
             }
             if (m_block.is_inter) {
-                ASSERT(0 && "is_inter");
+                TX_TYPE txType = m_frame.TxTypes[y4][x4];
+                if (!is_tx_type_in_set(txSet, txType))
+                    return DCT_DCT;
+                return txType;
             }
             TX_TYPE txType = Mode_To_Txfm[m_block.UVMode];
             if (!is_tx_type_in_set(txSet, txType))
@@ -1276,16 +1279,13 @@ namespace Yami {
             TX_TYPE TxType;
             if (set > 0 && m_block.get_q_idx() > 0) {
                 if (m_block.is_inter ) {
-                    ASSERT(0 && "inter_tx_type");
-                    /*
-			        //inter_tx_type
+                    uint8_t inter_tx_type = m_entropy.readInterTxType(set, txSzSqr);
 			        if ( set == TX_SET_INTER_1 )
 				        TxType = Tx_Type_Inter_Inv_Set1[ inter_tx_type ];
 			        else if ( set == TX_SET_INTER_2 )
 				        TxType = Tx_Type_Inter_Inv_Set2[ inter_tx_type ];
 			        else
 				        TxType = Tx_Type_Inter_Inv_Set3[ inter_tx_type ];
-                        */
 		        } else {
                     uint8_t intra_tx_type = m_entropy.readIntraTxType(set, txSzSqr, getIntraDir());
                     if ( set == TX_SET_INTRA_1 )
@@ -2998,12 +2998,22 @@ namespace Yami {
             }
             reconstruct();
             //copy to frame
-            for (int i = 0; i < h; i++) {
-                for (int j = 0; j < w; j++) {
-                    uint8_t pixel = CLIP1(Residual[i][j] + pred[i][j]);
-                    frame->setPixel(plane, x + j, y + i, pixel);
+            if (!m_block.is_inter) {
+                for (int i = 0; i < h; i++) {
+                    for (int j = 0; j < w; j++) {
+                        uint8_t pixel = CLIP1(Residual[i][j] + pred[i][j]);
+                        frame->setPixel(plane, x + j, y + i, pixel);
+                    }
                 }
+            } else {
+                for (int i = 0; i < h; i++) {
+                    for (int j = 0; j < w; j++) {
+                        uint8_t pixel = CLIP1(Residual[i][j] + frame->getPixel(plane,  x + j, y + i));
+                        frame->setPixel(plane, x + j, y + i, pixel);
+                    }
+                }            
             }
+            
 
             for (int i = 0; i < stepY; i++) {
                 for (int j = 0; j < stepX; j++) {

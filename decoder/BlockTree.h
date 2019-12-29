@@ -7,7 +7,7 @@ namespace Yami {
         struct BlockTree {
         public:
             virtual void parse() = 0;
-            virtual bool decode(std::shared_ptr<YuvFrame>&) = 0;
+            virtual bool decode(std::shared_ptr<YuvFrame>&, const FrameStore&) = 0;
         };
     }
 }

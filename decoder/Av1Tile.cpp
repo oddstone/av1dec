@@ -142,10 +142,10 @@ namespace Yami {
             m_left.clear(m_frame->AlignedMiRows);
         }
 
-        bool Tile::decode(std::shared_ptr<YuvFrame>& frame)
+        bool Tile::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
         {
             for (auto& sb : m_sbs) {
-                if (!sb->decode(frame))
+                if (!sb->decode(frame, frameStore))
                     return false;
 
             }

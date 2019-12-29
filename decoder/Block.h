@@ -22,7 +22,7 @@ namespace Yami {
         public:
             Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize);
             void parse();
-            bool decode(std::shared_ptr<YuvFrame>& frame);
+            bool decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
         private:
             void intra_segment_id();
@@ -47,7 +47,7 @@ namespace Yami {
             void palette_tokens();
             void read_block_tx_size();
             void read_tx_size(bool allowSelect);
-            void compute_prediction(std::shared_ptr<YuvFrame>& frame);
+            void compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
             void reset_block_context();
             BLOCK_SIZE get_plane_residual_size(int subsize, int plane);
@@ -64,6 +64,7 @@ namespace Yami {
             int16_t get_q_idx();
 
             void transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x, int y);
+            void transform_tree(int baseX, int baseY, int w, int h);
             void residual();
 
             //for inter
@@ -129,6 +130,8 @@ namespace Yami {
             BLOCK_SIZE MiSize;
             uint32_t bw4;
             uint32_t bh4;
+            uint32_t bw;
+            uint32_t bh;
             bool HasChroma;
             bool AvailU;
             bool AvailL;
@@ -152,7 +155,7 @@ namespace Yami {
             bool use_filter_intra;
             FILTER_INTRA_MODE filter_intra_mode;
             TX_SIZE TxSize;
-            uint8_t RefFrame[2];
+            int8_t RefFrame[2];
             bool use_intrabc;
             uint32_t sbMask;
 

@@ -2,8 +2,10 @@
 #define Av1Common_h
 #include "enums.h"
 #include <memory>
+#include <vector>
 
 namespace Yami {
+    struct YuvFrame;
     namespace Av1 {
         class Parser;
         struct FrameHeader;
@@ -13,6 +15,7 @@ namespace Yami {
         typedef std::shared_ptr<const SequenceHeader> ConstSequencePtr;
         typedef std::shared_ptr<FrameHeader> FramePtr;
         typedef std::shared_ptr<const FrameHeader> ConstFramePtr;
+        typedef std::vector<std::shared_ptr<YuvFrame>> FrameStore;
     }
 }
 
@@ -212,5 +215,6 @@ struct Mv {
 
 #define MV_INTRABC_CONTEXT 1
 
+#define SUBPEL_MASK 15
 
 #endif

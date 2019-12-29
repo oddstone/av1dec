@@ -3,8 +3,8 @@
 #include "Cdef.h"
 #include "LoopFilter.h"
 #include "LoopRestoration.h"
-#include "bitReader.h"
 #include "VideoFrame.h"
+#include "bitReader.h"
 #include "log.h"
 
 namespace Yami {
@@ -74,6 +74,17 @@ namespace Av1 {
         }
         return true;
     }
+
+    void Decoder::updateFrameStore(const FrameHeader& h, const std::shared_ptr<YuvFrame> frame)
+    {
+        m_store.resize(NUM_REF_FRAMES);
+        for (int i = 0; i < NUM_REF_FRAMES; i++) {
+            if (h.refresh_frame_flags & (1 << i)) {
+                m_store[i] = frame;
+            }
+        }
+    }
+    
     bool Decoder::decodeFrame(TileGroup tiles)
     {
         FrameHeader& h = *m_frame;
@@ -81,15 +92,16 @@ namespace Av1 {
         if (!frame)
             return false;
         for (auto& t : tiles) {
-            if (!t->decode(frame)) {
+            if (!t->decode(frame, m_store)) {
                 return false;
             }
         }
-        if (!h.disable_frame_end_update_cdf ) {
+        if (!h.disable_frame_end_update_cdf) {
             printf("warning: disable_frame_end_update_cdf is not supported");
         }
         std::shared_ptr<YuvFrame> filtered = decode_frame_wrapup(frame);
         m_output.push_back(filtered);
+        updateFrameStore(h, filtered);
         m_parser->finishFrame();
         return true;
     }

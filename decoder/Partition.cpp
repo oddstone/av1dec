@@ -180,10 +180,10 @@ namespace Yami {
 
         }
 
-        bool Partition::decode(std::shared_ptr<YuvFrame>& frame)
+        bool Partition::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
         {
             for (auto& b : m_blocks) {
-                if (!b->decode(frame))
+                if (!b->decode(frame, frameStore))
                     return false;
             }
             return true;

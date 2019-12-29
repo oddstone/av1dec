@@ -4,6 +4,7 @@
 #include "Av1Tile.h"
 #include "SymbolDecoder.h"
 #include "TransformBlock.h"
+#include "VideoFrame.h"
 #include "log.h"
 
 #include <limits>
@@ -21,6 +22,8 @@ namespace Av1 {
         , MiSize(subSize)
         , bw4(Num_4x4_Blocks_Wide[subSize])
         , bh4(Num_4x4_Blocks_High[subSize])
+        , bw(bw4 << 2)
+        , bh(bh4 << 2)
         , sbMask(m_sequence.use_128x128_superblock ? 31 : 15)
         , subsampling_x(m_sequence.subsampling_x)
         , subsampling_y(m_sequence.subsampling_y)
@@ -60,18 +63,20 @@ namespace Av1 {
 
     class Block::PredictInter {
     public:
-        PredictInter(const Block& block, YuvFrame& yuv);
-        void predict_inter(int plane, int x, int y, int w, int h, int candRow, int candCol);
+        PredictInter(const Block& block, YuvFrame& yuv, const FrameStore& frameStore);
+        void predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol);
 
     private:
         uint8_t getUseWarp(int x, int y, int refFrame);
         void motionVectorScaling(uint8_t refIdx, int plane, int x, int y, const Mv& mv);
-        void blockInterPrediction(int refList, int w, int h, int candRow, int candCol);
+        int getFilterIdx(int size, int candRow, int candCol, int dir);
+        void blockInterPrediction(uint8_t refIdx, int refList, int plane, uint32_t w, uint32_t h, int candRow, int candCol);
 
         const Block& m_block;
         const FrameHeader& m_frame;
         const SequenceHeader& m_sequence;
         YuvFrame& m_yuv;
+        const FrameStore& m_frameStore;
         bool isCompound;
         int InterRound0;
         int InterRound1;
@@ -81,17 +86,17 @@ namespace Av1 {
 
         int startX;
         int startY;
-        int stepX;
-        int stepY;
-
+        int xStep;
+        int yStep;
         std::vector<std::vector<uint8_t>> preds[2];
     };
 
-    Block::PredictInter::PredictInter(const Block& block, YuvFrame& yuv)
+    Block::PredictInter::PredictInter(const Block& block, YuvFrame& yuv, const FrameStore& frameStore)
         : m_block(block)
         , m_frame(block.m_frame)
         , m_sequence(block.m_sequence)
         , m_yuv(yuv)
+        , m_frameStore(frameStore)
     {
     }
 
@@ -119,28 +124,178 @@ namespace Av1 {
         const static uint8_t halfSample = (1 << (SUBPEL_BITS - 1));
         uint8_t subX = plane ? m_sequence.subsampling_x : 0;
         uint8_t subY = plane ? m_sequence.subsampling_y : 0;
-        uint32_t origX = ((x << SUBPEL_BITS) + ((2 * mv.mv[1]) >> subX) + halfSample);
-        uint32_t origY = ((y << SUBPEL_BITS) + ((2 * mv.mv[0]) >> subY) + halfSample);
-        uint32_t baseX = (origX * xScale - (halfSample << REF_SCALE_SHIFT));
-        uint32_t baseY = (origY * yScale - (halfSample << REF_SCALE_SHIFT));
+        int origX = ((x << SUBPEL_BITS) + ((2 * mv.mv[1]) >> subX) + halfSample);
+        int origY = ((y << SUBPEL_BITS) + ((2 * mv.mv[0]) >> subY) + halfSample);
+        int baseX = (origX * xScale - (halfSample << REF_SCALE_SHIFT));
+        int baseY = (origY * yScale - (halfSample << REF_SCALE_SHIFT));
 
         const static uint8_t off = ((1 << (SCALE_SUBPEL_BITS - SUBPEL_BITS)) / 2);
 
         startX = (ROUND2SIGNED(baseX, REF_SCALE_SHIFT + SUBPEL_BITS - SCALE_SUBPEL_BITS) + off);
         startY = (ROUND2SIGNED(baseY, REF_SCALE_SHIFT + SUBPEL_BITS - SCALE_SUBPEL_BITS) + off);
-        stepX = ROUND2SIGNED(xScale, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
-        stepY = ROUND2SIGNED(yScale, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
+        xStep = ROUND2SIGNED(xScale, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
+        yStep = ROUND2SIGNED(yScale, REF_SCALE_SHIFT - SCALE_SUBPEL_BITS);
     }
-    void Block::PredictInter::blockInterPrediction(int refList, int w, int h, int candRow, int candCol)
+
+    inline int Block::PredictInter::getFilterIdx(int size, int candRow, int candCol, int dir)
+    {
+        InterpFilter interpFilter = m_frame.InterpFilters[candRow][candCol][dir];
+        int idx = (int)interpFilter;
+        if (size <= 4) {
+            if (interpFilter == EIGHTTAP || interpFilter == EIGHTTAP_SHARP) {
+                idx = 4;
+            } else if (interpFilter == EIGHTTAP_SMOOTH) {
+                idx = 5;
+            }
+        }
+        return idx;
+    }
+
+    const static int Subpel_Filters[6][16][8] = {
+        { { 0, 0, 0, 128, 0, 0, 0, 0 },
+            { 0, 2, -6, 126, 8, -2, 0, 0 },
+            { 0, 2, -10, 122, 18, -4, 0, 0 },
+            { 0, 2, -12, 116, 28, -8, 2, 0 },
+            { 0, 2, -14, 110, 38, -10, 2, 0 },
+            { 0, 2, -14, 102, 48, -12, 2, 0 },
+            { 0, 2, -16, 94, 58, -12, 2, 0 },
+            { 0, 2, -14, 84, 66, -12, 2, 0 },
+            { 0, 2, -14, 76, 76, -14, 2, 0 },
+            { 0, 2, -12, 66, 84, -14, 2, 0 },
+            { 0, 2, -12, 58, 94, -16, 2, 0 },
+            { 0, 2, -12, 48, 102, -14, 2, 0 },
+            { 0, 2, -10, 38, 110, -14, 2, 0 },
+            { 0, 2, -8, 28, 116, -12, 2, 0 },
+            { 0, 0, -4, 18, 122, -10, 2, 0 },
+            { 0, 0, -2, 8, 126, -6, 2, 0 } },
+        { { 0, 0, 0, 128, 0, 0, 0, 0 },
+            { 0, 2, 28, 62, 34, 2, 0, 0 },
+            { 0, 0, 26, 62, 36, 4, 0, 0 },
+            { 0, 0, 22, 62, 40, 4, 0, 0 },
+            { 0, 0, 20, 60, 42, 6, 0, 0 },
+            { 0, 0, 18, 58, 44, 8, 0, 0 },
+            { 0, 0, 16, 56, 46, 10, 0, 0 },
+            { 0, -2, 16, 54, 48, 12, 0, 0 },
+            { 0, -2, 14, 52, 52, 14, -2, 0 },
+            { 0, 0, 12, 48, 54, 16, -2, 0 },
+            { 0, 0, 10, 46, 56, 16, 0, 0 },
+            { 0, 0, 8, 44, 58, 18, 0, 0 },
+            { 0, 0, 6, 42, 60, 20, 0, 0 },
+            { 0, 0, 4, 40, 62, 22, 0, 0 },
+            { 0, 0, 4, 36, 62, 26, 0, 0 },
+            { 0, 0, 2, 34, 62, 28, 2, 0 } },
+        { { 0, 0, 0, 128, 0, 0, 0, 0 },
+            { -2, 2, -6, 126, 8, -2, 2, 0 },
+            { -2, 6, -12, 124, 16, -6, 4, -2 },
+            { -2, 8, -18, 120, 26, -10, 6, -2 },
+            { -4, 10, -22, 116, 38, -14, 6, -2 },
+            { -4, 10, -22, 108, 48, -18, 8, -2 },
+            { -4, 10, -24, 100, 60, -20, 8, -2 },
+            { -4, 10, -24, 90, 70, -22, 10, -2 },
+            { -4, 12, -24, 80, 80, -24, 12, -4 },
+            { -2, 10, -22, 70, 90, -24, 10, -4 },
+            { -2, 8, -20, 60, 100, -24, 10, -4 },
+            { -2, 8, -18, 48, 108, -22, 10, -4 },
+            { -2, 6, -14, 38, 116, -22, 10, -4 },
+            { -2, 6, -10, 26, 120, -18, 8, -2 },
+            { -2, 4, -6, 16, 124, -12, 6, -2 },
+            { 0, 2, -2, 8, 126, -6, 2, -2 } },
+        { { 0, 0, 0, 128, 0, 0, 0, 0 },
+            { 0, 0, 0, 120, 8, 0, 0, 0 },
+            { 0, 0, 0, 112, 16, 0, 0, 0 },
+            { 0, 0, 0, 104, 24, 0, 0, 0 },
+            { 0, 0, 0, 96, 32, 0, 0, 0 },
+            { 0, 0, 0, 88, 40, 0, 0, 0 },
+            { 0, 0, 0, 80, 48, 0, 0, 0 },
+            { 0, 0, 0, 72, 56, 0, 0, 0 },
+            { 0, 0, 0, 64, 64, 0, 0, 0 },
+            { 0, 0, 0, 56, 72, 0, 0, 0 },
+            { 0, 0, 0, 48, 80, 0, 0, 0 },
+            { 0, 0, 0, 40, 88, 0, 0, 0 },
+            { 0, 0, 0, 32, 96, 0, 0, 0 },
+            { 0, 0, 0, 24, 104, 0, 0, 0 },
+            { 0, 0, 0, 16, 112, 0, 0, 0 },
+            { 0, 0, 0, 8, 120, 0, 0, 0 } },
+        { { 0, 0, 0, 128, 0, 0, 0, 0 },
+            { 0, 0, -4, 126, 8, -2, 0, 0 },
+            { 0, 0, -8, 122, 18, -4, 0, 0 },
+            { 0, 0, -10, 116, 28, -6, 0, 0 },
+            { 0, 0, -12, 110, 38, -8, 0, 0 },
+            { 0, 0, -12, 102, 48, -10, 0, 0 },
+            { 0, 0, -14, 94, 58, -10, 0, 0 },
+            { 0, 0, -12, 84, 66, -10, 0, 0 },
+            { 0, 0, -12, 76, 76, -12, 0, 0 },
+            { 0, 0, -10, 66, 84, -12, 0, 0 },
+            { 0, 0, -10, 58, 94, -14, 0, 0 },
+            { 0, 0, -10, 48, 102, -12, 0, 0 },
+            { 0, 0, -8, 38, 110, -12, 0, 0 },
+            { 0, 0, -6, 28, 116, -10, 0, 0 },
+            { 0, 0, -4, 18, 122, -8, 0, 0 },
+            { 0, 0, -2, 8, 126, -4, 0, 0 } },
+        { { 0, 0, 0, 128, 0, 0, 0, 0 },
+            { 0, 0, 30, 62, 34, 2, 0, 0 },
+            { 0, 0, 26, 62, 36, 4, 0, 0 },
+            { 0, 0, 22, 62, 40, 4, 0, 0 },
+            { 0, 0, 20, 60, 42, 6, 0, 0 },
+            { 0, 0, 18, 58, 44, 8, 0, 0 },
+            { 0, 0, 16, 56, 46, 10, 0, 0 },
+            { 0, 0, 14, 54, 48, 12, 0, 0 },
+            { 0, 0, 12, 52, 52, 12, 0, 0 },
+            { 0, 0, 12, 48, 54, 14, 0, 0 },
+            { 0, 0, 10, 46, 56, 16, 0, 0 },
+            { 0, 0, 8, 44, 58, 18, 0, 0 },
+            { 0, 0, 6, 42, 60, 20, 0, 0 },
+            { 0, 0, 4, 40, 62, 22, 0, 0 },
+            { 0, 0, 4, 36, 62, 26, 0, 0 },
+            { 0, 0, 2, 34, 62, 30, 0, 0 } }
+    };
+    void Block::PredictInter::blockInterPrediction(uint8_t refIdx, int refList, int plane, uint32_t w, uint32_t h, int candRow, int candCol)
     {
         std::vector<std::vector<uint8_t>>& pred = preds[refList];
         pred.assign(h, std::vector<uint8_t>(w));
+        YuvFrame& ref = (refIdx == NONE_FRAME ? m_yuv : *m_frameStore[refIdx]);
 
+        uint32_t lastX, lastY;
+        if (refIdx == NONE_FRAME) {
+            ASSERT(0);
+        } else {
+            int subX = plane ? m_sequence.subsampling_x : 0;
+            int subY = plane ? m_sequence.subsampling_y : 0;
+            auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
+            lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
+            lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
+        }
+        const int intermediateHeight = (((h - 1) * yStep + (1 << SCALE_SUBPEL_BITS) - 1) >> SCALE_SUBPEL_BITS) + 8;
+        std::vector<std::vector<int>> intermediate(intermediateHeight, std::vector<int>(w));
+        int filterIdx = getFilterIdx(w, candRow, candCol, 1);
 
+        for (int r = 0; r < intermediateHeight; r++) {
+            for (int c = 0; c < w; c++) {
+                int s = 0;
+                int p = startX + xStep * c;
+                for (int t = 0; t < 8; t++)
+                    s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * ref.getPixel(plane, CLIP3(0, lastY, (startY >> 10) + r - 3), CLIP3(0, lastX, (p >> 10) + t - 3));
+                intermediate[r][c] = ROUND2(s, InterRound0);
+            }
+        }
+
+        filterIdx = getFilterIdx(h, candRow, candCol, 0);
+        for (int r = 0; r < h; r++) {
+            for (int c = 0; c < w; c++) {
+                int s = 0;
+                int p = (startY & 1023) + yStep * r;
+                for (int t = 0; t < 8; t++)
+                    s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * intermediate[(p >> 10) + t][c];
+                pred[r][c] = ROUND2(s, InterRound1);
+            }
+        }
     }
-    void Block::PredictInter::predict_inter(int plane, int x, int y, int w, int h, int candRow, int candCol)
+    void Block::PredictInter::predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
     {
         isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
+        if (isCompound) {
+            ASSERT(0);
+        }
         roundingVariablesDerivation(isCompound, m_sequence.BitDepth, InterRound0, InterRound1, InterPostRound);
         if (!plane && m_block.motion_mode == LOCALWARP) {
             ASSERT(0);
@@ -166,11 +321,20 @@ namespace Av1 {
         if (useWarp) {
             ASSERT(0);
         } else {
-            blockInterPrediction(refList, w, h, candRow, candCol);
+            blockInterPrediction(refIdx, refList, plane, w, h, candRow, candCol);
+        }
+        if (!isCompound) {
+            for (int i = 0; i < h; i++) {
+                for (int j = 0; j < w; j++) {
+                    m_yuv.setPixel(plane, x + j, y + i, preds[0][i][j]);
+                }
+            }
+        } else {
+            ASSERT(0);
         }
     }
 
-    void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame)
+    void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
     {
 
         uint32_t subBlockMiRow = MiRow & sbMask;
@@ -192,7 +356,31 @@ namespace Av1 {
                 ASSERT(0 && "IsInterIntra");
             }
             if (is_inter) {
-                ASSERT(0 && "is_inter");
+                uint32_t predW = bw >> subX;
+                uint32_t predH = bh >> subY;
+                bool someUseIntra = false;
+                for (uint32_t r = 0; r < (bh4 << subY); r++) {
+                    for (uint32_t c = 0; c < (bw4 << subX); c++) {
+                        if (m_frame.RefFrames[candRow + r][candCol + c][0] == INTRA_FRAME)
+                            someUseIntra = true;
+                    }
+                }
+                if (someUseIntra) {
+                    predW = bw;
+                    predH = bh;
+                    candRow = MiRow;
+                    candCol = MiCol;
+                }
+                uint32_t r = 0;
+                for (uint32_t y = 0; y < bh; y += predH) {
+                    uint32_t c = 0;
+                    for (uint32_t x = 0; x < bw; x += predW) {
+                        PredictInter inter(*this, *frame, frameStore);
+                        inter.predict_inter(plane, x, y, predW, predH, candRow + r, candCol + c);
+                        c++;
+                    }
+                    r++;
+                }
             }
         }
     }
@@ -245,7 +433,49 @@ namespace Av1 {
         }
         return uvTx;
     }
+    static TX_SIZE find_tx_size(int w, int h)
+    {
+        int txSz;
+        for (txSz = 0; txSz < TX_SIZES_ALL; txSz++)
+            if (Tx_Width[txSz] == w && Tx_Height[txSz] == h)
+                break;
+        return (TX_SIZE)txSz;
+    }
 
+    void Block::transform_tree(int startX, int startY, int w, int h)
+    {
+        uint32_t maxX = m_frame.MiCols * MI_SIZE;
+        uint32_t maxY = m_frame.MiRows * MI_SIZE;
+
+        if (startX >= maxX || startY >= maxY) {
+            return;
+        }
+        int row = startY >> MI_SIZE_LOG2;
+        int col = startX >> MI_SIZE_LOG2;
+        int lumaTxSz = m_frame.InterTxSizes[row][col];
+        int lumaW = Tx_Width[lumaTxSz];
+        int lumaH = Tx_Height[lumaTxSz];
+        if (w <= lumaW && h <= lumaH)
+        {
+            TX_SIZE txSz = find_tx_size(w, h);
+            transform_block(0, startX, startY, txSz, 0, 0);
+        }
+        else
+        {
+            if (w > h) {
+                transform_tree(startX, startY, w / 2, h);
+                transform_tree(startX + w / 2, startY, w / 2, h);
+            } else if (w < h) {
+                transform_tree(startX, startY, w, h / 2);
+                transform_tree(startX, startY + h / 2, w, h / 2);
+            } else {
+                transform_tree(startX, startY, w / 2, h / 2);
+                transform_tree(startX + w / 2, startY, w / 2, h / 2);
+                transform_tree(startX, startY + h / 2, w / 2, h / 2);
+                transform_tree(startX + w / 2, startY + h / 2, w / 2, h / 2);
+            }
+        }
+    }
     void Block::residual()
     {
         int Block_Width = Num_4x4_Blocks_Wide[MiSize] << 2;
@@ -270,8 +500,7 @@ namespace Av1 {
                     int baseX = (miColChunk >> subX) * MI_SIZE;
                     int baseY = (miRowChunk >> subY) * MI_SIZE;
                     if (is_inter && !Lossless && !plane) {
-                        ASSERT(0 && "transform_tree");
-                        //transform_tree( baseX, baseY, num4x4W * 4, num4x4H * 4 )
+                        transform_tree(baseX, baseY, num4x4W * 4, num4x4H * 4);
                     } else {
                         int baseXBlock = (MiCol >> subX) * MI_SIZE;
                         int baseYBlock = (MiRow >> subY) * MI_SIZE;
@@ -1069,6 +1298,9 @@ namespace Av1 {
             }
             if (!m_sequence.enable_dual_filter)
                 interp_filter[1] = interp_filter[0];
+        } else {
+            for (int dir = 0; dir < 2; dir++)
+                interp_filter[dir] = m_frame.interpolation_filter;        
         }
     }
     int Wedge_Bits[BLOCK_SIZES_ALL] = {
@@ -1504,9 +1736,9 @@ namespace Av1 {
         }
     }
 
-    bool Block::decode(std::shared_ptr<YuvFrame>& frame)
+    bool Block::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
     {
-        compute_prediction(frame);
+        compute_prediction(frame, frameStore);
         for (auto& t : m_transformBlocks) {
             if (!t->decode(frame))
                 return false;
@@ -1709,6 +1941,10 @@ namespace Av1 {
                     NumMvFound++;
                 }
             }
+        } else {
+            for (int idx = NumMvFound; idx < 2; idx++) {
+                RefStackMv[idx][0] = GlobalMvs[0];
+            }        
         }
     }
     void Block::FindMvStack::find_mv_stack()
@@ -1716,6 +1952,7 @@ namespace Av1 {
         setupGlobalMV(0);
         if (isCompound)
             setupGlobalMV(1);
+        FoundMatch = false;
         scanRow(-1);
         bool foundAboveMatch = FoundMatch;
 

@@ -518,7 +518,7 @@ namespace Av1 {
         SegmentIds.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
         Skips.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
         for (int i = 0; i < FRAME_LF_COUNT; i++) {
-            DeltaLFs[i].assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+            DeltaLFs[i].assign(AlignedMiRows, std::vector<int8_t>(AlignedMiCols));
         }
         MfRefFrames.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
         MfMvs.assign(AlignedMiRows, std::vector<Mv>(AlignedMiCols));
@@ -1467,9 +1467,13 @@ namespace Av1 {
         }
         NumTiles = TileCols * TileRows;
         if (TileColsLog2 > 0 || TileRowsLog2 > 0) {
+            READ_BITS(context_update_tile_id, TileRowsLog2 + TileColsLog2);
+
             uint8_t tile_size_bytes_minus_1;
             READ_BITS(tile_size_bytes_minus_1, 2);
             TileSizeBytes = tile_size_bytes_minus_1 + 1;
+        } else {
+            context_update_tile_id = 0;
         }
         return true;
     }
