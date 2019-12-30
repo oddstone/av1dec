@@ -121,7 +121,7 @@ namespace Av1 {
         uint32_t xScale, yScale;
         m_frame.getScale(refIdx, xScale, yScale);
 
-        const static uint8_t halfSample = (1 << (SUBPEL_BITS - 1));
+        const static int halfSample = (1 << (SUBPEL_BITS - 1));
         uint8_t subX = plane ? m_sequence.subsampling_x : 0;
         uint8_t subY = plane ? m_sequence.subsampling_y : 0;
         int origX = ((x << SUBPEL_BITS) + ((2 * mv.mv[1]) >> subX) + halfSample);
@@ -129,7 +129,7 @@ namespace Av1 {
         int baseX = (origX * xScale - (halfSample << REF_SCALE_SHIFT));
         int baseY = (origY * yScale - (halfSample << REF_SCALE_SHIFT));
 
-        const static uint8_t off = ((1 << (SCALE_SUBPEL_BITS - SUBPEL_BITS)) / 2);
+        const static int off = ((1 << (SCALE_SUBPEL_BITS - SUBPEL_BITS)) / 2);
 
         startX = (ROUND2SIGNED(baseX, REF_SCALE_SHIFT + SUBPEL_BITS - SCALE_SUBPEL_BITS) + off);
         startY = (ROUND2SIGNED(baseY, REF_SCALE_SHIFT + SUBPEL_BITS - SCALE_SUBPEL_BITS) + off);
@@ -255,7 +255,7 @@ namespace Av1 {
         pred.assign(h, std::vector<uint8_t>(w));
         YuvFrame& ref = (refIdx == NONE_FRAME ? m_yuv : *m_frameStore[refIdx]);
 
-        uint32_t lastX, lastY;
+        int lastX, lastY;
         if (refIdx == NONE_FRAME) {
             ASSERT(0);
         } else {
@@ -273,8 +273,11 @@ namespace Av1 {
             for (int c = 0; c < w; c++) {
                 int s = 0;
                 int p = startX + xStep * c;
-                for (int t = 0; t < 8; t++)
-                    s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * ref.getPixel(plane, CLIP3(0, lastY, (startY >> 10) + r - 3), CLIP3(0, lastX, (p >> 10) + t - 3));
+                for (int t = 0; t < 8; t++) {
+                    uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, (p >> 10) + t - 3), CLIP3(0, lastY, (startY >> 10) + r - 3));
+                    s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * pixel;
+                }
+                
                 intermediate[r][c] = ROUND2(s, InterRound0);
             }
         }
@@ -376,7 +379,7 @@ namespace Av1 {
                     uint32_t c = 0;
                     for (uint32_t x = 0; x < bw; x += predW) {
                         PredictInter inter(*this, *frame, frameStore);
-                        inter.predict_inter(plane, x, y, predW, predH, candRow + r, candCol + c);
+                        inter.predict_inter(plane, baseX + x, baseY + y, predW, predH, candRow + r, candCol + c);
                         c++;
                     }
                     r++;
@@ -2086,7 +2089,7 @@ namespace Av1 {
         int deltaRow = 0;
         uint32_t end4 = std::min(std::min(bh4, m_frame.MiRows - m_block.MiRow), (uint32_t)16);
         bool useStep16 = (bh4 >= 16);
-        if (std::abs(deltaCol)) {
+        if (std::abs(deltaCol) > 1) {
             deltaRow = 1 - (MiRow & 1);
             deltaCol += MiCol & 1;
         }
@@ -2123,7 +2126,7 @@ namespace Av1 {
         } else {
             candMv = m_frame.Mvs[mvRow][mvCol][candList];
         }
-        lower_mv_precision(candMv);
+        //lower_mv_precision(candMv);
         if (has_newmv(candMode))
             NewMvCount++;
         FoundMatch = true;
@@ -2295,7 +2298,7 @@ namespace Av1 {
         int deltaCol = 0;
         uint32_t end4 = std::min(std::min(bw4, m_frame.MiCols - m_block.MiCol), (uint32_t)16);
         bool useStep16 = (bw4 >= 16);
-        if (std::abs(deltaRow)) {
+        if (std::abs(deltaRow) > 1) {
             deltaRow += MiRow & 1;
             deltaCol = 1 - (MiCol & 1);
         }

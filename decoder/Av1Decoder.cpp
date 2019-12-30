@@ -84,7 +84,7 @@ namespace Av1 {
             }
         }
     }
-    
+
     bool Decoder::decodeFrame(TileGroup tiles)
     {
         FrameHeader& h = *m_frame;

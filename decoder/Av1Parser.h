@@ -458,7 +458,6 @@ namespace Av1 {
         uint32_t context_update_tile_id;
         uint8_t TileSizeBytes;
 
-        bool enable_warped_motion;
         bool allow_warped_motion;
 
         bool CodedLossless;

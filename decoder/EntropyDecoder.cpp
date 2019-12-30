@@ -212,8 +212,10 @@ namespace Av1 {
     }
     uint8_t EntropyDecoder::readInterTxType(TxSet set, TX_SIZE txSzSqr)
     {
-        return (uint8_t)m_symbol->read(inter_ext_tx_cdf[1][set], TX_TYPES);
-    }
+        ASSERT(set == TX_SET_INTER_1 || set == TX_SET_INTER_2 || set == TX_SET_INTER_3);
+        const int cdfSize[] = { 0, 16, 12, 2 };
+        return (uint8_t)m_symbol->read(inter_ext_tx_cdf[set][txSzSqr], cdfSize[set]);
+     }
     uint8_t EntropyDecoder::readIntraTxType(TxSet set, TX_SIZE txSzSqr, PREDICTION_MODE intraDir)
     {
         ASSERT(set == TX_SET_INTRA_1 || set == TX_SET_INTRA_2);

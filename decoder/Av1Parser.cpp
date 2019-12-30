@@ -1228,7 +1228,7 @@ namespace Av1 {
             return false;
         if (!skip_mode_params(br, refInfo))
             return false;
-        if (FrameIsIntra || error_resilient_mode || !enable_warped_motion)
+        if (FrameIsIntra || error_resilient_mode || !sequence.enable_warped_motion)
             allow_warped_motion = false;
         else
             READ(allow_warped_motion);
