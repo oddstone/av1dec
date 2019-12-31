@@ -210,12 +210,16 @@ namespace Av1 {
         int size = Sizes[maxTxDepth];
         return (uint8_t)m_symbol->read(tx_size_cdf[cat][ctx], size);
     }
+    bool EntropyDecoder::readTxfmSplit(uint8_t ctx)
+    {
+        return (bool)m_symbol->read(txfm_partition_cdf[ctx], 2);
+    }
     uint8_t EntropyDecoder::readInterTxType(TxSet set, TX_SIZE txSzSqr)
     {
         ASSERT(set == TX_SET_INTER_1 || set == TX_SET_INTER_2 || set == TX_SET_INTER_3);
         const int cdfSize[] = { 0, 16, 12, 2 };
         return (uint8_t)m_symbol->read(inter_ext_tx_cdf[set][txSzSqr], cdfSize[set]);
-     }
+    }
     uint8_t EntropyDecoder::readIntraTxType(TxSet set, TX_SIZE txSzSqr, PREDICTION_MODE intraDir)
     {
         ASSERT(set == TX_SET_INTRA_1 || set == TX_SET_INTRA_2);
@@ -487,6 +491,16 @@ namespace Av1 {
     InterpFilter EntropyDecoder::readInterpFilter(uint8_t ctx)
     {
         return (InterpFilter)m_symbol->read(switchable_interp_cdf[ctx], SWITCHABLE_FILTERS);
+    }
+
+    bool EntropyDecoder::readUseObmc(BLOCK_SIZE MiSize)
+    {
+        return (bool)m_symbol->read(obmc_cdf[MiSize], 2);
+    }
+
+    MOTION_MODE EntropyDecoder::readMotionMode(BLOCK_SIZE MiSize)
+    {
+        return (MOTION_MODE)m_symbol->read(motion_mode_cdf[MiSize], MOTION_MODES);
     }
 
     bool EntropyDecoder::readUe(uint32_t& v)

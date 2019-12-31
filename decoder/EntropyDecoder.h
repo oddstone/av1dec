@@ -30,6 +30,7 @@ namespace Yami {
             bool readUseFilterIntra(BLOCK_SIZE bSize);
             FILTER_INTRA_MODE readFilterIntraMode();
             uint8_t readTxDepth(int maxTxDepth, uint8_t ctx);
+            bool readTxfmSplit(uint8_t ctx);
             uint8_t readInterTxType(TxSet set, TX_SIZE txSzSqr);
             uint8_t readIntraTxType(TxSet set, TX_SIZE txSzSqr, PREDICTION_MODE intraDir);
             bool readAllZero(uint8_t txSzCtx, uint8_t ctx);
@@ -93,9 +94,8 @@ namespace Yami {
             bool readMaskType();
 
             InterpFilter readInterpFilter(uint8_t ctx);
-
-
-
+            bool readUseObmc(BLOCK_SIZE MiSize);
+            MOTION_MODE readMotionMode(BLOCK_SIZE MiSize);
 
             bool readUe(uint32_t& v);
             uint32_t readLiteral(uint32_t n);

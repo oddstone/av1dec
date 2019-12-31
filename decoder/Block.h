@@ -19,6 +19,25 @@ namespace Yami {
             class FindMvStack;
             class PredictInter;
 
+            class LocalWarp {
+            public:
+                LocalWarp(Block& block);
+                void find_warp_samples();
+                int NumSamples = 0;
+            private:
+                void add_sample(int deltaRow, int deltaCol);
+                const Block& m_block;
+                const Tile& m_tile;
+                const FrameHeader& m_frame;
+
+                int NumSamplesScanned = 0;
+                const int w4;
+                const int h4;
+                const uint32_t MiRow;
+                const uint32_t MiCol;
+                std::vector<std::vector<int16_t>> CandList;
+            };
+
         public:
             Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize);
             void parse();
@@ -47,6 +66,8 @@ namespace Yami {
             void palette_tokens();
             void read_block_tx_size();
             void read_tx_size(bool allowSelect);
+            uint8_t getTxfmSplitCtx(uint32_t row, uint32_t col, TX_SIZE txSz);
+            void read_var_tx_size(uint32_t row, uint32_t col, TX_SIZE txSz, int depth);
             void compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
             void reset_block_context();
@@ -187,6 +208,7 @@ namespace Yami {
 
             EntropyDecoder& m_entropy;
             std::deque<std::shared_ptr<TransformBlock>> m_transformBlocks;
+            LocalWarp m_localWarp;
 
             bool has_nearmv() const;
         };

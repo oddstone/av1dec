@@ -11,6 +11,7 @@
 
 namespace Yami {
 namespace Av1 {
+   
     Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
         : m_frame(*tile.m_frame)
         , m_sequence(*tile.m_sequence)
@@ -29,6 +30,7 @@ namespace Av1 {
         , subsampling_y(m_sequence.subsampling_y)
         , AngleDeltaY(0)
         , AngleDeltaUV(0)
+        , m_localWarp(*this)
     {
         if (bh4 == 1 && subsampling_y && (MiRow & 1) == 0)
             HasChroma = false;
@@ -277,7 +279,7 @@ namespace Av1 {
                     uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, (p >> 10) + t - 3), CLIP3(0, lastY, (startY >> 10) + r - 3));
                     s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * pixel;
                 }
-                
+
                 intermediate[r][c] = ROUND2(s, InterRound0);
             }
         }
@@ -458,13 +460,10 @@ namespace Av1 {
         int lumaTxSz = m_frame.InterTxSizes[row][col];
         int lumaW = Tx_Width[lumaTxSz];
         int lumaH = Tx_Height[lumaTxSz];
-        if (w <= lumaW && h <= lumaH)
-        {
+        if (w <= lumaW && h <= lumaH) {
             TX_SIZE txSz = find_tx_size(w, h);
             transform_block(0, startX, startY, txSz, 0, 0);
-        }
-        else
-        {
+        } else {
             if (w > h) {
                 transform_tree(startX, startY, w / 2, h);
                 transform_tree(startX + w / 2, startY, w / 2, h);
@@ -1303,7 +1302,7 @@ namespace Av1 {
                 interp_filter[1] = interp_filter[0];
         } else {
             for (int dir = 0; dir < 2; dir++)
-                interp_filter[dir] = m_frame.interpolation_filter;        
+                interp_filter[dir] = m_frame.interpolation_filter;
         }
     }
     int Wedge_Bits[BLOCK_SIZES_ALL] = {
@@ -1409,6 +1408,110 @@ namespace Av1 {
         return false;
     }
 
+    Block::LocalWarp::LocalWarp(Block& block)
+        : m_block(block)
+        , m_tile(block.m_tile)
+        , m_frame(block.m_frame)
+        , w4(block.bw4)
+        , h4(block.bh4)
+        , MiCol(m_block.MiCol)
+        , MiRow(m_block.MiRow)
+    {
+    }
+
+    void Block::LocalWarp::find_warp_samples()
+    {
+        bool doTopLeft = true;
+        bool doTopRight = true;
+        if (m_block.AvailU) {
+            BLOCK_SIZE srcSize = m_frame.MiSizes[MiRow - 1][MiCol];
+            int srcW = Num_4x4_Blocks_Wide[srcSize];
+            if (w4 <= srcW) {
+                int colOffset = -(MiCol & (srcW - 1));
+                if (colOffset < 0)
+                    doTopLeft = false;
+                if (colOffset + srcW > w4)
+                    doTopRight = false;
+                add_sample(-1, 0);
+            } else {
+                int miStep;
+                for (int i = 0; i < std::min(w4, (int)(m_frame.MiCols - MiCol)); i += miStep) {
+                    srcSize = m_frame.MiSizes[MiRow - 1][MiCol + i];
+                    srcW = Num_4x4_Blocks_Wide[srcSize];
+                    miStep = std::min(w4, srcW);
+                    add_sample(-1, i);
+                }
+            }
+        }
+        if (m_block.AvailL) {
+            BLOCK_SIZE srcSize = m_frame.MiSizes[MiRow][MiCol - 1];
+            int srcH = Num_4x4_Blocks_High[srcSize];
+            if (h4 <= srcH) {
+                int rowOffset = -(MiRow & (srcH - 1));
+                if (rowOffset < 0)
+                    doTopLeft = false;
+                add_sample(0, -1);
+            } else {
+                int miStep;
+                for (int i = 0; i < std::min(h4, (int)(m_frame.MiRows - MiRow)); i += miStep) {
+                    srcSize = m_frame.MiSizes[MiRow + i][MiCol - 1];
+                    srcH = Num_4x4_Blocks_High[srcSize];
+                    miStep = std::min(h4, srcH);
+                    add_sample(i, -1);
+                }
+            }
+        }
+        if (doTopLeft) {
+            add_sample(-1, -1);
+        }
+        if (doTopRight) {
+            if (std::max(w4, h4) <= 16) {
+                add_sample(-1, w4);
+            }
+        }
+        if (NumSamples == 0 && NumSamplesScanned > 0)
+            NumSamples = 1;
+    }
+    void Block::LocalWarp::add_sample(int deltaRow, int deltaCol)
+    {
+        static const int LEAST_SQUARES_SAMPLES_MAX = 8;
+        if (NumSamplesScanned >= LEAST_SQUARES_SAMPLES_MAX)
+            return;
+        uint32_t mvRow = MiRow + deltaRow;
+        uint32_t mvCol = MiCol + deltaCol;
+        if (!m_tile.is_inside(mvRow, mvCol))
+            return;
+        if (m_frame.RefFrames[mvRow][mvCol][0] == NONE_FRAME)
+            return;
+        if (m_frame.RefFrames[mvRow][mvCol][0] != m_block.RefFrame[0])
+            return;
+        if (m_frame.RefFrames[mvRow][mvCol][1] != NONE_FRAME)
+            return;
+        BLOCK_SIZE candSz = m_frame.MiSizes[mvRow][mvCol];
+        int candW4 = Num_4x4_Blocks_Wide[candSz];
+        int candH4 = Num_4x4_Blocks_High[candSz];
+        int candRow = mvRow & ~(candH4 - 1);
+        int candCol = mvCol & ~(candW4 - 1);
+        int midY = candRow * 4 + candH4 * 2 - 1;
+        int midX = candCol * 4 + candW4 * 2 - 1;
+        int threshold = CLIP3(16, 112, (int)std::max(m_block.bw, m_block.bh));
+        int mvDiffRow = std::abs(m_frame.Mvs[candRow][candCol][0].mv[0] - m_block.m_mv[0].mv[0]);
+        int mvDiffCol = std::abs(m_frame.Mvs[candRow][candCol][0].mv[1] - m_block.m_mv[0].mv[1]);
+        bool valid = ((mvDiffRow + mvDiffCol) <= threshold);
+        std::vector<int16_t> cand(4);
+        cand[0] = midY * 8;
+        cand[1] = midX * 8;
+        cand[2] = midY * 8 + m_frame.Mvs[candRow][candCol][0].mv[0];
+        cand[3] = midX * 8 + m_frame.Mvs[candRow][candCol][0].mv[1];
+        NumSamplesScanned += 1;
+        if (!valid && NumSamplesScanned > 1)
+            return;
+        CandList.resize(NumSamples + 1);
+        CandList[NumSamples] = cand;
+        if (valid)
+            NumSamples += 1;
+    }
+
     void Block::read_motion_mode(bool isCompound)
     {
         if (skip_mode) {
@@ -1435,16 +1538,15 @@ namespace Av1 {
             motion_mode = SIMPLE_TRANSLATION;
             return;
         }
-        ASSERT(0);
-        /*
-        find_warp_samples();
-        if ( force_integer_mv || NumSamples == 0 ||
-            !allow_warped_motion || is_scaled( RefFrame[0] ) ) {
-            use_obmc S()
-            motion_mode = use_obmc ? OBMC : SIMPLE_TRANSLATION;
+        
+        m_localWarp.find_warp_samples();
+        if (m_frame.force_integer_mv || m_localWarp.NumSamples == 0 ||
+            !m_frame.allow_warped_motion || m_frame.is_scaled( RefFrame[0] ) ) {
+            bool use_obmc = m_entropy.readUseObmc(MiSize);
+            motion_mode = use_obmc ? OBMC_CAUSAL : SIMPLE_TRANSLATION;
         } else {
-            motion_mode
-        }*/
+            motion_mode = m_entropy.readMotionMode(MiSize);
+        }
     }
 
     void Block::read_interintra_mode(bool isCompound)
@@ -1726,10 +1828,54 @@ namespace Av1 {
         }
     }
 
+    uint8_t Block::getTxfmSplitCtx(uint32_t row, uint32_t col, TX_SIZE txSz)
+    {
+        int above = get_above_tx_width(row, col) < Tx_Width[txSz];
+        int left = get_left_tx_height(row, col) < Tx_Height[txSz];
+        int size = std::min(64, std::max(Block_Width[MiSize], Block_Height[MiSize]));
+        int maxTxSz = find_tx_size(size, size);
+        TX_SIZE txSzSqrUp = Tx_Size_Sqr_Up[txSz];
+
+        uint8_t ctx = (txSzSqrUp != maxTxSz) * 3 + (TX_SIZES - 1 - maxTxSz) * 6 + above + left;
+        return ctx;
+    }
+
+    void Block::read_var_tx_size(uint32_t row, uint32_t col, TX_SIZE txSz, int depth)
+    {
+        if (row >= m_frame.MiRows || col >= m_frame.MiCols)
+            return;
+        bool txfm_split;
+        if (txSz == TX_4X4 || depth == MAX_VARTX_DEPTH) {
+            txfm_split = false;
+        } else {
+            txfm_split = m_entropy.readTxfmSplit(getTxfmSplitCtx(row, col, txSz));
+        }
+        int w4 = Tx_Width[txSz] / MI_SIZE;
+        int h4 = Tx_Height[txSz] / MI_SIZE;
+        if (txfm_split) {
+            TX_SIZE subTxSz = Split_Tx_Size[txSz];
+            int stepW = Tx_Width[subTxSz] / MI_SIZE;
+            int stepH = Tx_Height[subTxSz] / MI_SIZE;
+            for (int i = 0; i < h4; i += stepH)
+                for (int j = 0; j < w4; j += stepW)
+                    read_var_tx_size(row + i, col + j, subTxSz, depth + 1);
+        } else {
+            for (int i = 0; i < h4; i++)
+                for (int j = 0; j < w4; j++)
+                    m_frame.InterTxSizes[row + i][col + j] = txSz;
+            TxSize = txSz;
+        }
+    }
+
     void Block::read_block_tx_size()
     {
         if (m_frame.TxMode == TX_MODE_SELECT && MiSize > BLOCK_4X4 && is_inter && !skip && !m_frame.CodedLossless) {
-            ASSERT(0);
+            TX_SIZE maxTxSz = Max_Tx_Size_Rect[MiSize];
+            int txW4 = Tx_Width[maxTxSz] / MI_SIZE;
+            int txH4 = Tx_Height[maxTxSz] / MI_SIZE;
+            for (uint32_t row = MiRow; row < MiRow + bh4; row += txH4)
+                for (uint32_t col = MiCol; col < MiCol + bw4; col += txW4)
+                    read_var_tx_size(row, col, maxTxSz, 0);
         } else {
             read_tx_size(!skip || !is_inter);
             for (int row = MiRow; row < MiRow + bh4; row++) {
@@ -1947,7 +2093,7 @@ namespace Av1 {
         } else {
             for (int idx = NumMvFound; idx < 2; idx++) {
                 RefStackMv[idx][0] = GlobalMvs[0];
-            }        
+            }
         }
     }
     void Block::FindMvStack::find_mv_stack()
