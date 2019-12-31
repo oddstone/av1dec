@@ -23,19 +23,28 @@ namespace Yami {
             public:
                 LocalWarp(Block& block);
                 void find_warp_samples();
+                void warpEstimation();
+                void setupShear();
+                bool setupShear(int warpParams[6], int& alpha, int& beta, int& gamma, int& delta);
                 int NumSamples = 0;
+                bool LocalValid;
             private:
                 void add_sample(int deltaRow, int deltaCol);
+
+                void resolveDivisor(int d, int& divShift, int& divFactor);
+                
                 const Block& m_block;
                 const Tile& m_tile;
                 const FrameHeader& m_frame;
 
                 int NumSamplesScanned = 0;
+
                 const int w4;
                 const int h4;
                 const uint32_t MiRow;
                 const uint32_t MiCol;
                 std::vector<std::vector<int16_t>> CandList;
+                int LocalWarpParams[6];
             };
 
         public:

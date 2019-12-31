@@ -11,7 +11,7 @@
 
 namespace Yami {
 namespace Av1 {
-   
+
     Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
         : m_frame(*tile.m_frame)
         , m_sequence(*tile.m_sequence)
@@ -65,7 +65,7 @@ namespace Av1 {
 
     class Block::PredictInter {
     public:
-        PredictInter(const Block& block, YuvFrame& yuv, const FrameStore& frameStore);
+        PredictInter(Block& block, YuvFrame& yuv, const FrameStore& frameStore);
         void predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol);
 
     private:
@@ -77,13 +77,13 @@ namespace Av1 {
         const Block& m_block;
         const FrameHeader& m_frame;
         const SequenceHeader& m_sequence;
+        LocalWarp& m_localWarp;
         YuvFrame& m_yuv;
         const FrameStore& m_frameStore;
         bool isCompound;
         int InterRound0;
         int InterRound1;
         int InterPostRound;
-        bool LocalValid = false;
         bool globaValid = false;
 
         int startX;
@@ -93,8 +93,9 @@ namespace Av1 {
         std::vector<std::vector<uint8_t>> preds[2];
     };
 
-    Block::PredictInter::PredictInter(const Block& block, YuvFrame& yuv, const FrameStore& frameStore)
-        : m_block(block)
+    Block::PredictInter::PredictInter(Block& block, YuvFrame& yuv, const FrameStore& frameStore)
+        : m_localWarp(block.m_localWarp)
+        , m_block(block)
         , m_frame(block.m_frame)
         , m_sequence(block.m_sequence)
         , m_yuv(yuv)
@@ -108,7 +109,7 @@ namespace Av1 {
             return false;
         if (m_frame.force_integer_mv)
             return false;
-        if (m_block.motion_mode == LOCALWARP && LocalValid)
+        if (m_block.motion_mode == LOCALWARP && m_localWarp.LocalValid)
             return true;
         if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV)
             && m_frame.GmType[refFrame] > TRANSLATION
@@ -303,7 +304,8 @@ namespace Av1 {
         }
         roundingVariablesDerivation(isCompound, m_sequence.BitDepth, InterRound0, InterRound1, InterPostRound);
         if (!plane && m_block.motion_mode == LOCALWARP) {
-            ASSERT(0);
+            m_localWarp.warpEstimation();
+            m_localWarp.setupShear();
         }
         int refList = 0;
         int refFrame = m_frame.RefFrames[candRow][candCol][refList];
@@ -1512,6 +1514,150 @@ namespace Av1 {
             NumSamples += 1;
     }
 
+    const static int DIV_LUT_NUM = 257;
+
+    const static int Div_Lut[DIV_LUT_NUM] = {
+        16384, 16320, 16257, 16194, 16132, 16070, 16009, 15948, 15888, 15828, 15768,
+        15709, 15650, 15592, 15534, 15477, 15420, 15364, 15308, 15252, 15197, 15142,
+        15087, 15033, 14980, 14926, 14873, 14821, 14769, 14717, 14665, 14614, 14564,
+        14513, 14463, 14413, 14364, 14315, 14266, 14218, 14170, 14122, 14075, 14028,
+        13981, 13935, 13888, 13843, 13797, 13752, 13707, 13662, 13618, 13574, 13530,
+        13487, 13443, 13400, 13358, 13315, 13273, 13231, 13190, 13148, 13107, 13066,
+        13026, 12985, 12945, 12906, 12866, 12827, 12788, 12749, 12710, 12672, 12633,
+        12596, 12558, 12520, 12483, 12446, 12409, 12373, 12336, 12300, 12264, 12228,
+        12193, 12157, 12122, 12087, 12053, 12018, 11984, 11950, 11916, 11882, 11848,
+        11815, 11782, 11749, 11716, 11683, 11651, 11619, 11586, 11555, 11523, 11491,
+        11460, 11429, 11398, 11367, 11336, 11305, 11275, 11245, 11215, 11185, 11155,
+        11125, 11096, 11067, 11038, 11009, 10980, 10951, 10923, 10894, 10866, 10838,
+        10810, 10782, 10755, 10727, 10700, 10673, 10645, 10618, 10592, 10565, 10538,
+        10512, 10486, 10460, 10434, 10408, 10382, 10356, 10331, 10305, 10280, 10255,
+        10230, 10205, 10180, 10156, 10131, 10107, 10082, 10058, 10034, 10010, 9986,
+        9963, 9939, 9916, 9892, 9869, 9846, 9823, 9800, 9777, 9754, 9732,
+        9709, 9687, 9664, 9642, 9620, 9598, 9576, 9554, 9533, 9511, 9489,
+        9468, 9447, 9425, 9404, 9383, 9362, 9341, 9321, 9300, 9279, 9259,
+        9239, 9218, 9198, 9178, 9158, 9138, 9118, 9098, 9079, 9059, 9039,
+        9020, 9001, 8981, 8962, 8943, 8924, 8905, 8886, 8867, 8849, 8830,
+        8812, 8793, 8775, 8756, 8738, 8720, 8702, 8684, 8666, 8648, 8630,
+        8613, 8595, 8577, 8560, 8542, 8525, 8508, 8490, 8473, 8456, 8439,
+        8422, 8405, 8389, 8372, 8355, 8339, 8322, 8306, 8289, 8273, 8257,
+        8240, 8224, 8208, 8192
+    };
+
+    void Block::LocalWarp::resolveDivisor(int d, int& divShift, int& divFactor)
+    {
+        static const int DIV_LUT_BITS = 8;
+        static const int DIV_LUT_PREC_BITS = 14;
+        int n = FloorLog2(std::abs(d));
+        int e = std::abs(d) - (1 << n);
+        int f = n > DIV_LUT_BITS ? ROUND2(e, n - DIV_LUT_BITS) : (e << (DIV_LUT_BITS - n));
+        divShift = (n + DIV_LUT_PREC_BITS);
+        divFactor = d < 0 ? -Div_Lut[f] : Div_Lut[f];
+    }
+    inline int ls_product(int a, int b)
+    {
+        return ((a * b) >> 2) + (a + b);
+    }
+
+    static const int WARPEDMODEL_NONDIAGAFFINE_CLAMP = 1 << 13;
+
+    inline int nondiag(int v, int divFactor, int divShift)
+    {
+        return CLIP3(-WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
+            WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1,
+            ROUND2SIGNED(v * divFactor, divShift));
+    }
+    inline int diag(int v, int divFactor, int divShift)
+    {
+        return CLIP3((1 << WARPEDMODEL_PREC_BITS) - WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
+            (1 << WARPEDMODEL_PREC_BITS) + WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1,
+            ROUND2SIGNED(v * divFactor, divShift));
+    }
+    void Block::LocalWarp::warpEstimation()
+    {
+        int A[2][2];
+        int Bx[2];
+        int By[2];
+        memset(A, 0, sizeof(A));
+        Bx[1] = Bx[0] = 0;
+        By[1] = By[0] = 0;
+        int midY = MiRow * 4 + h4 * 2 - 1;
+        int midX = MiCol * 4 + w4 * 2 - 1;
+        int suy = midY * 8;
+        int sux = midX * 8;
+        int duy = suy + m_block.m_mv[0].mv[0];
+        int dux = sux + m_block.m_mv[0].mv[1];
+        for (int i = 0; i < NumSamples; i++) {
+            static const int LS_MV_MAX = 256;
+            int sy = CandList[i][0] - suy;
+            int sx = CandList[i][1] - sux;
+            int dy = CandList[i][2] - duy;
+            int dx = CandList[i][3] - dux;
+            if (std::abs(sx - dx) < LS_MV_MAX && std::abs(sy - dy) < LS_MV_MAX) {
+                A[0][0] += ls_product(sx, sx) + 8;
+                A[0][1] += ls_product(sx, sy) + 4;
+                A[1][1] += ls_product(sy, sy) + 8;
+                Bx[0] += ls_product(sx, dx) + 8;
+                Bx[1] += ls_product(sy, dx) + 4;
+                By[0] += ls_product(sx, dy) + 4;
+                By[1] += ls_product(sy, dy) + 8;
+            }
+        }
+        int det = A[0][0] * A[1][1] - A[0][1] * A[0][1];
+        LocalValid = (det != 0);
+        if (!LocalValid)
+            return;
+
+        int divShift, divFactor;
+        resolveDivisor(det, divShift, divFactor);
+        divShift -= WARPEDMODEL_PREC_BITS;
+        if (divShift < 0) {
+            divFactor = divFactor << (-divShift);
+            divShift = 0;
+        }
+        LocalWarpParams[2] = diag(A[1][1] * Bx[0] - A[0][1] * Bx[1], divShift, divFactor);
+        LocalWarpParams[3] = nondiag(-A[0][1] * Bx[0] + A[0][0] * Bx[1], divShift, divFactor);
+        LocalWarpParams[4] = nondiag(A[1][1] * By[0] - A[0][1] * By[1], divShift, divFactor);
+        LocalWarpParams[5] = diag(-A[0][1] * By[0] + A[0][0] * By[1], divShift, divFactor);
+        int16_t mvx = m_block.m_mv[0].mv[1];
+        int16_t mvy = m_block.m_mv[0].mv[0];
+        int vx = mvx * (1 << (WARPEDMODEL_PREC_BITS - 3)) - (midX * (LocalWarpParams[2] - (1 << WARPEDMODEL_PREC_BITS)) + midY * LocalWarpParams[3]);
+        int vy = mvy * (1 << (WARPEDMODEL_PREC_BITS - 3)) - (midX * LocalWarpParams[4] + midY * (LocalWarpParams[5] - (1 << WARPEDMODEL_PREC_BITS)));
+        const static int WARPEDMODEL_TRANS_CLAMP = 1 << 23;
+        LocalWarpParams[0] = CLIP3(-WARPEDMODEL_TRANS_CLAMP, WARPEDMODEL_TRANS_CLAMP - 1, vx);
+        LocalWarpParams[1] = CLIP3(-WARPEDMODEL_TRANS_CLAMP, WARPEDMODEL_TRANS_CLAMP - 1, vy);
+    }
+
+    void Block::LocalWarp::setupShear()
+    {
+        if (LocalValid) {
+            int alpha, beta, gamma, delta;
+            LocalValid = setupShear(LocalWarpParams, alpha, beta, gamma, delta);
+        }
+    }
+
+    bool Block::LocalWarp::setupShear(int warpParams[6], int& alpha, int& beta, int& gamma, int& delta)
+    {
+        int alpha0 = CLIP3(-32768, 32767, warpParams[2] - (1 << WARPEDMODEL_PREC_BITS));
+        int beta0 = CLIP3(-32768, 32767, warpParams[3]);
+        int divShift, divFactor;
+        resolveDivisor(warpParams[2], divShift, divFactor);
+        int v = (warpParams[4] << WARPEDMODEL_PREC_BITS);
+        int gamma0 = CLIP3(-32768, 32767, ROUND2SIGNED(v * divFactor, divShift));
+        int w = (warpParams[3] * warpParams[4]);
+        int delta0 = CLIP3(-32768, 32767, warpParams[5] - ROUND2SIGNED(w * divFactor, divShift) - (1 << WARPEDMODEL_PREC_BITS));
+
+        static const int WARP_PARAM_REDUCE_BITS = 6;
+        alpha = ROUND2SIGNED(alpha0, WARP_PARAM_REDUCE_BITS) << WARP_PARAM_REDUCE_BITS;
+        beta = ROUND2SIGNED(beta0, WARP_PARAM_REDUCE_BITS) << WARP_PARAM_REDUCE_BITS;
+        gamma = ROUND2SIGNED(gamma0, WARP_PARAM_REDUCE_BITS) << WARP_PARAM_REDUCE_BITS;
+        delta = ROUND2SIGNED(delta0, WARP_PARAM_REDUCE_BITS) << WARP_PARAM_REDUCE_BITS;
+        if ((4 * std::abs(alpha) + 7 * std::abs(beta)) >= (1 << WARPEDMODEL_PREC_BITS))
+            return false;
+        if ((4 * std::abs(gamma) + 4 * std::abs(delta)) >= (1 << WARPEDMODEL_PREC_BITS))
+            return false;
+        return true;
+    }
+
     void Block::read_motion_mode(bool isCompound)
     {
         if (skip_mode) {
@@ -1538,10 +1684,9 @@ namespace Av1 {
             motion_mode = SIMPLE_TRANSLATION;
             return;
         }
-        
+
         m_localWarp.find_warp_samples();
-        if (m_frame.force_integer_mv || m_localWarp.NumSamples == 0 ||
-            !m_frame.allow_warped_motion || m_frame.is_scaled( RefFrame[0] ) ) {
+        if (m_frame.force_integer_mv || m_localWarp.NumSamples == 0 || !m_frame.allow_warped_motion || m_frame.is_scaled(RefFrame[0])) {
             bool use_obmc = m_entropy.readUseObmc(MiSize);
             motion_mode = use_obmc ? OBMC_CAUSAL : SIMPLE_TRANSLATION;
         } else {
@@ -2486,6 +2631,5 @@ namespace Av1 {
     {
         return NumMvFound;
     }
-
 }
 }
