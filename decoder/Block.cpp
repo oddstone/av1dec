@@ -73,7 +73,7 @@ namespace Av1 {
         void motionVectorScaling(uint8_t refIdx, int plane, int x, int y, const Mv& mv);
         int getFilterIdx(int size, int candRow, int candCol, int dir);
         void blockInterPrediction(uint8_t refIdx, int refList, int plane, uint32_t w, uint32_t h, int candRow, int candCol);
-
+        void blockWarp(int useWarp, int plane, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
         const Block& m_block;
         const FrameHeader& m_frame;
         const SequenceHeader& m_sequence;
@@ -296,6 +296,159 @@ namespace Av1 {
             }
         }
     }
+
+    static const int WARPEDDIFF_PREC_BITS = 10;
+    static const int WARPEDPIXEL_PREC_SHIFTS = 1 << 6;
+
+    static const int Warped_Filters[WARPEDPIXEL_PREC_SHIFTS * 3 + 1][8] = {
+        { 0, 0, 127, 1, 0, 0, 0, 0 }, { 0, -1, 127, 2, 0, 0, 0, 0 },
+        { 1, -3, 127, 4, -1, 0, 0, 0 }, { 1, -4, 126, 6, -2, 1, 0, 0 },
+        { 1, -5, 126, 8, -3, 1, 0, 0 }, { 1, -6, 125, 11, -4, 1, 0, 0 },
+        { 1, -7, 124, 13, -4, 1, 0, 0 }, { 2, -8, 123, 15, -5, 1, 0, 0 },
+        { 2, -9, 122, 18, -6, 1, 0, 0 }, { 2, -10, 121, 20, -6, 1, 0, 0 },
+        { 2, -11, 120, 22, -7, 2, 0, 0 }, { 2, -12, 119, 25, -8, 2, 0, 0 },
+        { 3, -13, 117, 27, -8, 2, 0, 0 }, { 3, -13, 116, 29, -9, 2, 0, 0 },
+        { 3, -14, 114, 32, -10, 3, 0, 0 }, { 3, -15, 113, 35, -10, 2, 0, 0 },
+        { 3, -15, 111, 37, -11, 3, 0, 0 }, { 3, -16, 109, 40, -11, 3, 0, 0 },
+        { 3, -16, 108, 42, -12, 3, 0, 0 }, { 4, -17, 106, 45, -13, 3, 0, 0 },
+        { 4, -17, 104, 47, -13, 3, 0, 0 }, { 4, -17, 102, 50, -14, 3, 0, 0 },
+        { 4, -17, 100, 52, -14, 3, 0, 0 }, { 4, -18, 98, 55, -15, 4, 0, 0 },
+        { 4, -18, 96, 58, -15, 3, 0, 0 }, { 4, -18, 94, 60, -16, 4, 0, 0 },
+        { 4, -18, 91, 63, -16, 4, 0, 0 }, { 4, -18, 89, 65, -16, 4, 0, 0 },
+        { 4, -18, 87, 68, -17, 4, 0, 0 }, { 4, -18, 85, 70, -17, 4, 0, 0 },
+        { 4, -18, 82, 73, -17, 4, 0, 0 }, { 4, -18, 80, 75, -17, 4, 0, 0 },
+        { 4, -18, 78, 78, -18, 4, 0, 0 }, { 4, -17, 75, 80, -18, 4, 0, 0 },
+        { 4, -17, 73, 82, -18, 4, 0, 0 }, { 4, -17, 70, 85, -18, 4, 0, 0 },
+        { 4, -17, 68, 87, -18, 4, 0, 0 }, { 4, -16, 65, 89, -18, 4, 0, 0 },
+        { 4, -16, 63, 91, -18, 4, 0, 0 }, { 4, -16, 60, 94, -18, 4, 0, 0 },
+        { 3, -15, 58, 96, -18, 4, 0, 0 }, { 4, -15, 55, 98, -18, 4, 0, 0 },
+        { 3, -14, 52, 100, -17, 4, 0, 0 }, { 3, -14, 50, 102, -17, 4, 0, 0 },
+        { 3, -13, 47, 104, -17, 4, 0, 0 }, { 3, -13, 45, 106, -17, 4, 0, 0 },
+        { 3, -12, 42, 108, -16, 3, 0, 0 }, { 3, -11, 40, 109, -16, 3, 0, 0 },
+        { 3, -11, 37, 111, -15, 3, 0, 0 }, { 2, -10, 35, 113, -15, 3, 0, 0 },
+        { 3, -10, 32, 114, -14, 3, 0, 0 }, { 2, -9, 29, 116, -13, 3, 0, 0 },
+        { 2, -8, 27, 117, -13, 3, 0, 0 }, { 2, -8, 25, 119, -12, 2, 0, 0 },
+        { 2, -7, 22, 120, -11, 2, 0, 0 }, { 1, -6, 20, 121, -10, 2, 0, 0 },
+        { 1, -6, 18, 122, -9, 2, 0, 0 }, { 1, -5, 15, 123, -8, 2, 0, 0 },
+        { 1, -4, 13, 124, -7, 1, 0, 0 }, { 1, -4, 11, 125, -6, 1, 0, 0 },
+        { 1, -3, 8, 126, -5, 1, 0, 0 }, { 1, -2, 6, 126, -4, 1, 0, 0 },
+        { 0, -1, 4, 127, -3, 1, 0, 0 }, { 0, 0, 2, 127, -1, 0, 0, 0 },
+        { 0, 0, 0, 127, 1, 0, 0, 0 }, { 0, 0, -1, 127, 2, 0, 0, 0 },
+        { 0, 1, -3, 127, 4, -2, 1, 0 }, { 0, 1, -5, 127, 6, -2, 1, 0 },
+        { 0, 2, -6, 126, 8, -3, 1, 0 }, { -1, 2, -7, 126, 11, -4, 2, -1 },
+        { -1, 3, -8, 125, 13, -5, 2, -1 }, { -1, 3, -10, 124, 16, -6, 3, -1 },
+        { -1, 4, -11, 123, 18, -7, 3, -1 }, { -1, 4, -12, 122, 20, -7, 3, -1 },
+        { -1, 4, -13, 121, 23, -8, 3, -1 }, { -2, 5, -14, 120, 25, -9, 4, -1 },
+        { -1, 5, -15, 119, 27, -10, 4, -1 }, { -1, 5, -16, 118, 30, -11, 4, -1 },
+        { -2, 6, -17, 116, 33, -12, 5, -1 }, { -2, 6, -17, 114, 35, -12, 5, -1 },
+        { -2, 6, -18, 113, 38, -13, 5, -1 }, { -2, 7, -19, 111, 41, -14, 6, -2 },
+        { -2, 7, -19, 110, 43, -15, 6, -2 }, { -2, 7, -20, 108, 46, -15, 6, -2 },
+        { -2, 7, -20, 106, 49, -16, 6, -2 }, { -2, 7, -21, 104, 51, -16, 7, -2 },
+        { -2, 7, -21, 102, 54, -17, 7, -2 }, { -2, 8, -21, 100, 56, -18, 7, -2 },
+        { -2, 8, -22, 98, 59, -18, 7, -2 }, { -2, 8, -22, 96, 62, -19, 7, -2 },
+        { -2, 8, -22, 94, 64, -19, 7, -2 }, { -2, 8, -22, 91, 67, -20, 8, -2 },
+        { -2, 8, -22, 89, 69, -20, 8, -2 }, { -2, 8, -22, 87, 72, -21, 8, -2 },
+        { -2, 8, -21, 84, 74, -21, 8, -2 }, { -2, 8, -22, 82, 77, -21, 8, -2 },
+        { -2, 8, -21, 79, 79, -21, 8, -2 }, { -2, 8, -21, 77, 82, -22, 8, -2 },
+        { -2, 8, -21, 74, 84, -21, 8, -2 }, { -2, 8, -21, 72, 87, -22, 8, -2 },
+        { -2, 8, -20, 69, 89, -22, 8, -2 }, { -2, 8, -20, 67, 91, -22, 8, -2 },
+        { -2, 7, -19, 64, 94, -22, 8, -2 }, { -2, 7, -19, 62, 96, -22, 8, -2 },
+        { -2, 7, -18, 59, 98, -22, 8, -2 }, { -2, 7, -18, 56, 100, -21, 8, -2 },
+        { -2, 7, -17, 54, 102, -21, 7, -2 }, { -2, 7, -16, 51, 104, -21, 7, -2 },
+        { -2, 6, -16, 49, 106, -20, 7, -2 }, { -2, 6, -15, 46, 108, -20, 7, -2 },
+        { -2, 6, -15, 43, 110, -19, 7, -2 }, { -2, 6, -14, 41, 111, -19, 7, -2 },
+        { -1, 5, -13, 38, 113, -18, 6, -2 }, { -1, 5, -12, 35, 114, -17, 6, -2 },
+        { -1, 5, -12, 33, 116, -17, 6, -2 }, { -1, 4, -11, 30, 118, -16, 5, -1 },
+        { -1, 4, -10, 27, 119, -15, 5, -1 }, { -1, 4, -9, 25, 120, -14, 5, -2 },
+        { -1, 3, -8, 23, 121, -13, 4, -1 }, { -1, 3, -7, 20, 122, -12, 4, -1 },
+        { -1, 3, -7, 18, 123, -11, 4, -1 }, { -1, 3, -6, 16, 124, -10, 3, -1 },
+        { -1, 2, -5, 13, 125, -8, 3, -1 }, { -1, 2, -4, 11, 126, -7, 2, -1 },
+        { 0, 1, -3, 8, 126, -6, 2, 0 }, { 0, 1, -2, 6, 127, -5, 1, 0 },
+        { 0, 1, -2, 4, 127, -3, 1, 0 }, { 0, 0, 0, 2, 127, -1, 0, 0 },
+        { 0, 0, 0, 1, 127, 0, 0, 0 }, { 0, 0, 0, -1, 127, 2, 0, 0 },
+        { 0, 0, 1, -3, 127, 4, -1, 0 }, { 0, 0, 1, -4, 126, 6, -2, 1 },
+        { 0, 0, 1, -5, 126, 8, -3, 1 }, { 0, 0, 1, -6, 125, 11, -4, 1 },
+        { 0, 0, 1, -7, 124, 13, -4, 1 }, { 0, 0, 2, -8, 123, 15, -5, 1 },
+        { 0, 0, 2, -9, 122, 18, -6, 1 }, { 0, 0, 2, -10, 121, 20, -6, 1 },
+        { 0, 0, 2, -11, 120, 22, -7, 2 }, { 0, 0, 2, -12, 119, 25, -8, 2 },
+        { 0, 0, 3, -13, 117, 27, -8, 2 }, { 0, 0, 3, -13, 116, 29, -9, 2 },
+        { 0, 0, 3, -14, 114, 32, -10, 3 }, { 0, 0, 3, -15, 113, 35, -10, 2 },
+        { 0, 0, 3, -15, 111, 37, -11, 3 }, { 0, 0, 3, -16, 109, 40, -11, 3 },
+        { 0, 0, 3, -16, 108, 42, -12, 3 }, { 0, 0, 4, -17, 106, 45, -13, 3 },
+        { 0, 0, 4, -17, 104, 47, -13, 3 }, { 0, 0, 4, -17, 102, 50, -14, 3 },
+        { 0, 0, 4, -17, 100, 52, -14, 3 }, { 0, 0, 4, -18, 98, 55, -15, 4 },
+        { 0, 0, 4, -18, 96, 58, -15, 3 }, { 0, 0, 4, -18, 94, 60, -16, 4 },
+        { 0, 0, 4, -18, 91, 63, -16, 4 }, { 0, 0, 4, -18, 89, 65, -16, 4 },
+        { 0, 0, 4, -18, 87, 68, -17, 4 }, { 0, 0, 4, -18, 85, 70, -17, 4 },
+        { 0, 0, 4, -18, 82, 73, -17, 4 }, { 0, 0, 4, -18, 80, 75, -17, 4 },
+        { 0, 0, 4, -18, 78, 78, -18, 4 }, { 0, 0, 4, -17, 75, 80, -18, 4 },
+        { 0, 0, 4, -17, 73, 82, -18, 4 }, { 0, 0, 4, -17, 70, 85, -18, 4 },
+        { 0, 0, 4, -17, 68, 87, -18, 4 }, { 0, 0, 4, -16, 65, 89, -18, 4 },
+        { 0, 0, 4, -16, 63, 91, -18, 4 }, { 0, 0, 4, -16, 60, 94, -18, 4 },
+        { 0, 0, 3, -15, 58, 96, -18, 4 }, { 0, 0, 4, -15, 55, 98, -18, 4 },
+        { 0, 0, 3, -14, 52, 100, -17, 4 }, { 0, 0, 3, -14, 50, 102, -17, 4 },
+        { 0, 0, 3, -13, 47, 104, -17, 4 }, { 0, 0, 3, -13, 45, 106, -17, 4 },
+        { 0, 0, 3, -12, 42, 108, -16, 3 }, { 0, 0, 3, -11, 40, 109, -16, 3 },
+        { 0, 0, 3, -11, 37, 111, -15, 3 }, { 0, 0, 2, -10, 35, 113, -15, 3 },
+        { 0, 0, 3, -10, 32, 114, -14, 3 }, { 0, 0, 2, -9, 29, 116, -13, 3 },
+        { 0, 0, 2, -8, 27, 117, -13, 3 }, { 0, 0, 2, -8, 25, 119, -12, 2 },
+        { 0, 0, 2, -7, 22, 120, -11, 2 }, { 0, 0, 1, -6, 20, 121, -10, 2 },
+        { 0, 0, 1, -6, 18, 122, -9, 2 }, { 0, 0, 1, -5, 15, 123, -8, 2 },
+        { 0, 0, 1, -4, 13, 124, -7, 1 }, { 0, 0, 1, -4, 11, 125, -6, 1 },
+        { 0, 0, 1, -3, 8, 126, -5, 1 }, { 0, 0, 1, -2, 6, 126, -4, 1 },
+        { 0, 0, 0, -1, 4, 127, -3, 1 }, { 0, 0, 0, 0, 2, 127, -1, 0 },
+        { 0, 0, 0, 0, 2, 127, -1, 0 }
+    };
+
+    void Block::PredictInter::blockWarp(int useWarp, int plane, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h)
+    {
+        YuvFrame& ref = *m_frameStore[refIdx];
+        std::vector<std::vector<uint8_t>>& pred = preds[refList];
+        int subX = plane ? m_sequence.subsampling_x : 0;
+        int subY = plane ? m_sequence.subsampling_y : 0;
+        auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
+        int lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
+        int lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
+        int srcX = (x + j8 * 8 + 4) << subX;
+        int srcY = (y + i8 * 8 + 4) << subY;
+        const int* warpParams = useWarp == 1 ? m_localWarp.LocalWarpParams : m_frame.gm_params[m_block.RefFrame[refList]];
+        int dstX = warpParams[2] * srcX + warpParams[3] * srcY + warpParams[0];
+        int dstY = warpParams[4] * srcX + warpParams[5] * srcY + warpParams[1];
+        int alpha, beta, gamma, delta;
+        bool warpValid = m_localWarp.setupShear(warpParams, alpha, beta, gamma, delta);
+
+        int intermediate[16][8];
+
+        int x4 = dstX >> subX;
+        int y4 = dstY >> subY;
+        int ix4 = x4 >> WARPEDMODEL_PREC_BITS;
+        int sx4 = x4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
+        int iy4 = y4 >> WARPEDMODEL_PREC_BITS;
+        int sy4 = y4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
+        for (int i1 = -7; i1 < 8; i1++) {
+            for (int i2 = -4; i2 < 4; i2++) {
+                int sx = sx4 + alpha * i2 + beta * i1;
+                int offs = ROUND2(sx, WARPEDDIFF_PREC_BITS) + WARPEDPIXEL_PREC_SHIFTS;
+                int s = 0;
+                for (int i3 = 0; i3 < 8; i3++) {
+                    uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, ix4 + i2 - 3 + i3), CLIP3(0, lastY, iy4 + i1));
+                    s += Warped_Filters[offs][i3] * pixel;
+                }
+                intermediate[(i1 + 7)][(i2 + 4)] = ROUND2(s, InterRound0);
+            }
+        }
+        for (int i1 = -4; i1 < std::min(4, h - i8 * 8 - 4); i1++) {
+            for (int i2 = -4; i2 < std::min(4, w - j8 * 8 - 4); i2++) {
+                int sy = sy4 + gamma * i2 + delta * i1;
+                int offs = ROUND2(sy, WARPEDDIFF_PREC_BITS) + WARPEDPIXEL_PREC_SHIFTS;
+                int s = 0;
+                for (int i3 = 0; i3 < 8; i3++) {
+                    s += Warped_Filters[offs][i3] * intermediate[(i1 + i3 + 4)][(i2 + 4)];
+                }
+                pred[i8 * 8 + i1 + 4][j8 * 8 + i2 + 4] = ROUND2(s, InterRound1);
+            }
+        }
+    }
     void Block::PredictInter::predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
     {
         isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
@@ -326,7 +479,14 @@ namespace Av1 {
             ASSERT(0);
         }
         if (useWarp) {
-            ASSERT(0);
+            std::vector<std::vector<uint8_t>>& pred = preds[refList];
+            pred.assign(h, std::vector<uint8_t>(w));
+            for (int i8 = 0; i8 <= ((h - 1) >> 3); i8++) {
+                for (int j8 = 0; j8 <= ((w - 1) >> 3); j8++) {
+                    blockWarp(useWarp, plane, refIdx, refList, x, y, i8, j8, w, h);
+                }
+            }
+
         } else {
             blockInterPrediction(refIdx, refList, plane, w, h, candRow, candCol);
         }
@@ -1543,7 +1703,7 @@ namespace Av1 {
         8240, 8224, 8208, 8192
     };
 
-    void Block::LocalWarp::resolveDivisor(int d, int& divShift, int& divFactor)
+    void Block::LocalWarp::resolveDivisor(int d, int& divShift, int& divFactor) const
     {
         static const int DIV_LUT_BITS = 8;
         static const int DIV_LUT_PREC_BITS = 14;
@@ -1614,10 +1774,10 @@ namespace Av1 {
             divFactor = divFactor << (-divShift);
             divShift = 0;
         }
-        LocalWarpParams[2] = diag(A[1][1] * Bx[0] - A[0][1] * Bx[1], divShift, divFactor);
-        LocalWarpParams[3] = nondiag(-A[0][1] * Bx[0] + A[0][0] * Bx[1], divShift, divFactor);
-        LocalWarpParams[4] = nondiag(A[1][1] * By[0] - A[0][1] * By[1], divShift, divFactor);
-        LocalWarpParams[5] = diag(-A[0][1] * By[0] + A[0][0] * By[1], divShift, divFactor);
+        LocalWarpParams[2] = diag(A[1][1] * Bx[0] - A[0][1] * Bx[1], divFactor, divShift );
+        LocalWarpParams[3] = nondiag(-A[0][1] * Bx[0] + A[0][0] * Bx[1], divFactor, divShift);
+        LocalWarpParams[4] = nondiag(A[1][1] * By[0] - A[0][1] * By[1], divFactor, divShift);
+        LocalWarpParams[5] = diag(-A[0][1] * By[0] + A[0][0] * By[1], divFactor, divShift);
         int16_t mvx = m_block.m_mv[0].mv[1];
         int16_t mvy = m_block.m_mv[0].mv[0];
         int vx = mvx * (1 << (WARPEDMODEL_PREC_BITS - 3)) - (midX * (LocalWarpParams[2] - (1 << WARPEDMODEL_PREC_BITS)) + midY * LocalWarpParams[3]);
@@ -1635,7 +1795,7 @@ namespace Av1 {
         }
     }
 
-    bool Block::LocalWarp::setupShear(int warpParams[6], int& alpha, int& beta, int& gamma, int& delta)
+    bool Block::LocalWarp::setupShear(const int warpParams[6], int& alpha, int& beta, int& gamma, int& delta) const
     {
         int alpha0 = CLIP3(-32768, 32767, warpParams[2] - (1 << WARPEDMODEL_PREC_BITS));
         int beta0 = CLIP3(-32768, 32767, warpParams[3]);

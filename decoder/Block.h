@@ -20,18 +20,19 @@ namespace Yami {
             class PredictInter;
 
             class LocalWarp {
+                friend class PredictInter;
             public:
                 LocalWarp(Block& block);
                 void find_warp_samples();
                 void warpEstimation();
                 void setupShear();
-                bool setupShear(int warpParams[6], int& alpha, int& beta, int& gamma, int& delta);
+                bool setupShear(const int warpParams[6], int& alpha, int& beta, int& gamma, int& delta) const;
                 int NumSamples = 0;
                 bool LocalValid;
             private:
                 void add_sample(int deltaRow, int deltaCol);
 
-                void resolveDivisor(int d, int& divShift, int& divFactor);
+                void resolveDivisor(int d, int& divShift, int& divFactor) const;
                 
                 const Block& m_block;
                 const Tile& m_tile;
