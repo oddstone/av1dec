@@ -1,19 +1,18 @@
-#ifndef SuperBlock_h
-#define SuperBlock_h
+#pragma once
 
 #include "Av1Tile.h"
 #include "Partition.h"
 
 
-namespace Yami {
-    namespace Av1 {
-        class SuperBlock : public Partition {
-        public:
-            SuperBlock(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
-            void parse();
-            bool decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
-        };
-    }
+namespace YamiAv1 {
+
+class SuperBlock : public Partition {
+public:
+    SuperBlock(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
+    void parse();
+    bool decode(std::shared_ptr<Yami::YuvFrame>& frame, const FrameStore& frameStore);
+};
+
 }
-#endif
+
 

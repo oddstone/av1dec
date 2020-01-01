@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     }
 
     VideoDecodeBuffer buf;
-    Yami::Av1::Decoder decoder;
+    YamiAv1::Decoder decoder;
     while (input->getNextDecodeUnit(buf)) {
         printf("%d\r\n", buf.size);
         decoder.decode(buf.data, buf.size);

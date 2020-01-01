@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef bitReader_h
-#define bitReader_h
+#pragma once
 
 #include <stdint.h>
 #include <algorithm> /*std::min*/
@@ -127,5 +126,3 @@ bool BitReader::peek(T& v, uint32_t nbits) const
 }
 
 } /*namespace Yami*/
-
-#endif
