@@ -851,9 +851,9 @@ namespace Av1 {
         mv.mv[0] = mv.mv[1] = -1 << 15;
         MotionFieldMvs.resize(TOTAL_REFS_PER_FRAME);
         for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++) {
-            MotionFieldMvs[ref].resize(h8);
-            for (uint32_t y = 0; y < h8; y++) {
-                MotionFieldMvs[ref][y].assign((size_t)w8, mv);
+            MotionFieldMvs[ref].resize(AlignedMiRows >> 1);
+            for (uint32_t y = 0; y < (AlignedMiRows >> 1); y++) {
+                MotionFieldMvs[ref][y].assign((size_t)AlignedMiCols>>1, mv);
             }
         }
         uint8_t lastIdx = ref_frame_idx[0];
