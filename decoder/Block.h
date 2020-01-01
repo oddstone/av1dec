@@ -20,10 +20,10 @@ class TransformBlock;
 class Block : public BlockTree {
     friend class TransformBlock;
     class FindMvStack;
-    class PredictInter;
+    class InterPredict;
 
     class LocalWarp {
-        friend class PredictInter;
+        friend class InterPredict;
 
     public:
         LocalWarp(Block& block);
