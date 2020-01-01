@@ -1,13 +1,13 @@
 #pragma once
 
 #include "Av1Common.h"
-#include <memory>
 #include <deque>
-#include <vector>
+#include <memory>
 #include <stdint.h>
+#include <vector>
 
 namespace Yami {
-    struct YuvFrame;
+struct YuvFrame;
 }
 
 namespace YamiAv1 {
@@ -36,5 +36,4 @@ private:
     Tiles m_tiles;
     FrameStore m_store;
 };
-
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
 #include "Av1Common.h"
 #include "VideoFrame.h"
+#include <memory>
 
 namespace YamiAv1 {
 class Parser;
@@ -13,6 +13,7 @@ class LoopFilter {
 public:
     LoopFilter(const ConstFramePtr&);
     void filter(const std::shared_ptr<YuvFrame>& frame);
+
 private:
     void loop_filter_edge(const std::shared_ptr<YuvFrame>& frame,
         int plane, int pass, int row, int col);
@@ -47,5 +48,4 @@ private:
     const LoopFilterParams& m_filter;
     const DeltaLf& m_deltaLF;
 };
-
 }

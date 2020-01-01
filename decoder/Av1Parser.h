@@ -500,8 +500,8 @@ struct FrameHeader {
     std::vector<std::vector<uint8_t>> CompGroupIdxs;
     std::vector<std::vector<uint8_t>> CompoundIdxs;
     std::vector<std::vector<std::vector<InterpFilter>>> InterpFilters;
-        //std::vector<std::vector<uint32_t>> PaletteSizes[2];
-        //PaletteColors
+    //std::vector<std::vector<uint32_t>> PaletteSizes[2];
+    //PaletteColors
 
     Quantization m_quant;
     Segmentation m_segmentation;
@@ -512,7 +512,6 @@ struct FrameHeader {
     LoopRestorationpParams m_loopRestoration;
     ConstSequencePtr m_sequence;
     RefInfo m_refInfo; //a copy of parsers refInfo
-        
 
     const static uint8_t SUPERRES_NUM = 8;
 
@@ -599,6 +598,4 @@ inline static void roundingVariablesDerivation(
     }
     InterPostRound = 2 * FILTER_BITS - (InterRound0 + InterRound1);
 }
-
 }
-

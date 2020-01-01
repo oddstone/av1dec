@@ -1227,8 +1227,8 @@ TX_TYPE TransformBlock::compute_tx_type() const
         return m_frame.TxTypes[y4][x4];
     }
     if (m_block.is_inter) {
-        int i = std::max((int)m_block.MiCol, x4 << (plane ? m_sequence.subsampling_x:0));
-        int j = std::max((int)m_block.MiRow, y4 << (plane ? m_sequence.subsampling_y:0));
+        int i = std::max((int)m_block.MiCol, x4 << (plane ? m_sequence.subsampling_x : 0));
+        int j = std::max((int)m_block.MiRow, y4 << (plane ? m_sequence.subsampling_y : 0));
         TX_TYPE txType = m_frame.TxTypes[j][i];
         if (!is_tx_type_in_set(txSet, txType))
             return DCT_DCT;
@@ -3032,5 +3032,4 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     }
     return true;
 }
-
 }

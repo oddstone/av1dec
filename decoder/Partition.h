@@ -10,6 +10,7 @@ public:
     Partition(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     void parse();
     bool decode(std::shared_ptr<Yami::YuvFrame>& frame, const FrameStore& frameStore);
+
 protected:
     void parseBlock(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
     void parseSubPartition(uint32_t r, uint32_t c, BLOCK_SIZE sbSize);
@@ -24,9 +25,5 @@ protected:
     uint32_t m_r;
     uint32_t m_c;
     BLOCK_SIZE m_bSize;
-
 };
-
 }
-
-

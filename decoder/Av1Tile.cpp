@@ -1,9 +1,9 @@
 #include "Av1Tile.h"
-#include "Av1Parser.h"
 #include "Av1Common.h"
+#include "Av1Parser.h"
 #include "Block.h"
-#include "SuperBlock.h"
 #include "Partition.h"
+#include "SuperBlock.h"
 #include "SymbolDecoder.h"
 #include "VideoFrame.h"
 #include "log.h"
@@ -63,7 +63,6 @@ void BlockDecoded::clearFlag(int plane, int r, int c)
     m_decoded[plane][r + OFFSET][c + OFFSET] = false;
 }
 
-
 Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum)
     : m_sequence(sequence)
     , m_frame(frame)
@@ -76,7 +75,6 @@ Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<Frame
     MiColEnd = frame->MiColStarts[TileCol + 1];
     CurrentQIndex = frame->m_quant.base_q_idx;
     m_decoded.init(*this);
-
 }
 
 bool Tile::is_inside(uint32_t r, uint32_t c) const
@@ -128,7 +126,6 @@ bool Tile::parse(const uint8_t* data, uint32_t size)
             std::shared_ptr<SuperBlock> sb(new SuperBlock(*this, r, c, sbSize));
             sb->parse();
             m_sbs.push_back(sb);
-
         }
     }
     return true;
@@ -149,7 +146,6 @@ bool Tile::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore
     for (auto& sb : m_sbs) {
         if (!sb->decode(frame, frameStore))
             return false;
-
     }
     return true;
 }
@@ -179,5 +175,4 @@ void BlockContext::set(uint32_t plane, uint32_t start, uint32_t count, int16_t c
     std::fill_n(&LevelContext[plane][start], count, culLevel);
     std::fill_n(&DcContext[plane][start], count, dcCategory);
 }
-
 }

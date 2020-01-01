@@ -144,5 +144,4 @@ std::shared_ptr<YuvFrame> Decoder::getOutput()
     }
     return f;
 }
-
 }

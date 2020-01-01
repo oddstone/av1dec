@@ -32,10 +32,10 @@ std::shared_ptr<YuvFrame> Cdef::filter(const std::shared_ptr<YuvFrame>& frame)
 }
 
 const int Cdef_Uv_Dir[2][2][8] = {
-    { {0, 1, 2, 3, 4, 5, 6, 7},
-    {1, 2, 2, 2, 3, 4, 6, 0} },
-    { {7, 0, 2, 4, 5, 6, 6, 6},
-    {0, 1, 2, 3, 4, 5, 6, 7} }
+    { { 0, 1, 2, 3, 4, 5, 6, 7 },
+        { 1, 2, 2, 2, 3, 4, 6, 0 } },
+    { { 7, 0, 2, 4, 5, 6, 6, 6 },
+        { 0, 1, 2, 3, 4, 5, 6, 7 } }
 };
 
 void Cdef::cdef_block(const std::shared_ptr<YuvFrame>& cdef,
@@ -67,8 +67,6 @@ void Cdef::cdef_block(const std::shared_ptr<YuvFrame>& cdef,
         cdefFilter(cdef, frame, 1, r, c, priStr, secStr, damping, dir);
         cdefFilter(cdef, frame, 2, r, c, priStr, secStr, damping, dir);
     }
-
-
 }
 
 const static int Cdef_Pri_Taps[2][2] = {
@@ -79,7 +77,8 @@ const static int Cdef_Sec_Taps[2][2] = {
     { 2, 1 }, { 2, 1 }
 };
 
-static int constrain(int diff, int threshold, int damping) {
+static int constrain(int diff, int threshold, int damping)
+{
     if (!threshold)
         return 0;
     int dampingAdj = std::max(0, damping - FloorLog2(threshold));
@@ -98,20 +97,19 @@ const static int Cdef_Directions[8][2][2] = {
     { { 1, 0 }, { 2, -1 } }
 };
 
-bool Cdef::is_inside_filter_region(int candidateR, int candidateC) {
+bool Cdef::is_inside_filter_region(int candidateR, int candidateC)
+{
     int colStart = 0;
     int colEnd = m_frame->MiCols;
     int rowStart = 0;
     int rowEnd = m_frame->MiRows;
-    return (candidateC >= colStart &&
-        candidateC < colEnd &&
-        candidateR >= rowStart &&
-        candidateR < rowEnd);
+    return (candidateC >= colStart && candidateC < colEnd && candidateR >= rowStart && candidateR < rowEnd);
 }
 
 uint8_t Cdef::cdef_get_at(const std::shared_ptr<YuvFrame>& frame,
     int plane, int x0, int y0, int i, int j, int dir, int k,
-    int sign, int subX, int subY, bool& CdefAvailable) {
+    int sign, int subX, int subY, bool& CdefAvailable)
+{
 
     int y = y0 + i + sign * Cdef_Directions[dir][k][0];
     int x = x0 + j + sign * Cdef_Directions[dir][k][1];
@@ -168,7 +166,6 @@ void Cdef::cdefFilter(const std::shared_ptr<YuvFrame>& cdef,
     }
 }
 
-
 static const int Div_Table[9] = {
     0, 840, 420, 280, 210, 168, 140, 120, 105
 };
@@ -207,12 +204,8 @@ void Cdef::cdefDirection(const std::shared_ptr<YuvFrame>& frame,
     cost[2] *= Div_Table[8];
     cost[6] *= Div_Table[8];
     for (int i = 0; i < 7; i++) {
-        cost[0] += (partial[0][i] * partial[0][i] +
-            partial[0][14 - i] * partial[0][14 - i]) *
-            Div_Table[i + 1];
-        cost[4] += (partial[4][i] * partial[4][i] +
-            partial[4][14 - i] * partial[4][14 - i]) *
-            Div_Table[i + 1];
+        cost[0] += (partial[0][i] * partial[0][i] + partial[0][14 - i] * partial[0][14 - i]) * Div_Table[i + 1];
+        cost[4] += (partial[4][i] * partial[4][i] + partial[4][14 - i] * partial[4][14 - i]) * Div_Table[i + 1];
     }
     cost[0] += partial[0][7] * partial[0][7] * Div_Table[8];
     cost[4] += partial[4][7] * partial[4][7] * Div_Table[8];
@@ -223,7 +216,7 @@ void Cdef::cdefDirection(const std::shared_ptr<YuvFrame>& frame,
         cost[i] *= Div_Table[8];
         for (int j = 0; j < 4 - 1; j++) {
             cost[i] += (partial[i][j] * partial[i][j]
-                + partial[i][10 - j] * partial[i][10 - j])
+                           + partial[i][10 - j] * partial[i][10 - j])
                 * Div_Table[2 * j + 2];
         }
     }
@@ -235,7 +228,4 @@ void Cdef::cdefDirection(const std::shared_ptr<YuvFrame>& frame,
     }
     var = (bestCost - cost[(yDir + 4) & 7]) >> 10;
 }
-
 }
-
-

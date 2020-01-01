@@ -593,5 +593,4 @@ uint32_t EntropyDecoder::readNS(int n)
         return v;
     return (v << 1) - m + readLiteral(1);
 }
-
 }

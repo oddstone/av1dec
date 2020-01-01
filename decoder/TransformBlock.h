@@ -5,7 +5,6 @@
 namespace Yami {
 
 struct YuvFrame;
-
 }
 
 namespace YamiAv1 {
@@ -112,5 +111,4 @@ private:
     bool flipLR;
     int m_eob;
 };
-
 }

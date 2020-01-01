@@ -10,7 +10,6 @@
 namespace Yami {
 
 struct YuvFrame;
-
 }
 
 namespace YamiAv1 {
@@ -25,6 +24,7 @@ class Block : public BlockTree {
 
     class LocalWarp {
         friend class PredictInter;
+
     public:
         LocalWarp(Block& block);
         void find_warp_samples();
@@ -33,11 +33,12 @@ class Block : public BlockTree {
         bool setupShear(const int warpParams[6], int& alpha, int& beta, int& gamma, int& delta) const;
         int NumSamples = 0;
         bool LocalValid;
+
     private:
         void add_sample(int deltaRow, int deltaCol);
 
         void resolveDivisor(int d, int& divShift, int& divFactor) const;
-                
+
         const Block& m_block;
         const Tile& m_tile;
         const FrameHeader& m_frame;
@@ -89,11 +90,10 @@ private:
     bool is_tx_type_in_set(TxSet txSet, TX_TYPE txType);
     TX_TYPE compute_tx_type(int plane, TX_SIZE txSz, int blockX, int blockY);
     int get_above_tx_width(uint32_t row, uint32_t col);
-    int get_left_tx_height(uint32_t         row, uint32_t col);
+    int get_left_tx_height(uint32_t row, uint32_t col);
     uint8_t getTxDepthCtx(TX_SIZE maxRectTxSize);
     TX_SIZE get_tx_size(int plane, TX_SIZE txSz);
     TxSet get_tx_set(TX_SIZE txSz);
-
 
     uint8_t getAllZeroCtx(int plane, int x4, int y4, int w4, int h4, TX_SIZE txSz);
     int16_t get_q_idx();
@@ -137,12 +137,11 @@ private:
     uint8_t getSingleRefP5Ctx();
     uint8_t getSingleRefP6Ctx();
 
-
     void readCompReference();
     void readSingleReference();
 
     int16_t read_mv_component(uint8_t MvCtx, uint8_t comp);
-    void read_mv(Mv PredMv[2], int ref );
+    void read_mv(Mv PredMv[2], int ref);
     void assign_mv(const FindMvStack& find, bool isCompound);
     PREDICTION_MODE get_mode(int refList);
     void read_interintra_mode(bool isCompound);
@@ -212,7 +211,7 @@ private:
     uint8_t wedge_index;
     uint8_t wedge_sign;
     MOTION_MODE motion_mode;
-            
+
     bool comp_group_idx;
     bool compound_idx;
     COMPOUND_TYPE compound_type;
@@ -241,6 +240,4 @@ inline bool is_directional_mode(int mode)
 {
     return is_directional_mode((PREDICTION_MODE)mode);
 }
-
 }
-

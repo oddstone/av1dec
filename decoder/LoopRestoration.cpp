@@ -4,7 +4,8 @@
 
 namespace YamiAv1 {
 
-static int count_units_in_frame(int unitSize, int frameSize) {
+static int count_units_in_frame(int unitSize, int frameSize)
+{
     return std::max((frameSize + (unitSize >> 1)) / unitSize, 1);
 }
 
@@ -220,10 +221,9 @@ void LoopRestoration::selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
             LrFrame->setPixel(plane, x + j, y + i, CLIP1(s));
         }
     }
-
 }
 
-void LoopRestoration::loop_restore_block(const    std::shared_ptr<YuvFrame>& LrFrame,
+void LoopRestoration::loop_restore_block(const std::shared_ptr<YuvFrame>& LrFrame,
     int plane, int row, int col)
 {
     int lumaY = row * MI_SIZE;
@@ -252,4 +252,3 @@ void LoopRestoration::loop_restore_block(const    std::shared_ptr<YuvFrame>& LrF
     }
 }
 }
-

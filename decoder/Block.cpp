@@ -1775,7 +1775,7 @@ void Block::LocalWarp::warpEstimation()
         divFactor = divFactor << (-divShift);
         divShift = 0;
     }
-    LocalWarpParams[2] = diag(A[1][1] * Bx[0] - A[0][1] * Bx[1], divFactor, divShift );
+    LocalWarpParams[2] = diag(A[1][1] * Bx[0] - A[0][1] * Bx[1], divFactor, divShift);
     LocalWarpParams[3] = nondiag(-A[0][1] * Bx[0] + A[0][0] * Bx[1], divFactor, divShift);
     LocalWarpParams[4] = nondiag(A[1][1] * By[0] - A[0][1] * By[1], divFactor, divShift);
     LocalWarpParams[5] = diag(-A[0][1] * By[0] + A[0][0] * By[1], divFactor, divShift);

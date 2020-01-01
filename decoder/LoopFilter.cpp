@@ -30,7 +30,6 @@ void LoopFilter::filter(const std::shared_ptr<YuvFrame>& frame)
             }
         }
     }
-
 }
 
 void LoopFilter::loop_filter_edge(const std::shared_ptr<YuvFrame>& frame,
@@ -70,7 +69,6 @@ void LoopFilter::loop_filter_edge(const std::shared_ptr<YuvFrame>& frame,
             sampleFilter(frame, xP + dy * i, yP + dx * i, plane, limit, blimit, thresh, dx, dy, filterSize);
         }
     }
-
 }
 void LoopFilter::sampleFilter(const std::shared_ptr<YuvFrame>& frame,
     int x, int y, int plane,
@@ -89,7 +87,7 @@ void LoopFilter::sampleFilter(const std::shared_ptr<YuvFrame>& frame,
         wideFilter(frame, x, y, plane, dx, dy, 4);
     }
 }
-#define FILTER4_CLAMP(value) CLIP3( -(1 << (BitDepth - 1)), (1 << (BitDepth - 1)) - 1, (value) )
+#define FILTER4_CLAMP(value) CLIP3(-(1 << (BitDepth - 1)), (1 << (BitDepth - 1)) - 1, (value))
 void LoopFilter::narrowFilter(const std::shared_ptr<YuvFrame>& frame,
     int hevMask, int x, int y, int plane, int dx, int dy)
 {
@@ -118,7 +116,6 @@ void LoopFilter::narrowFilter(const std::shared_ptr<YuvFrame>& frame,
         frame->setPixel(plane, x + dx, y + dy, oq1);
         frame->setPixel(plane, x - dx * 2, y - dy * 2, op1);
     }
-
 }
 void LoopFilter::wideFilter(const std::shared_ptr<YuvFrame>& frame,
     int x, int y, int plane, int dx, int dy, int log2Size)
@@ -151,8 +148,6 @@ void LoopFilter::wideFilter(const std::shared_ptr<YuvFrame>& frame,
     for (int i = -n; i < n; i++) {
         frame->setPixel(plane, x + i * dx, y + i * dy, F[i]);
     }
-
-
 }
 void LoopFilter::getFilterMask(const std::shared_ptr<YuvFrame>& frame,
     int x, int y, int plane, int limit, int blimit, int thresh,
@@ -210,7 +205,6 @@ void LoopFilter::getFilterMask(const std::shared_ptr<YuvFrame>& frame,
     }
     filterMask = (mask == 0);
 
-
     int thresholdBd = 1 << (BitDepth - 8);
     if (filterSize >= 8) {
         mask = 0;
@@ -238,7 +232,6 @@ void LoopFilter::getFilterMask(const std::shared_ptr<YuvFrame>& frame,
     } else {
         flatMask2 = 0;
     }
-
 }
 
 int LoopFilter::getFilterSize(TX_SIZE txSz, TX_SIZE prevTxSz, int pass, int plane)
@@ -274,8 +267,7 @@ int LoopFilter::getLimit(int lvl)
     } else {
         shift = 0;
     }
-    int limit = loop_filter_sharpness > 0 ?
-        CLIP3(1, 9 - loop_filter_sharpness, lvl >> shift) : std::max(1, lvl >> shift);
+    int limit = loop_filter_sharpness > 0 ? CLIP3(1, 9 - loop_filter_sharpness, lvl >> shift) : std::max(1, lvl >> shift);
     return limit;
 }
 int8_t LoopFilter::getLvl(uint8_t segment, int ref, int modeType, int8_t deltaLF, int plane, int pass)
@@ -297,8 +289,7 @@ int8_t LoopFilter::getLvl(uint8_t segment, int ref, int modeType, int8_t deltaLF
         if (ref == INTRA_FRAME) {
             lvlSeg = lvlSeg + (loop_filter_ref_deltas[INTRA_FRAME] << nShift);
         } else {
-            lvlSeg = lvlSeg + (loop_filter_ref_deltas[ref] << nShift) +
-                (loop_filter_mode_deltas[modeType] << nShift);
+            lvlSeg = lvlSeg + (loop_filter_ref_deltas[ref] << nShift) + (loop_filter_mode_deltas[modeType] << nShift);
         }
         lvlSeg = CLIP3(0, MAX_LOOP_FILTER, lvlSeg);
     }

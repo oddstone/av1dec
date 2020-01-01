@@ -1,6 +1,6 @@
-#include "decodeinput.h"
 #include "Av1Decoder.h"
 #include "VideoFrame.h"
+#include "decodeinput.h"
 #include <string.h>
 
 void usage(const char* app)
@@ -23,7 +23,6 @@ void writeFrame(FILE* fp, std::shared_ptr<Yami::YuvFrame>& frame)
             uint8_t* line = start + h * stride;
             fwrite(line, 1, width, fp);
         }
-
     }
     fflush(fp);
 }
@@ -54,10 +53,8 @@ int main(int argc, char** argv)
         while ((frame = decoder.getOutput())) {
             writeFrame(out, frame);
         }
-
     }
     fclose(out);
     //getchar();
     return 0;
 }
-

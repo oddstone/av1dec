@@ -1,15 +1,14 @@
 #pragma once
 #include "../aom/enums.h"
 #include "EntropyDecoder.h"
+#include <deque>
 #include <memory>
 #include <stdint.h>
 #include <vector>
-#include <deque>
 
 namespace Yami {
 
 struct YuvFrame;
-
 }
 
 namespace YamiAv1 {
@@ -91,6 +90,5 @@ private:
     BlockContext m_left;
     std::deque<std::shared_ptr<SuperBlock>> m_sbs;
     int8_t DeltaLF[FRAME_LF_COUNT];
-
 };
 }

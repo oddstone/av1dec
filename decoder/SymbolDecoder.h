@@ -5,7 +5,6 @@
 namespace Yami {
 
 class BitReader;
-
 }
 
 namespace YamiAv1 {

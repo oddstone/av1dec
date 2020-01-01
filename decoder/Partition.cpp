@@ -176,7 +176,6 @@ void Partition::parse()
             parseBlock(r, c + quarterBlock4x4 * 3, subSize);
     }
     return;
-
 }
 
 bool Partition::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)

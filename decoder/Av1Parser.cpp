@@ -80,7 +80,6 @@ namespace YamiAv1 {
 #define ROUND2(x, n) ((n == 0) ? x : ((x + (1 << (n - 1))) >> n))
 #endif
 
-
 bool obu_extension_header::parse(BitReader& br)
 {
     READ_BITS(temporal_id, 3);
@@ -853,7 +852,7 @@ void FrameHeader::motion_field_estimation(const RefInfo& refInfo)
     for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++) {
         MotionFieldMvs[ref].resize(AlignedMiRows >> 1);
         for (uint32_t y = 0; y < (AlignedMiRows >> 1); y++) {
-            MotionFieldMvs[ref][y].assign((size_t)AlignedMiCols>>1, mv);
+            MotionFieldMvs[ref][y].assign((size_t)AlignedMiCols >> 1, mv);
         }
     }
     uint8_t lastIdx = ref_frame_idx[0];
@@ -1959,5 +1958,4 @@ void LoopRestorationpParams::resetRefs(int NumPlanes)
         }
     }
 }
-
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
 #include "Av1Common.h"
 #include "VideoFrame.h"
+#include <memory>
 
 namespace YamiAv1 {
 
@@ -12,6 +12,7 @@ class Cdef {
 public:
     Cdef(const ConstFramePtr& frame);
     std::shared_ptr<YuvFrame> filter(const std::shared_ptr<YuvFrame>& frame);
+
 private:
     void cdefDirection(const std::shared_ptr<YuvFrame>& frame,
         int r, int, int& yDir, int& var);
@@ -29,6 +30,4 @@ private:
     const SequenceHeader& m_sequence;
     const CdefParams& m_cdef;
 };
-
 }
-

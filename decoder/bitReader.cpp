@@ -18,18 +18,11 @@
 #include "config.h"
 #endif
 
-#include <assert.h>
 #include "bitReader.h"
+#include <assert.h>
 
 #define LOAD8BYTESDATA_BE(x) \
-    (((uint64_t)((const uint8_t*)(x))[0] << 56) | \
-     ((uint64_t)((const uint8_t*)(x))[1] << 48) | \
-     ((uint64_t)((const uint8_t*)(x))[2] << 40) | \
-     ((uint64_t)((const uint8_t*)(x))[3] << 32) | \
-     ((uint64_t)((const uint8_t*)(x))[4] << 24) | \
-     ((uint64_t)((const uint8_t*)(x))[5] << 16) | \
-     ((uint64_t)((const uint8_t*)(x))[6] <<  8) | \
-     ((uint64_t)((const uint8_t*)(x))[7]))
+    (((uint64_t)((const uint8_t*)(x))[0] << 56) | ((uint64_t)((const uint8_t*)(x))[1] << 48) | ((uint64_t)((const uint8_t*)(x))[2] << 40) | ((uint64_t)((const uint8_t*)(x))[3] << 32) | ((uint64_t)((const uint8_t*)(x))[4] << 24) | ((uint64_t)((const uint8_t*)(x))[5] << 16) | ((uint64_t)((const uint8_t*)(x))[6] << 8) | ((uint64_t)((const uint8_t*)(x))[7]))
 
 namespace Yami {
 
@@ -132,76 +125,76 @@ uint32_t BitReader::peek(uint32_t nbits) const
 
 uint32_t floorLog2(uint32_t n)
 {
-	if (!n)
-		return 0;
-	int i = 0; 
-	while ((1 << i) <= n) {
-		i++;
-	}
-	return i - 1;
+    if (!n)
+        return 0;
+    int i = 0;
+    while ((1 << i) <= n) {
+        i++;
+    }
+    return i - 1;
 }
 
 bool BitReader::readNs(uint32_t& v, uint32_t n)
 {
-	uint32_t w = floorLog2(n) + 1;
-	uint32_t m = (1 << w) - n;
-	if (!read(v, w - 1))
-		return false;
-	if (v < m)
-		return true;
-	uint32_t extra;
-	if (!read(extra, 1))
-		return false;
-	v = (v << 1) - m + extra;
-	return true;
+    uint32_t w = floorLog2(n) + 1;
+    uint32_t m = (1 << w) - n;
+    if (!read(v, w - 1))
+        return false;
+    if (v < m)
+        return true;
+    uint32_t extra;
+    if (!read(extra, 1))
+        return false;
+    v = (v << 1) - m + extra;
+    return true;
 }
 bool BitReader::readSu(int8_t& v, uint32_t n)
 {
-	int16_t value;
-	if (!readSu(value, n))
-		return false;
-	v = (int8_t)value;
-	return true;
+    int16_t value;
+    if (!readSu(value, n))
+        return false;
+    v = (int8_t)value;
+    return true;
 }
 
 bool BitReader::readSu(int16_t& v, uint32_t n)
 {
-	uint32_t value;
-	if (!read(value, n))
-		return false;
-	uint32_t signMask = 1 << (n - 1);
-	if (value & signMask)
-		v = (int16_t)(value - 2 * signMask);
-	else
-		v = (int16_t)value;
-	return true;
+    uint32_t value;
+    if (!read(value, n))
+        return false;
+    uint32_t signMask = 1 << (n - 1);
+    if (value & signMask)
+        v = (int16_t)(value - 2 * signMask);
+    else
+        v = (int16_t)value;
+    return true;
 }
 
 bool BitReader::readLe(uint32_t& v, uint32_t nBits)
 {
-	uint32_t t= 0;
-	for (uint32_t i = 0; i < nBits; i++) {
-		uint8_t byte;
-		if (!readT(byte))
-			return false;
-		t += (byte << (i * 8));
-	}
-	return t;
+    uint32_t t = 0;
+    for (uint32_t i = 0; i < nBits; i++) {
+        uint8_t byte;
+        if (!readT(byte))
+            return false;
+        t += (byte << (i * 8));
+    }
+    return t;
 }
 
 bool BitReader::readUe(uint32_t& v)
 {
-	int32_t leadingZeroBits = -1;
+    int32_t leadingZeroBits = -1;
 
-	for (uint32_t b = 0; !b; leadingZeroBits++) {
-		if (!read(b, 1))
-			return false;
-	}
-	
-	if (!read(v, leadingZeroBits))
-		return false;
-	v = (1 << leadingZeroBits) - 1 + v;
-	return true;
+    for (uint32_t b = 0; !b; leadingZeroBits++) {
+        if (!read(b, 1))
+            return false;
+    }
+
+    if (!read(v, leadingZeroBits))
+        return false;
+    v = (1 << leadingZeroBits) - 1 + v;
+    return true;
 }
 
 } /*namespace Yami*/

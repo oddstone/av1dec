@@ -2,14 +2,14 @@
 #include <string.h>
 
 namespace Yami {
-struct YuvFrameImp : public YuvFrame
-{
+struct YuvFrameImp : public YuvFrame {
     friend struct YuvFrame;
+
 private:
     std::vector<uint8_t> m_data;
 };
 
-#define ROOF(b, a) ((b + (a -1)) & ~(a-1))
+#define ROOF(b, a) ((b + (a - 1)) & ~(a - 1))
 std::shared_ptr<YuvFrame> YuvFrame::create(int width, int height)
 {
     std::shared_ptr<YuvFrameImp> p(new YuvFrameImp);
@@ -49,5 +49,4 @@ std::shared_ptr<YuvFrame> YuvFrame::create(const std::shared_ptr<YuvFrame>& othe
     }
     return frame;
 }
-
 }

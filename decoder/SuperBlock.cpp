@@ -23,5 +23,4 @@ bool SuperBlock::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& fram
     m_tile.m_decoded.clearFlags(m_r, m_c, sbSize4);
     return Partition::decode(frame, frameStore);
 }
-
 }
