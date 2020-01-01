@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "Av1Common.h"
-#include "Av1Parser.h"
+#include "Parser.h"
 #include "SymbolDecoder.h"
 #include "log.h"
 

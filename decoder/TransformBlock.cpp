@@ -1,6 +1,6 @@
 #include "Av1Common.h"
-#include "Av1Parser.h"
-#include "Av1Tile.h"
+#include "Parser.h"
+#include "Tile.h"
 #include "Block.h"
 #include "SymbolDecoder.h"
 #include "VideoFrame.h"

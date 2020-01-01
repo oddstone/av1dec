@@ -1,5 +1,5 @@
 #include "LoopRestoration.h"
-#include "Av1Parser.h"
+#include "Parser.h"
 #include "log.h"
 
 namespace YamiAv1 {

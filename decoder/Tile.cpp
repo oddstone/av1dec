@@ -1,6 +1,6 @@
-#include "Av1Tile.h"
+#include "Tile.h"
 #include "Av1Common.h"
-#include "Av1Parser.h"
+#include "Parser.h"
 #include "Block.h"
 #include "Partition.h"
 #include "SuperBlock.h"

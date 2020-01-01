@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../aom/enums.h"
-#include "Av1Tile.h"
+#include "Tile.h"
 #include "BlockTree.h"
 #include "EntropyDecoder.h"
 #include <memory>

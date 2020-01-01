@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Av1Tile.h"
+#include "Tile.h"
 #include "BlockTree.h"
 
 namespace YamiAv1 {
