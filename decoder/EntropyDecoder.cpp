@@ -445,7 +445,7 @@ int EntropyDecoder::readMvHp(uint8_t ctx, uint8_t comp)
 
 bool EntropyDecoder::readInterIntra(BLOCK_SIZE MiSize)
 {
-    uint8_t ctx = Size_Group[MiSize] - 1;
+    uint8_t ctx = Size_Group[MiSize];
     return (bool)m_symbol->read(interintra_cdf[ctx], 2);
 }
 

@@ -209,6 +209,7 @@ private:
     uint8_t RefMvIdx;
     std::vector<Mv> m_mv;
     bool interintra;
+    INTERINTRA_MODE interintra_mode;
     bool wedge_interintra;
     uint8_t wedge_index;
     uint8_t wedge_sign;

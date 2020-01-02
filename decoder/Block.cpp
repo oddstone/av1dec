@@ -1,12 +1,12 @@
 #include "Block.h"
 #include "Av1Common.h"
-#include "Parser.h"
-#include "Tile.h"
-#include "SymbolDecoder.h"
-#include "TransformBlock.h"
-#include "VideoFrame.h"
 #include "InterPredict.h"
 #include "IntraPredict.h"
+#include "Parser.h"
+#include "SymbolDecoder.h"
+#include "Tile.h"
+#include "TransformBlock.h"
+#include "VideoFrame.h"
 #include "log.h"
 
 #include <limits>
@@ -85,28 +85,51 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
         int candCol = (MiCol >> subX) << subX;
         bool IsInterIntra = (is_inter && RefFrame[1] == INTRA_FRAME);
         if (IsInterIntra) {
-            ASSERT(0 && "IsInterIntra");
+            PREDICTION_MODE mode;
+            if (interintra_mode == II_DC_PRED)
+                mode = DC_PRED;
+            else if (interintra_mode == II_V_PRED)
+                mode = V_PRED;
+            else if (interintra_mode == II_H_PRED)
+                mode = H_PRED;
+            else
+                mode = SMOOTH_PRED;
+
+            std::vector<std::vector<uint8_t>> pred;
+            IntraPredict predict(*this, frame, plane, baseX, baseY, log2W, log2H, pred);
+            bool haveAboveRight = m_decoded.getFlag(plane, (subBlockMiRow >> subY) - 1, (subBlockMiCol >> subX) + num4x4W);
+            bool haveBelowLeft = m_decoded.getFlag(plane, (subBlockMiRow >> subY) + num4x4H, (subBlockMiCol >> subX) - 1);
+            predict.predict_intra(
+                plane == 0 ? AvailL : AvailLChroma,
+                plane == 0 ? AvailU : AvailUChroma,
+                haveAboveRight, haveBelowLeft, mode);
+            for (size_t row = 0; row < pred.size(); row++) {
+                auto& v = pred[row];
+                for (size_t col = 0; col < v.size(); col++) {          
+                    frame->setPixel(plane, baseX + col, baseY + row, v[col]);
+                }
+            }
         }
         if (is_inter) {
             uint32_t predW = bw >> subX;
             uint32_t predH = bh >> subY;
             bool someUseIntra = false;
-            for (uint32_t r = 0; r < (bh4 << subY); r++) {
-                for (uint32_t c = 0; c < (bw4 << subX); c++) {
+            for (uint32_t r = 0; r < (num4x4H << subY); r++) {
+                for (uint32_t c = 0; c < (num4x4W << subX); c++) {
                     if (m_frame.RefFrames[candRow + r][candCol + c][0] == INTRA_FRAME)
                         someUseIntra = true;
                 }
             }
             if (someUseIntra) {
-                predW = bw;
-                predH = bh;
+                predW = num4x4H * 4;
+                predH = num4x4W * 4;
                 candRow = MiRow;
                 candCol = MiCol;
             }
             uint32_t r = 0;
-            for (uint32_t y = 0; y < bh; y += predH) {
+            for (uint32_t y = 0; y < num4x4H * 4; y += predH) {
                 uint32_t c = 0;
-                for (uint32_t x = 0; x < bw; x += predW) {
+                for (uint32_t x = 0; x < num4x4W * 4; x += predW) {
                     InterPredict inter(*this, *frame, frameStore);
                     inter.predict_inter(plane, baseX + x, baseY + y, predW, predH, candRow + r, candCol + c);
                     c++;
@@ -1365,7 +1388,7 @@ void Block::read_interintra_mode(bool isCompound)
     if (!skip_mode && m_sequence.enable_interintra_compound && !isCompound && MiSize >= BLOCK_8X8 && MiSize <= BLOCK_32X32) {
         interintra = m_entropy.readInterIntra(MiSize);
         if (interintra) {
-            INTERINTRA_MODE interintra_mode = m_entropy.readInterIntraMode(MiSize);
+            interintra_mode = m_entropy.readInterIntraMode(MiSize);
             RefFrame[1] = INTRA_FRAME;
             AngleDeltaY = 0;
             AngleDeltaUV = 0;
