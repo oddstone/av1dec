@@ -6,7 +6,6 @@
 
 namespace YamiAv1 {
 
-
 Block::InterPredict::InterPredict(Block& block, YuvFrame& yuv, const FrameStore& frameStore)
     : m_localWarp(block.m_localWarp)
     , m_block(block)

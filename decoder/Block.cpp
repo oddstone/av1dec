@@ -6,6 +6,7 @@
 #include "TransformBlock.h"
 #include "VideoFrame.h"
 #include "InterPredict.h"
+#include "IntraPredict.h"
 #include "log.h"
 
 #include <limits>

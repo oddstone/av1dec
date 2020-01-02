@@ -10,6 +10,7 @@
 namespace Yami {
 
 struct YuvFrame;
+
 }
 
 namespace YamiAv1 {
@@ -21,6 +22,7 @@ class Block : public BlockTree {
     friend class TransformBlock;
     class FindMvStack;
     class InterPredict;
+    class IntraPredict;
 
     class LocalWarp {
         friend class InterPredict;
