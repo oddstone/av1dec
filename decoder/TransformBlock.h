@@ -17,7 +17,7 @@ enum TxClass {
 
 class TransformBlock {
 public:
-    TransformBlock(Block& block, int plane, int startX, int startY, TX_SIZE txSz);
+    TransformBlock(Block& block, int plane, int startX, int startY, TX_SIZE txSz, bool skip);
     void parse();
     bool decode(std::shared_ptr<YuvFrame>& frame);
 
@@ -61,6 +61,8 @@ private:
     Tile& m_tile;
     FrameHeader& m_frame;
     const SequenceHeader& m_sequence;
+
+    bool m_skip;
 
     int plane;
     PLANE_TYPE ptype;

@@ -105,7 +105,7 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
                 haveAboveRight, haveBelowLeft, mode);
             for (size_t row = 0; row < pred.size(); row++) {
                 auto& v = pred[row];
-                for (size_t col = 0; col < v.size(); col++) {          
+                for (size_t col = 0; col < v.size(); col++) {
                     frame->setPixel(plane, baseX + col, baseY + row, v[col]);
                 }
             }
@@ -157,11 +157,9 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
     if (startX >= maxX || startY >= maxY) {
         return;
     }
-    if (!skip) {
-        std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, startX, startY, txSz));
-        tb->parse();
-        m_transformBlocks.push_back(tb);
-    }
+    std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, startX, startY, txSz, skip));
+    tb->parse();
+    m_transformBlocks.push_back(tb);
     for (int i = 0; i < stepY; i++) {
         for (int j = 0; j < stepX; j++) {
             /*        LoopfilterTxSizes[ plane ]
@@ -928,6 +926,11 @@ void Block::inter_block_mode_info()
 
     FindMvStack find(*this);
     find.find_mv_stack();
+    printf("++++++++++(%d, %d)\r\n", MiCol*4, MiRow*4);
+    for (int i = 0; i < find.getNumMvFound(); i++) {
+        printf("%d: (%d, %d)\r\n", i, find.RefStackMv[i]->mv[1], find.RefStackMv[i]->mv[0]);
+    }
+    printf("----------\r\n");
 
     if (skip_mode) {
         YMode = NEAREST_NEARESTMV;
@@ -1450,6 +1453,7 @@ int16_t Block::read_mv_component(uint8_t ctx, uint8_t comp)
             mv_class0_hp = 1;
         mag = ((mv_class0_bit << 3) | (mv_class0_fr << 1) | mv_class0_hp) + 1;
     } else {
+        d = 0;
         for (int i = 0; i < mv_class; i++) {
             int mv_bit = m_entropy.readMvBit(i, ctx, comp);
             d |= mv_bit << i;

@@ -17,6 +17,8 @@ private:
     int getFilterIdx(int size, int candRow, int candCol, int dir);
     void blockInterPrediction(uint8_t refIdx, int refList, int plane, uint32_t w, uint32_t h, int candRow, int candCol);
     void blockWarp(int useWarp, int plane, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
+    void IntraVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const;
+    void maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int plane, int x, int y, int w, int h);
     const Block& m_block;
     const FrameHeader& m_frame;
     const SequenceHeader& m_sequence;

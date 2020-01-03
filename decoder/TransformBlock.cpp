@@ -1136,12 +1136,13 @@ static const int Ac_Qlookup[3][256] = {
         25551, 26047, 26559, 27071, 27599, 28143, 28687, 29247 }
 };
 
-TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_SIZE txSize)
+TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_SIZE txSize, bool skip)
     : m_entropy(block.m_entropy)
     , m_block(block)
     , m_tile(block.m_tile)
     , m_frame(block.m_frame)
     , m_sequence(block.m_sequence)
+    , m_skip(skip)
     , plane(p)
     , ptype(p > 0 ? PLANE_TYPE_UV : PLANE_TYPE_Y)
     , x(startX)
@@ -2251,6 +2252,8 @@ void TransformBlock::reconstruct()
 
 void TransformBlock::parse()
 {
+    if (m_skip)
+        return;
     m_eob = coeffs();
 
     //return;// eob;
@@ -2389,7 +2392,6 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             m_block.MaxLumaW = x + stepX * 4;
             m_block.MaxLumaH = y + stepY * 4;
         }
-
     }
     reconstruct();
     if (!m_block.is_inter) {
@@ -2401,7 +2403,7 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
                 frame->setPixel(plane, x + j, y + i, pixel);
             }
         }
-    }  else {
+    } else {
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
                 int xx = flipLR ? (w - j - 1) : j;
@@ -2410,7 +2412,6 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
                 frame->setPixel(plane, x + j, y + i, pixel);
             }
         }
-    
     }
 
     for (int i = 0; i < stepY; i++) {

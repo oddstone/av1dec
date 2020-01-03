@@ -451,7 +451,7 @@ bool EntropyDecoder::readInterIntra(BLOCK_SIZE MiSize)
 
 INTERINTRA_MODE EntropyDecoder::readInterIntraMode(BLOCK_SIZE MiSize)
 {
-    uint8_t ctx = Size_Group[MiSize] - 1;
+    uint8_t ctx = Size_Group[MiSize];
     return (INTERINTRA_MODE)m_symbol->read(interintra_mode_cdf[ctx], INTERINTRA_MODES);
 }
 

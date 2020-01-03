@@ -362,6 +362,66 @@ void Block::InterPredict::blockWarp(int useWarp, int plane, uint8_t refIdx, int 
         }
     }
 }
+
+void Block::InterPredict::IntraVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const
+{
+    int Ii_Weights_1d[MAX_SB_SIZE] = {
+        60, 58, 56, 54, 52, 50, 48, 47, 45, 44, 42, 41, 39, 38, 37, 35, 34, 33, 32,
+        31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 22, 21, 20, 19, 19, 18, 18, 17, 16,
+        16, 15, 15, 14, 14, 13, 13, 12, 12, 12, 11, 11, 10, 10, 10, 9, 9, 9, 8,
+        8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4, 4,
+        4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    };
+    int sizeScale = MAX_SB_SIZE / std::max(h, w);
+    Mask.assign(h, std::vector<uint8_t>(w));
+    for (int i = 0; i < h; i++) {
+        INTERINTRA_MODE interintra_mode = m_block.interintra_mode;
+        for (int j = 0; j < w; j++) {
+            if (interintra_mode == II_V_PRED) {
+                Mask[i][j] = Ii_Weights_1d[i * sizeScale];
+            } else if (interintra_mode == II_H_PRED) {
+                Mask[i][j] = Ii_Weights_1d[j * sizeScale];
+            } else if (interintra_mode == II_SMOOTH_PRED) {
+                Mask[i][j] = Ii_Weights_1d[std::min(i, j) * sizeScale];
+            } else {
+                Mask[i][j] = 32;
+            }
+        }
+    }
+}
+
+void Block::InterPredict::maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int plane, int dstX, int dstY, int w, int h)
+{
+    uint8_t subX = plane ? m_sequence.subsampling_x : 0;
+    uint8_t subY = plane ? m_sequence.subsampling_y : 0;
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int m;
+            if ((!subX && !subY) || (m_block.interintra && !m_block.wedge_interintra)) {
+                m = Mask[y][x];
+            } else if (subX && !subY) {
+                m = ROUND2(Mask[y][2 * x] + Mask[y][2 * x + 1], 1);
+            } else if (!subX && subY) {
+                m = ROUND2(Mask[2 * y][x] + Mask[2 * y + 1][x], 1);
+            } else {
+                m = ROUND2(Mask[2 * y][2 * x] + Mask[2 * y][2 * x + 1] + Mask[2 * y + 1][2 * x] + Mask[2 * y + 1][2 * x + 1], 2);
+            }
+            if (m_block.interintra) {
+                int pred0 = CLIP1(ROUND2(preds[0][y][x], InterPostRound));
+                int pred1 = m_yuv.getPixel(plane, dstX + x, dstY + y);
+                m_yuv.setPixel(plane, dstX + x, dstY + y, ROUND2(m * pred1 + (64 - m) * pred0, 6));
+            } else {
+                int pred0 = preds[0][y][x];
+                int pred1 = preds[1][y][x];
+                m_yuv.setPixel(plane, dstX + x, dstY + y, CLIP1(ROUND2(m * pred0 + (64 - m) * pred1, 6 + InterPostRound)));
+            }
+        }
+    }
+
+}
+
 void Block::InterPredict::predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
 {
     isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
@@ -403,15 +463,38 @@ void Block::InterPredict::predict_inter(int plane, int x, int y, uint32_t w, uin
     } else {
         blockInterPrediction(refIdx, refList, plane, w, h, candRow, candCol);
     }
-    if (!isCompound) {
+    COMPOUND_TYPE compound_type = m_block.compound_type;
+    std::vector<std::vector<uint8_t>> Mask;
+    if (compound_type == COMPOUND_WEDGE && plane == 0) {
+        //ASSERT(0);
+    } else if (compound_type == COMPOUND_INTRA) {
+        IntraVariantMask(Mask, w, h);
+    } else if (compound_type == COMPOUND_DIFFWTD && plane == 0) {
+        ASSERT(0);
+    }
+    if (compound_type == COMPOUND_DISTANCE) {
+        ASSERT(0);
+    }
+
+    bool IsInterIntra = (m_block.is_inter && m_block.RefFrame[1] == INTRA_FRAME);
+    if (!isCompound && !IsInterIntra) {
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
                 m_yuv.setPixel(plane, x + j, y + i, preds[0][i][j]);
             }
         }
-    } else {
+    } else if (compound_type == COMPOUND_AVERAGE) {
         ASSERT(0);
+    } else if (compound_type == COMPOUND_DISTANCE) {
+        ASSERT(0);
+    } else if (compound_type == COMPOUND_WEDGE) {
     }
+    else {
+        maskBlend(Mask, plane, x, y, w, h);
+    }
+    /*if (m_block.motion_mode == OBMC_CAUSAL) {
+        ASSERT(0);
+    }*/
 }
 
 void Block::FindMvStack::add_tpl_ref_mv(int deltaRow, int deltaCol)
