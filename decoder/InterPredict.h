@@ -17,10 +17,11 @@ private:
     int getFilterIdx(int size, int candRow, int candCol, int dir);
     void blockInterPrediction(uint8_t refIdx, int refList, uint32_t w, uint32_t h, int candRow, int candCol);
     void blockWarp(int useWarp, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
-    void IntraVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const;
+    void intraModeVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const;
     void maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int x, int y, int w, int h);
     void predict_overlap(int pass, int candRow, int candCol, int x4, int y4, int predW, int predH, const uint8_t* mask);
     void overlappedMotionCompensation(int w, int h);
+    void wedgeMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const;
     const Block& m_block;
     const FrameHeader& m_frame;
     const SequenceHeader& m_sequence;

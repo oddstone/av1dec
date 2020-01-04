@@ -999,7 +999,8 @@ void Block::inter_block_mode_info()
             interp_filter[dir] = m_frame.interpolation_filter;
     }
 }
-int Wedge_Bits[BLOCK_SIZES_ALL] = {
+
+static int Wedge_Bits[BLOCK_SIZES_ALL] = {
     0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 0,
     0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0
 };

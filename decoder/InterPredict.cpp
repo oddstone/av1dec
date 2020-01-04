@@ -362,7 +362,7 @@ void Block::InterPredict::blockWarp(int useWarp, uint8_t refIdx, int refList, in
     }
 }
 
-void Block::InterPredict::IntraVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const
+void Block::InterPredict::intraModeVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const
 {
     int Ii_Weights_1d[MAX_SB_SIZE] = {
         60, 58, 56, 54, 52, 50, 48, 47, 45, 44, 42, 41, 39, 38, 37, 35, 34, 33, 32,
@@ -431,7 +431,7 @@ void Block::InterPredict::predict_overlap(int pass, int candRow, int candCol, in
             int m = pass ? mask[j] : mask[i];
             uint8_t pixel = ROUND2(m * m_yuv.getPixel(plane, predX + j, predY + i) + (64 - m) * CLIP1(preds[0][i][j]), 6);
             m_yuv.setPixel(plane, predX + j, predY + i, pixel);
-        }    
+        }
     }
 }
 
@@ -514,6 +514,198 @@ void Block::InterPredict::overlappedMotionCompensation(int w, int h)
     }
 }
 
+const int MASK_MASTER_SIZE = 64;
+static const int Wedge_Master_Oblique_Odd[MASK_MASTER_SIZE] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 6, 18,
+    37, 53, 60, 63, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
+};
+
+static const int Wedge_Master_Oblique_Even[MASK_MASTER_SIZE] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 11, 27,
+    46, 58, 62, 63, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
+};
+
+static int Wedge_Master_Vertical[MASK_MASTER_SIZE] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 7, 21,
+    43, 57, 62, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
+};
+
+enum {
+    WEDGE_HORIZONTAL,
+    WEDGE_VERTICAL,
+    WEDGE_OBLIQUE27,
+    WEDGE_OBLIQUE63,
+    WEDGE_OBLIQUE117,
+    WEDGE_OBLIQUE153,
+    WEDGE_DIRS,
+};
+
+static const int WEDGE_TYPES = 16;
+
+int WedgeMasks[BLOCK_SIZES_ALL][2][WEDGE_TYPES][MASK_MASTER_SIZE][MASK_MASTER_SIZE];
+int MasterMask[WEDGE_DIRS][MASK_MASTER_SIZE][MASK_MASTER_SIZE];
+
+static int Wedge_Bits[BLOCK_SIZES_ALL] = {
+    0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 0,
+    0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0
+};
+
+int Wedge_Codebook[3][16][3] = {
+    {
+        { WEDGE_OBLIQUE27, 4, 4 },
+        { WEDGE_OBLIQUE63, 4, 4 },
+        { WEDGE_OBLIQUE117, 4, 4 },
+        { WEDGE_OBLIQUE153, 4, 4 },
+        { WEDGE_HORIZONTAL, 4, 2 },
+        { WEDGE_HORIZONTAL, 4, 4 },
+        { WEDGE_HORIZONTAL, 4, 6 },
+        { WEDGE_VERTICAL, 4, 4 },
+        { WEDGE_OBLIQUE27, 4, 2 },
+        { WEDGE_OBLIQUE27, 4, 6 },
+        { WEDGE_OBLIQUE153, 4, 2 },
+        { WEDGE_OBLIQUE153, 4, 6 },
+        { WEDGE_OBLIQUE63, 2, 4 },
+        { WEDGE_OBLIQUE63, 6, 4 },
+        { WEDGE_OBLIQUE117, 2, 4 },
+        { WEDGE_OBLIQUE117, 6, 4 },
+    },
+    {
+        { WEDGE_OBLIQUE27, 4, 4 },
+        { WEDGE_OBLIQUE63, 4, 4 },
+        { WEDGE_OBLIQUE117, 4, 4 },
+        { WEDGE_OBLIQUE153, 4, 4 },
+        { WEDGE_VERTICAL, 2, 4 },
+        { WEDGE_VERTICAL, 4, 4 },
+        { WEDGE_VERTICAL, 6, 4 },
+        { WEDGE_HORIZONTAL, 4, 4 },
+        { WEDGE_OBLIQUE27, 4, 2 },
+        { WEDGE_OBLIQUE27, 4, 6 },
+        { WEDGE_OBLIQUE153, 4, 2 },
+        { WEDGE_OBLIQUE153, 4, 6 },
+        { WEDGE_OBLIQUE63, 2, 4 },
+        { WEDGE_OBLIQUE63, 6, 4 },
+        { WEDGE_OBLIQUE117, 2, 4 },
+        { WEDGE_OBLIQUE117, 6, 4 },
+    },
+    {
+        { WEDGE_OBLIQUE27, 4, 4 },
+        { WEDGE_OBLIQUE63, 4, 4 },
+        { WEDGE_OBLIQUE117, 4, 4 },
+        { WEDGE_OBLIQUE153, 4, 4 },
+        { WEDGE_HORIZONTAL, 4, 2 },
+        { WEDGE_HORIZONTAL, 4, 6 },
+        { WEDGE_VERTICAL, 2, 4 },
+        { WEDGE_VERTICAL, 6, 4 },
+        { WEDGE_OBLIQUE27, 4, 2 },
+        { WEDGE_OBLIQUE27, 4, 6 },
+        { WEDGE_OBLIQUE153, 4, 2 },
+        { WEDGE_OBLIQUE153, 4, 6 },
+        { WEDGE_OBLIQUE63, 2, 4 },
+        { WEDGE_OBLIQUE63, 6, 4 },
+        { WEDGE_OBLIQUE117, 2, 4 },
+        { WEDGE_OBLIQUE117, 6, 4 },
+    }
+};
+
+int block_shape(int bsize)
+{
+    int w4 = Num_4x4_Blocks_Wide[bsize];
+    int h4 = Num_4x4_Blocks_High[bsize];
+    if (h4 > w4)
+        return 0;
+    else if (h4 < w4)
+        return 1;
+    else
+        return 2;
+}
+
+int get_wedge_direction(int bsize, int index)
+{
+    return Wedge_Codebook[block_shape(bsize)][index][0];
+}
+int get_wedge_xoff(int bsize, int index)
+{
+    return Wedge_Codebook[block_shape(bsize)][index][1];
+}
+int get_wedge_yoff(int bsize, int index)
+{
+    return Wedge_Codebook[block_shape(bsize)][index][2];
+}
+
+void initialise_wedge_mask_table()
+{
+    static bool inited = false;
+    if (inited)
+        return;
+    int w = MASK_MASTER_SIZE;
+    int h = MASK_MASTER_SIZE;
+    for (int j = 0; j < w; j++)
+    {
+        int shift = MASK_MASTER_SIZE / 4;
+        for (int i = 0; i < h; i += 2)
+        {
+            MasterMask[WEDGE_OBLIQUE63][i][j] = Wedge_Master_Oblique_Even[CLIP3(0, MASK_MASTER_SIZE - 1, j - shift)];
+            shift -= 1;
+            MasterMask[WEDGE_OBLIQUE63][i + 1][j] = Wedge_Master_Oblique_Odd[CLIP3(0, MASK_MASTER_SIZE - 1, j - shift)];
+            MasterMask[WEDGE_VERTICAL][i][j] = Wedge_Master_Vertical[j];
+            MasterMask[WEDGE_VERTICAL][i + 1][j] = Wedge_Master_Vertical[j];
+        }
+    }
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            int msk = MasterMask[WEDGE_OBLIQUE63][i][j];
+            MasterMask[WEDGE_OBLIQUE27][j][i] = msk;
+            MasterMask[WEDGE_OBLIQUE117][i][w - 1 - j] = 64 - msk;
+            MasterMask[WEDGE_OBLIQUE153][w - 1 - j][i] = 64 - msk;
+            MasterMask[WEDGE_HORIZONTAL][j][i] = MasterMask[WEDGE_VERTICAL][i][j];
+        }
+    }
+    for (int bsize = BLOCK_8X8; bsize < BLOCK_SIZES_ALL; bsize++) {
+        if (Wedge_Bits[bsize] > 0) {
+            w = Block_Width[bsize];
+            h = Block_Height[bsize];
+            for (int wedge = 0; wedge < WEDGE_TYPES; wedge++)
+            {
+                int dir = get_wedge_direction((BLOCK_SIZE)bsize, wedge);
+                int xoff = MASK_MASTER_SIZE / 2 - ((get_wedge_xoff(bsize, wedge) * w) >> 3);
+                int yoff = MASK_MASTER_SIZE / 2 - ((get_wedge_yoff(bsize, wedge) * h) >> 3);
+                int sum = 0;
+                for (int i = 0; i < w; i++)
+                    sum += MasterMask[dir][yoff][xoff + i];
+                for (int i = 1; i < h; i++)
+                    sum += MasterMask[dir][yoff + i][xoff];
+                int avg = (sum + (w + h - 1) / 2) / (w + h - 1);
+                int flipSign = (avg < 32);
+                for (int i = 0; i < h; i++)
+                {
+                    for (int j = 0; j < w; j++) {
+                        WedgeMasks[bsize][flipSign][wedge][i][j] = MasterMask[dir][yoff + i][xoff + j];
+                        WedgeMasks[bsize][!flipSign][wedge][i][j] = 64 - MasterMask[dir][yoff + i][xoff + j];
+                    }
+                }
+            }
+        }
+    }
+    inited = true;
+}
+
+void Block::InterPredict::wedgeMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const
+{
+    initialise_wedge_mask_table();
+    Mask.assign(h, std::vector<uint8_t>(w));
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            Mask[i][j] = WedgeMasks[m_block.MiSize][m_block.wedge_sign][m_block.wedge_index][i][j];
+        }
+    }
+}
+
 void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
 {
     isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
@@ -557,9 +749,9 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
     COMPOUND_TYPE compound_type = m_block.compound_type;
     std::vector<std::vector<uint8_t>> Mask;
     if (compound_type == COMPOUND_WEDGE && plane == 0) {
-        //ASSERT(0);
+        wedgeMask(Mask, w, h);
     } else if (compound_type == COMPOUND_INTRA) {
-        IntraVariantMask(Mask, w, h);
+        intraModeVariantMask(Mask, w, h);
     } else if (compound_type == COMPOUND_DIFFWTD && plane == 0) {
         ASSERT(0);
     }
@@ -578,9 +770,9 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
         ASSERT(0);
     } else if (compound_type == COMPOUND_DISTANCE) {
         ASSERT(0);
-    } else if (compound_type == COMPOUND_WEDGE) {
     } else {
-        maskBlend(Mask, x, y, w, h);
+        if (compound_type != COMPOUND_WEDGE || plane == 0)
+            maskBlend(Mask, x, y, w, h);
     }
     if (m_block.motion_mode == OBMC_CAUSAL) {
         overlappedMotionCompensation(w, h);
