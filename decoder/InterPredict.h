@@ -8,20 +8,27 @@ namespace YamiAv1 {
 
 class Block::InterPredict {
 public:
-    InterPredict(Block& block, YuvFrame& yuv, const FrameStore& frameStore);
-    void predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol);
+    InterPredict(Block& block, int plane, YuvFrame& yuv, const FrameStore& frameStore);
+    void predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol);
 
 private:
     uint8_t getUseWarp(int x, int y, int refFrame);
-    void motionVectorScaling(uint8_t refIdx, int plane, int x, int y, const Mv& mv);
+    void motionVectorScaling(uint8_t refIdx, int x, int y, const Mv& mv);
     int getFilterIdx(int size, int candRow, int candCol, int dir);
-    void blockInterPrediction(uint8_t refIdx, int refList, int plane, uint32_t w, uint32_t h, int candRow, int candCol);
-    void blockWarp(int useWarp, int plane, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
+    void blockInterPrediction(uint8_t refIdx, int refList, uint32_t w, uint32_t h, int candRow, int candCol);
+    void blockWarp(int useWarp, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
     void IntraVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const;
-    void maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int plane, int x, int y, int w, int h);
+    void maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int x, int y, int w, int h);
+    void predict_overlap(int pass, int candRow, int candCol, int x4, int y4, int predW, int predH, const uint8_t* mask);
+    void overlappedMotionCompensation(int w, int h);
     const Block& m_block;
     const FrameHeader& m_frame;
     const SequenceHeader& m_sequence;
+    const int plane;
+    const int subX;
+    const int subY;
+    const uint32_t MiRow;
+    const uint32_t MiCol;
     LocalWarp& m_localWarp;
     YuvFrame& m_yuv;
     const FrameStore& m_frameStore;

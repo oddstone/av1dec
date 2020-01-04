@@ -6,11 +6,16 @@
 
 namespace YamiAv1 {
 
-Block::InterPredict::InterPredict(Block& block, YuvFrame& yuv, const FrameStore& frameStore)
+Block::InterPredict::InterPredict(Block& block, int p, YuvFrame& yuv, const FrameStore& frameStore)
     : m_localWarp(block.m_localWarp)
     , m_block(block)
     , m_frame(block.m_frame)
     , m_sequence(block.m_sequence)
+    , plane(p)
+    , subX(plane ? m_sequence.subsampling_x : 0)
+    , subY(plane ? m_sequence.subsampling_y : 0)
+    , MiRow(m_block.MiRow)
+    , MiCol(m_block.MiCol)
     , m_yuv(yuv)
     , m_frameStore(frameStore)
 {
@@ -32,14 +37,12 @@ uint8_t Block::InterPredict::getUseWarp(int w, int h, int refFrame)
     return 0;
 }
 
-void Block::InterPredict::motionVectorScaling(uint8_t refIdx, int plane, int x, int y, const Mv& mv)
+void Block::InterPredict::motionVectorScaling(uint8_t refIdx, int x, int y, const Mv& mv)
 {
     uint32_t xScale, yScale;
     m_frame.getScale(refIdx, xScale, yScale);
 
     const static int halfSample = (1 << (SUBPEL_BITS - 1));
-    uint8_t subX = plane ? m_sequence.subsampling_x : 0;
-    uint8_t subY = plane ? m_sequence.subsampling_y : 0;
     int origX = ((x << SUBPEL_BITS) + ((2 * mv.mv[1]) >> subX) + halfSample);
     int origY = ((y << SUBPEL_BITS) + ((2 * mv.mv[0]) >> subY) + halfSample);
     int baseX = (origX * xScale - (halfSample << REF_SCALE_SHIFT));
@@ -165,7 +168,7 @@ const static int Subpel_Filters[6][16][8] = {
         { 0, 0, 4, 36, 62, 26, 0, 0 },
         { 0, 0, 2, 34, 62, 30, 0, 0 } }
 };
-void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, int plane, uint32_t w, uint32_t h, int candRow, int candCol)
+void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, uint32_t w, uint32_t h, int candRow, int candCol)
 {
     std::vector<std::vector<uint8_t>>& pred = preds[refList];
     pred.assign(h, std::vector<uint8_t>(w));
@@ -175,8 +178,6 @@ void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, int 
     if (refIdx == NONE_FRAME) {
         ASSERT(0);
     } else {
-        int subX = plane ? m_sequence.subsampling_x : 0;
-        int subY = plane ? m_sequence.subsampling_y : 0;
         auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
         lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
         lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
@@ -313,12 +314,10 @@ static const int Warped_Filters[WARPEDPIXEL_PREC_SHIFTS * 3 + 1][8] = {
     { 0, 0, 0, 0, 2, 127, -1, 0 }
 };
 
-void Block::InterPredict::blockWarp(int useWarp, int plane, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h)
+void Block::InterPredict::blockWarp(int useWarp, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h)
 {
     YuvFrame& ref = *m_frameStore[refIdx];
     std::vector<std::vector<uint8_t>>& pred = preds[refList];
-    int subX = plane ? m_sequence.subsampling_x : 0;
-    int subY = plane ? m_sequence.subsampling_y : 0;
     auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
     int lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
     int lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
@@ -392,10 +391,8 @@ void Block::InterPredict::IntraVariantMask(std::vector<std::vector<uint8_t>>& Ma
     }
 }
 
-void Block::InterPredict::maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int plane, int dstX, int dstY, int w, int h)
+void Block::InterPredict::maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int dstX, int dstY, int w, int h)
 {
-    uint8_t subX = plane ? m_sequence.subsampling_x : 0;
-    uint8_t subY = plane ? m_sequence.subsampling_y : 0;
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             int m;
@@ -419,10 +416,105 @@ void Block::InterPredict::maskBlend(const std::vector<std::vector<uint8_t>>& Mas
             }
         }
     }
-
 }
 
-void Block::InterPredict::predict_inter(int plane, int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
+void Block::InterPredict::predict_overlap(int pass, int candRow, int candCol, int x4, int y4, int predW, int predH, const uint8_t* mask)
+{
+    Mv mv = m_frame.Mvs[candRow][candCol][0];
+    int refIdx = m_frame.ref_frame_idx[m_frame.RefFrames[candRow][candCol][0] - LAST_FRAME];
+    int predX = (x4 * 4) >> subX;
+    int predY = (y4 * 4) >> subY;
+    motionVectorScaling(refIdx, predX, predY, mv);
+    blockInterPrediction(refIdx, 0, predW, predH, candRow, candCol);
+    for (int i = 0; i < predH; i++) {
+        for (int j = 0; j < predW; j++) {
+            int m = pass ? mask[j] : mask[i];
+            uint8_t pixel = ROUND2(m * m_yuv.getPixel(plane, predX + j, predY + i) + (64 - m) * CLIP1(preds[0][i][j]), 6);
+            m_yuv.setPixel(plane, predX + j, predY + i, pixel);
+        }    
+    }
+}
+
+const uint8_t* get_obmc_mask(int length)
+{
+    const static uint8_t Obmc_Mask_2[2] = { 45, 64 };
+    const static uint8_t Obmc_Mask_4[4] = { 39, 50, 59, 64 };
+    const static uint8_t Obmc_Mask_8[8] = { 36, 42, 48, 53, 57, 61, 64, 64 };
+    const static uint8_t Obmc_Mask_16[16] = {
+        34, 37, 40, 43, 46, 49, 52, 54,
+        56, 58, 60, 61, 64, 64, 64, 64
+    };
+    const static uint8_t Obmc_Mask_32[32] = {
+        33, 35, 36, 38, 40, 41, 43, 44,
+        45, 47, 48, 50, 51, 52, 53, 55,
+        56, 57, 58, 59, 60, 60, 61, 62,
+        64, 64, 64, 64, 64, 64, 64, 64
+    };
+    if (length == 2) {
+        return Obmc_Mask_2;
+    } else if (length == 4) {
+        return Obmc_Mask_4;
+    } else if (length == 8) {
+        return Obmc_Mask_8;
+    } else if (length == 16) {
+        return Obmc_Mask_16;
+    } else {
+        return Obmc_Mask_32;
+    }
+}
+
+void Block::InterPredict::overlappedMotionCompensation(int w, int h)
+{
+    BLOCK_SIZE MiSize = m_block.MiSize;
+    if (m_block.AvailU) {
+        if (m_sequence.get_plane_residual_size(MiSize, plane) >= BLOCK_8X8) {
+            int pass = 0;
+            int w4 = Num_4x4_Blocks_Wide[MiSize];
+            int x4 = MiCol;
+            int y4 = MiRow;
+            int nCount = 0;
+            int nLimit = std::min(4, (int)Mi_Width_Log2[MiSize]);
+            while (nCount < nLimit && x4 < std::min(m_frame.MiCols, MiCol + w4)) {
+                int candRow = MiRow - 1;
+                int candCol = x4 | 1;
+                BLOCK_SIZE candSz = m_frame.MiSizes[candRow][candCol];
+                int step4 = CLIP3(2, 16, Num_4x4_Blocks_Wide[candSz]);
+                if (m_frame.RefFrames[candRow][candCol][0] > INTRA_FRAME) {
+                    nCount += 1;
+                    int predW = std::min(w, (step4 * MI_SIZE) >> subX);
+                    int predH = std::min(h >> 1, 32 >> subY);
+                    const uint8_t* mask = get_obmc_mask(predH);
+                    predict_overlap(pass, candRow, candCol, x4, y4, predW, predH, mask);
+                }
+                x4 += step4;
+            }
+        }
+    }
+    if (m_block.AvailL) {
+        int pass = 1;
+        int h4 = Num_4x4_Blocks_High[MiSize];
+        int x4 = MiCol;
+        int y4 = MiRow;
+        int nCount = 0;
+        int nLimit = std::min(4, (int)Mi_Height_Log2[MiSize]);
+        while (nCount < nLimit && y4 < std::min(m_frame.MiRows, MiRow + h4)) {
+            int candCol = MiCol - 1;
+            int candRow = y4 | 1;
+            BLOCK_SIZE candSz = m_frame.MiSizes[candRow][candCol];
+            int step4 = CLIP3(2, 16, Num_4x4_Blocks_High[candSz]);
+            if (m_frame.RefFrames[candRow][candCol][0] > INTRA_FRAME) {
+                nCount += 1;
+                int predW = std::min(w >> 1, 32 >> subX);
+                int predH = std::min(h, (step4 * MI_SIZE) >> subY);
+                const uint8_t* mask = get_obmc_mask(predW);
+                predict_overlap(pass, candRow, candCol, x4, y4, predW, predH, mask);
+            }
+            y4 += step4;
+        }
+    }
+}
+
+void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
 {
     isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
     if (isCompound) {
@@ -446,7 +538,7 @@ void Block::InterPredict::predict_inter(int plane, int x, int y, uint32_t w, uin
     } else {
         ASSERT(0);
     }
-    motionVectorScaling(refIdx, plane, x, y, mv);
+    motionVectorScaling(refIdx, x, y, mv);
 
     if (m_block.use_intrabc) {
         ASSERT(0);
@@ -456,12 +548,11 @@ void Block::InterPredict::predict_inter(int plane, int x, int y, uint32_t w, uin
         pred.assign(h, std::vector<uint8_t>(w));
         for (int i8 = 0; i8 <= ((h - 1) >> 3); i8++) {
             for (int j8 = 0; j8 <= ((w - 1) >> 3); j8++) {
-                blockWarp(useWarp, plane, refIdx, refList, x, y, i8, j8, w, h);
+                blockWarp(useWarp, refIdx, refList, x, y, i8, j8, w, h);
             }
         }
-
     } else {
-        blockInterPrediction(refIdx, refList, plane, w, h, candRow, candCol);
+        blockInterPrediction(refIdx, refList, w, h, candRow, candCol);
     }
     COMPOUND_TYPE compound_type = m_block.compound_type;
     std::vector<std::vector<uint8_t>> Mask;
@@ -488,13 +579,12 @@ void Block::InterPredict::predict_inter(int plane, int x, int y, uint32_t w, uin
     } else if (compound_type == COMPOUND_DISTANCE) {
         ASSERT(0);
     } else if (compound_type == COMPOUND_WEDGE) {
+    } else {
+        maskBlend(Mask, x, y, w, h);
     }
-    else {
-        maskBlend(Mask, plane, x, y, w, h);
+    if (m_block.motion_mode == OBMC_CAUSAL) {
+        overlappedMotionCompensation(w, h);
     }
-    /*if (m_block.motion_mode == OBMC_CAUSAL) {
-        ASSERT(0);
-    }*/
 }
 
 void Block::FindMvStack::add_tpl_ref_mv(int deltaRow, int deltaCol)

@@ -130,8 +130,8 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
             for (uint32_t y = 0; y < num4x4H * 4; y += predH) {
                 uint32_t c = 0;
                 for (uint32_t x = 0; x < num4x4W * 4; x += predW) {
-                    InterPredict inter(*this, *frame, frameStore);
-                    inter.predict_inter(plane, baseX + x, baseY + y, predW, predH, candRow + r, candCol + c);
+                    InterPredict inter(*this, plane, *frame, frameStore);
+                    inter.predict_inter(baseX + x, baseY + y, predW, predH, candRow + r, candCol + c);
                     c++;
                 }
                 r++;
