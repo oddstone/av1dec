@@ -1256,13 +1256,13 @@ inline int nondiag(int v, int divFactor, int divShift)
 {
     return CLIP3(-WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
         WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1,
-        ROUND2SIGNED(v * divFactor, divShift));
+        ROUND2SIGNED((int64_t)v * divFactor, divShift));
 }
 inline int diag(int v, int divFactor, int divShift)
 {
     return CLIP3((1 << WARPEDMODEL_PREC_BITS) - WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
         (1 << WARPEDMODEL_PREC_BITS) + WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1,
-        ROUND2SIGNED(v * divFactor, divShift));
+        ROUND2SIGNED((int64_t)v * divFactor, divShift));
 }
 void Block::LocalWarp::warpEstimation()
 {
@@ -1333,9 +1333,9 @@ bool Block::LocalWarp::setupShear(const int warpParams[6], int& alpha, int& beta
     int beta0 = CLIP3(-32768, 32767, warpParams[3]);
     int divShift, divFactor;
     resolveDivisor(warpParams[2], divShift, divFactor);
-    int v = (warpParams[4] << WARPEDMODEL_PREC_BITS);
+    int64_t v = (warpParams[4] << WARPEDMODEL_PREC_BITS);
     int gamma0 = CLIP3(-32768, 32767, ROUND2SIGNED(v * divFactor, divShift));
-    int w = (warpParams[3] * warpParams[4]);
+    int64_t w = (warpParams[3] * warpParams[4]);
     int delta0 = CLIP3(-32768, 32767, warpParams[5] - ROUND2SIGNED(w * divFactor, divShift) - (1 << WARPEDMODEL_PREC_BITS));
 
     static const int WARP_PARAM_REDUCE_BITS = 6;
