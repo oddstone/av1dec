@@ -362,7 +362,7 @@ void Block::InterPredict::blockWarp(int useWarp, uint8_t refIdx, int refList, in
     }
 }
 
-void Block::InterPredict::intraModeVariantMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const
+void Block::InterPredict::intraModeVariantMask(int w, int h)
 {
     int Ii_Weights_1d[MAX_SB_SIZE] = {
         60, 58, 56, 54, 52, 50, 48, 47, 45, 44, 42, 41, 39, 38, 37, 35, 34, 33, 32,
@@ -391,7 +391,7 @@ void Block::InterPredict::intraModeVariantMask(std::vector<std::vector<uint8_t>>
     }
 }
 
-void Block::InterPredict::maskBlend(const std::vector<std::vector<uint8_t>>& Mask, int dstX, int dstY, int w, int h)
+void Block::InterPredict::maskBlend(int dstX, int dstY, int w, int h)
 {
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
@@ -645,11 +645,9 @@ void initialise_wedge_mask_table()
         return;
     int w = MASK_MASTER_SIZE;
     int h = MASK_MASTER_SIZE;
-    for (int j = 0; j < w; j++)
-    {
+    for (int j = 0; j < w; j++) {
         int shift = MASK_MASTER_SIZE / 4;
-        for (int i = 0; i < h; i += 2)
-        {
+        for (int i = 0; i < h; i += 2) {
             MasterMask[WEDGE_OBLIQUE63][i][j] = Wedge_Master_Oblique_Even[CLIP3(0, MASK_MASTER_SIZE - 1, j - shift)];
             shift -= 1;
             MasterMask[WEDGE_OBLIQUE63][i + 1][j] = Wedge_Master_Oblique_Odd[CLIP3(0, MASK_MASTER_SIZE - 1, j - shift)];
@@ -670,8 +668,7 @@ void initialise_wedge_mask_table()
         if (Wedge_Bits[bsize] > 0) {
             w = Block_Width[bsize];
             h = Block_Height[bsize];
-            for (int wedge = 0; wedge < WEDGE_TYPES; wedge++)
-            {
+            for (int wedge = 0; wedge < WEDGE_TYPES; wedge++) {
                 int dir = get_wedge_direction((BLOCK_SIZE)bsize, wedge);
                 int xoff = MASK_MASTER_SIZE / 2 - ((get_wedge_xoff(bsize, wedge) * w) >> 3);
                 int yoff = MASK_MASTER_SIZE / 2 - ((get_wedge_yoff(bsize, wedge) * h) >> 3);
@@ -682,8 +679,7 @@ void initialise_wedge_mask_table()
                     sum += MasterMask[dir][yoff + i][xoff];
                 int avg = (sum + (w + h - 1) / 2) / (w + h - 1);
                 int flipSign = (avg < 32);
-                for (int i = 0; i < h; i++)
-                {
+                for (int i = 0; i < h; i++) {
                     for (int j = 0; j < w; j++) {
                         WedgeMasks[bsize][flipSign][wedge][i][j] = MasterMask[dir][yoff + i][xoff + j];
                         WedgeMasks[bsize][!flipSign][wedge][i][j] = 64 - MasterMask[dir][yoff + i][xoff + j];
@@ -695,9 +691,11 @@ void initialise_wedge_mask_table()
     inited = true;
 }
 
-void Block::InterPredict::wedgeMask(std::vector<std::vector<uint8_t>>& Mask, int w, int h) const
+void Block::InterPredict::wedgeMask(int w, int h)
 {
     initialise_wedge_mask_table();
+    w <<= subX;
+    h <<= subY;
     Mask.assign(h, std::vector<uint8_t>(w));
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
@@ -747,11 +745,10 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
         blockInterPrediction(refIdx, refList, w, h, candRow, candCol);
     }
     COMPOUND_TYPE compound_type = m_block.compound_type;
-    std::vector<std::vector<uint8_t>> Mask;
-    if (compound_type == COMPOUND_WEDGE && plane == 0) {
-        wedgeMask(Mask, w, h);
+    if (compound_type == COMPOUND_WEDGE) {
+        wedgeMask(w, h);
     } else if (compound_type == COMPOUND_INTRA) {
-        intraModeVariantMask(Mask, w, h);
+        intraModeVariantMask(w, h);
     } else if (compound_type == COMPOUND_DIFFWTD && plane == 0) {
         ASSERT(0);
     }
@@ -771,8 +768,8 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
     } else if (compound_type == COMPOUND_DISTANCE) {
         ASSERT(0);
     } else {
-        if (compound_type != COMPOUND_WEDGE || plane == 0)
-            maskBlend(Mask, x, y, w, h);
+        //if (compound_type != COMPOUND_WEDGE || plane == 0)
+        maskBlend(x, y, w, h);
     }
     if (m_block.motion_mode == OBMC_CAUSAL) {
         overlappedMotionCompensation(w, h);
