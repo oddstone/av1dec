@@ -317,7 +317,7 @@ bool LoopFilter::getIsBlockEdge(int xP, int yP, BLOCK_SIZE planeSize, int pass)
 {
     if (!pass && !(xP % Block_Width[planeSize]))
         return true;
-    if (pass && !(yP % Block_Width[planeSize]))
+    if (pass && !(yP % Block_Height[planeSize]))
         return true;
     return false;
 }
