@@ -272,8 +272,8 @@ void Block::reset_block_context()
     for (int plane = 0; plane < 1 + 2 * HasChroma; plane++) {
         int subX = (plane > 0) ? subsampling_x : 0;
         int subY = (plane > 0) ? subsampling_y : 0;
-        m_tile.m_above.reset(plane, MiCol >> subX, bw4);
-        m_tile.m_left.reset(plane, MiRow >> subY, bh4);
+        m_tile.m_above.reset(plane, MiCol >> subX, bw4>>subX);
+        m_tile.m_left.reset(plane, MiRow >> subY, bh4>>subY);
     }
 }
 
