@@ -69,9 +69,6 @@ uint8_t SymbolDecoder::read(uint16_t* icdf, uint8_t nicdf, bool disableUpdate)
     static FILE* fp = fopen("symbol.txt", "w");
     fprintf(fp, "%d\r\n", SymbolRange);
     fflush(fp);
-    //39901
-    if (SymbolRange == 49364)
-        printf("%d\r\n", SymbolRange);
     return symbol;
 }
 

@@ -102,7 +102,8 @@ bool Decoder::decodeFrame(TileGroup tiles)
         printf("warning: disable_frame_end_update_cdf is not supported");
     }
     std::shared_ptr<YuvFrame> filtered = decode_frame_wrapup(frame);
-#if 0
+//#define DUMP
+#ifdef DUMP
     static int i = 0;
     i++;
     if (i == 2) {
@@ -121,7 +122,7 @@ std::shared_ptr<YuvFrame> Decoder::decode_frame_wrapup(const std::shared_ptr<Yuv
     FrameHeader& h = *m_frame;
     if (h.show_existing_frame)
         return frame;
-#if 0
+#ifdef DUMP
     static int i = 0;
     i++;
     if (i == 2) {

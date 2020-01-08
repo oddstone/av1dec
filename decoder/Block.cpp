@@ -1236,13 +1236,13 @@ const static int Div_Lut[DIV_LUT_NUM] = {
     8240, 8224, 8208, 8192
 };
 
-void Block::LocalWarp::resolveDivisor(int d, int& divShift, int& divFactor) const
+void Block::LocalWarp::resolveDivisor(int64_t d, int& divShift, int& divFactor) const
 {
     static const int DIV_LUT_BITS = 8;
     static const int DIV_LUT_PREC_BITS = 14;
     int n = FloorLog2(std::abs(d));
-    int e = std::abs(d) - (1 << n);
-    int f = n > DIV_LUT_BITS ? ROUND2(e, n - DIV_LUT_BITS) : (e << (DIV_LUT_BITS - n));
+    int64_t e = std::abs(d) - ((int64_t)1 << n);
+    int64_t f = n > DIV_LUT_BITS ? ROUND2(e, n - DIV_LUT_BITS) : (e << (DIV_LUT_BITS - n));
     divShift = (n + DIV_LUT_PREC_BITS);
     divFactor = d < 0 ? -Div_Lut[f] : Div_Lut[f];
 }
@@ -1253,23 +1253,23 @@ inline int ls_product(int a, int b)
 
 static const int WARPEDMODEL_NONDIAGAFFINE_CLAMP = 1 << 13;
 
-inline int nondiag(int v, int divFactor, int divShift)
+inline int nondiag(int64_t v, int divFactor, int divShift)
 {
     return CLIP3(-WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
         WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1,
-        ROUND2SIGNED((int64_t)v * divFactor, divShift));
+        ROUND2SIGNED_64((int64_t)v * divFactor, divShift));
 }
-inline int diag(int v, int divFactor, int divShift)
+inline int diag(int64_t v, int divFactor, int divShift)
 {
     return CLIP3((1 << WARPEDMODEL_PREC_BITS) - WARPEDMODEL_NONDIAGAFFINE_CLAMP + 1,
         (1 << WARPEDMODEL_PREC_BITS) + WARPEDMODEL_NONDIAGAFFINE_CLAMP - 1,
-        ROUND2SIGNED((int64_t)v * divFactor, divShift));
+        ROUND2SIGNED_64((int64_t)v * divFactor, divShift));
 }
 void Block::LocalWarp::warpEstimation()
 {
-    int A[2][2];
-    int Bx[2];
-    int By[2];
+    int64_t A[2][2];
+    int64_t Bx[2];
+    int64_t By[2];
     memset(A, 0, sizeof(A));
     Bx[1] = Bx[0] = 0;
     By[1] = By[0] = 0;
@@ -1295,7 +1295,7 @@ void Block::LocalWarp::warpEstimation()
             By[1] += ls_product(sy, dy) + 8;
         }
     }
-    int det = A[0][0] * A[1][1] - A[0][1] * A[0][1];
+    int64_t det =A[0][0] * A[1][1] - A[0][1] * A[0][1];
     LocalValid = (det != 0);
     if (!LocalValid)
         return;

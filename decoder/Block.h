@@ -39,7 +39,7 @@ class Block : public BlockTree {
     private:
         void add_sample(int deltaRow, int deltaCol);
 
-        void resolveDivisor(int d, int& divShift, int& divFactor) const;
+        void resolveDivisor(int64_t d, int& divShift, int& divFactor) const;
 
         const Block& m_block;
         const Tile& m_tile;

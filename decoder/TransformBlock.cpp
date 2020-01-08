@@ -2252,8 +2252,11 @@ void TransformBlock::reconstruct()
 
 void TransformBlock::parse()
 {
-    if (m_skip)
+    if (m_skip) {
+        m_tile.m_above.set(plane, x4, w4, 0, 0);
+        m_tile.m_left.set(plane, y4, h4, 0, 0);
         return;
+    }
     m_eob = coeffs();
 
     //return;// eob;
