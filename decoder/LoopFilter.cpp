@@ -63,6 +63,8 @@ void LoopFilter::loop_filter_edge(const std::shared_ptr<YuvFrame>& frame,
 
     int lvl, limit, blimit, thresh;
     getFilterStrength(row, col, plane, pass, lvl, limit, blimit, thresh);
+    if (!lvl)
+        getFilterStrength(prevRow, prevCol, plane, pass, lvl, limit, blimit, thresh);
 
     for (int i = 0; i < MI_SIZE; i++) {
         if (applyFilter && lvl > 0) {
