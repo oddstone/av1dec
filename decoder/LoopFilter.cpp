@@ -32,6 +32,31 @@ void LoopFilter::filter(const std::shared_ptr<YuvFrame>& frame) const
     }
 }
 
+static bool getIsBlockEdge(int xP, int yP, BLOCK_SIZE planeSize, int pass)
+{
+    if (!pass && !(xP % Block_Width[planeSize]))
+        return true;
+    if (pass && !(yP % Block_Height[planeSize]))
+        return true;
+    return false;
+}
+
+static bool getIsTxEdge(int xP, int yP, TX_SIZE txSize, int pass)
+{
+    if (!pass && !(xP % Tx_Width[txSize]))
+        return true;
+    if (pass && !(yP % Tx_Height[txSize]))
+        return true;
+    return false;
+}
+
+static bool getApplyFilter(bool isTxEdge, bool isBlockEdge, bool skip, bool isIntra)
+{
+    if (!isTxEdge)
+        return false;
+    return isBlockEdge || !skip || isIntra;
+}
+
 void LoopFilter::loop_filter_edge(const std::shared_ptr<YuvFrame>& frame,
     int plane, int pass, int row, int col) const
 {
@@ -315,28 +340,4 @@ bool LoopFilter::isOnScreen(int x, int y, int pass) const
     return true;
 }
 
-bool LoopFilter::getIsBlockEdge(int xP, int yP, BLOCK_SIZE planeSize, int pass)
-{
-    if (!pass && !(xP % Block_Width[planeSize]))
-        return true;
-    if (pass && !(yP % Block_Height[planeSize]))
-        return true;
-    return false;
-}
-
-bool LoopFilter::getIsTxEdge(int xP, int yP, TX_SIZE txSize, int pass)
-{
-    if (!pass && !(xP % Tx_Width[txSize]))
-        return true;
-    if (pass && !(yP % Tx_Height[txSize]))
-        return true;
-    return false;
-}
-
-bool LoopFilter::getApplyFilter(bool isTxEdge, bool isBlockEdge, bool skip, bool isIntra)
-{
-    if (!isTxEdge)
-        return false;
-    return isBlockEdge || !skip || isIntra;
-}
 }

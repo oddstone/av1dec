@@ -37,12 +37,6 @@ private:
 
     bool isOnScreen(int x, int y, int pass) const;
 
-    static bool getIsBlockEdge(int xP, int yP, BLOCK_SIZE planeSize, int pass);
-
-    static bool getIsTxEdge(int xP, int yP, TX_SIZE txSize, int pass);
-
-    static bool getApplyFilter(bool isTxEdge, bool isBlockEdge, bool skip, bool isIntra);
-
     ConstFramePtr m_frame;
     const SequenceHeader& m_sequence;
     const LoopFilterParams& m_filter;
