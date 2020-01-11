@@ -3,7 +3,6 @@
 
 namespace YamiAv1 {
 
-using namespace YamiAv1;
 LoopFilter::LoopFilter(const ConstFramePtr& frame)
     : m_frame(frame)
     , m_sequence(*frame->m_sequence)
