@@ -57,12 +57,12 @@ std::shared_ptr<YuvFrame> LoopRestoration::filter()
     return LrFrame;
 }
 
-std::vector<int8_t> getFilter(const std::vector<int8_t>& coeff)
+std::vector<int> getFilter(const std::vector<int8_t>& coeff)
 {
-    std::vector<int8_t> filter(FILTER_BITS);
+    std::vector<int> filter(FILTER_BITS);
     filter[3] = 128;
     for (int i = 0; i < 3; i++) {
-        uint8_t c = coeff[i];
+        int c = coeff[i];
         filter[i] = c;
         filter[6 - i] = c;
         filter[3] -= 2 * c;
@@ -91,8 +91,8 @@ void LoopRestoration::wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
     int plane, int unitRow, int unitCol, int x, int y, int w, int h, int StripeStartY, int StripeEndY)
 {
     int BitDepth = m_sequence.BitDepth;
-    std::vector<int8_t> vfilter = getFilter(m_loopRestoration.LrWiener[plane][unitRow][unitCol][0]);
-    std::vector<int8_t> hfilter = getFilter(m_loopRestoration.LrWiener[plane][unitRow][unitCol][1]);
+    std::vector<int> vfilter = getFilter(m_loopRestoration.LrWiener[plane][unitRow][unitCol][0]);
+    std::vector<int> hfilter = getFilter(m_loopRestoration.LrWiener[plane][unitRow][unitCol][1]);
     std::vector<std::vector<int>> intermediate;
     intermediate.assign(h + 6, std::vector<int>(w));
     int offset = (1 << (BitDepth + FILTER_BITS - InterRound0 - 1));
