@@ -201,8 +201,8 @@ enum CompMode {
 
 enum GlobalMotionType {
     IDENTITY,
-    ROTZOOM,
     TRANSLATION,
+    ROTZOOM,
     AFFINE,
 };
 

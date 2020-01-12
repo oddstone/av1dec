@@ -477,6 +477,7 @@ struct FrameHeader {
     const static int MAX_PLANES = 3;
     GlobalMotionType GmType[NUM_REF_FRAMES];
     int gm_params[NUM_REF_FRAMES][6];
+    int PrevGmParams[NUM_REF_FRAMES][6];
 
     std::vector<uint32_t> MiColStarts;
     std::vector<uint32_t> MiRowStarts;
@@ -551,7 +552,7 @@ private:
     bool is_scaled(int refFrame) const;
     void getScale(uint8_t refIdx, uint32_t& xScale, uint32_t& yScale) const;
 
-    bool read_global_param(GlobalMotionType type, uint8_t ref, int idx);
+    bool read_global_param(BitReader& br, GlobalMotionType type, uint8_t ref, int idx);
 
     bool global_motion_params(BitReader& br);
 

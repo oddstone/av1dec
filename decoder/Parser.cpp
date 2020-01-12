@@ -550,6 +550,12 @@ bool FrameHeader::lr_params(BitReader& br)
 
 void FrameHeader::setup_past_independence()
 {
+    for (uint8_t ref = LAST_FRAME; ref <= ALTREF_FRAME; ref++) {
+        GmType[ref] = IDENTITY;
+        for (int i = 0; i < 6; i++) {
+            PrevGmParams[ref][i] = ((i % 3 == 2) ? 1 << WARPEDMODEL_PREC_BITS : 0);
+        }
+    }
     m_loopFilter.setup_past_independence();
     m_segmentation.setup_past_independence();
 }
@@ -956,11 +962,100 @@ bool FrameHeader::skip_mode_params(BitReader& br, const RefInfo& refInfo)
     return true;
 }
 
-bool FrameHeader::read_global_param(GlobalMotionType type, uint8_t ref, int idx)
+static int inverse_recenter(int r, int v)
 {
-    ASSERT(0);
+    if (v > 2 * r)
+        return v;
+    else if (v & 1)
+        return r - ((v + 1) >> 1);
+    else
+        return r + (v >> 1);
+}
+
+static bool decode_subexp(BitReader& br, int numSyms, int& v)
+{
+    int i = 0;
+    int mk = 0;
+    int k = 3;
+    while (1) {
+        int b2 = i ? k + i - 1 : k;
+        int a = 1 << b2;
+        if (numSyms <= mk + 3 * a) {
+            uint32_t subexp_final_bits;
+            READ_NS(subexp_final_bits, numSyms - mk);
+            v = subexp_final_bits + mk;
+            return true;
+        } else {
+            bool subexp_more_bits;
+            READ(subexp_more_bits);
+            if (subexp_more_bits) {
+                i++;
+                mk += a;
+            } else {
+                int subexp_bits;
+                READ_BITS(subexp_bits, b2);
+                v = subexp_bits + mk;
+                return true;
+            }
+        }
+    }
+}
+
+static int decode_unsigned_subexp_with_ref(BitReader& br, int mx, int r, int& v)
+{
+    if (!decode_subexp(br, mx, v))
+        return false;
+    if ((r << 1) <= mx) {
+        v = inverse_recenter(r, v);
+    } else {
+        v = mx - 1 - inverse_recenter(mx - 1 - r, v);
+    }
     return true;
 }
+
+static int decode_signed_subexp_with_ref(BitReader& br, int low, int high, int r, int& v)
+{
+    int x = 0;
+    if (!decode_unsigned_subexp_with_ref(br, high - low, r - low, x))
+        return false;
+    v = x + low;
+    return true;
+}
+
+bool FrameHeader::read_global_param(BitReader& br, GlobalMotionType type, uint8_t ref, int idx)
+{
+    const static int GM_ABS_ALPHA_BITS = 12;
+    const static int GM_ALPHA_PREC_BITS = 15;
+    const static int GM_ABS_TRANS_ONLY_BITS = 9;
+    const static int GM_TRANS_ONLY_PREC_BITS = 3;
+    const static int GM_ABS_TRANS_BITS = 12;
+    const static int GM_TRANS_PREC_BITS = 6;
+    int absBits = GM_ABS_ALPHA_BITS;
+    int precBits = GM_ALPHA_PREC_BITS;
+    if (idx < 2) {
+        if (type == TRANSLATION) {
+            absBits = GM_ABS_TRANS_ONLY_BITS - !allow_high_precision_mv;
+            precBits = GM_TRANS_ONLY_PREC_BITS - !allow_high_precision_mv;
+        } else {
+            absBits = GM_ABS_TRANS_BITS;
+            precBits = GM_TRANS_PREC_BITS;
+        }
+    }
+    int precDiff = WARPEDMODEL_PREC_BITS - precBits;
+    int round = (idx % 3) == 2 ? (1 << WARPEDMODEL_PREC_BITS) : 0;
+    int sub = (idx % 3) == 2 ? (1 << precBits) : 0;
+    int mx = (1 << absBits);
+    int r = (PrevGmParams[ref][idx] >> precDiff) - sub;
+    int v;
+    if (!decode_signed_subexp_with_ref(br, -mx, mx + 1, r, v))
+        return false;
+    gm_params[ref][idx] = (v << precDiff) + round;
+    return true;
+}
+
+#define READ_GLOBAL_PARAM(idx) \
+    if (!read_global_param(br, type, ref, idx)) \
+        return false;
 
 bool FrameHeader::global_motion_params(BitReader& br)
 {
@@ -991,19 +1086,19 @@ bool FrameHeader::global_motion_params(BitReader& br)
         }
         GmType[ref] = type;
         if (type >= ROTZOOM) {
-            read_global_param(type, ref, 2);
-            read_global_param(type, ref, 3);
+            READ_GLOBAL_PARAM(2);
+            READ_GLOBAL_PARAM(3);
             if (type == AFFINE) {
-                read_global_param(type, ref, 4);
-                read_global_param(type, ref, 5);
+                READ_GLOBAL_PARAM(4);
+                READ_GLOBAL_PARAM(5);
             } else {
                 gm_params[ref][4] = -gm_params[ref][3];
                 gm_params[ref][5] = gm_params[ref][2];
             }
         }
         if (type >= TRANSLATION) {
-            read_global_param(type, ref, 0);
-            read_global_param(type, ref, 1);
+            READ_GLOBAL_PARAM(0);
+            READ_GLOBAL_PARAM(1);
         }
     }
     return true;

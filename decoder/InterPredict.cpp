@@ -719,7 +719,8 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
     int refList = 0;
     int refFrame = m_frame.RefFrames[candRow][candCol][refList];
     if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV) && m_frame.GmType[refFrame] > TRANSLATION) {
-        ASSERT(0);
+        int alpha, beta, gamma, delta;
+        globaValid = m_localWarp.setupShear(m_frame.gm_params[refFrame], alpha, beta, gamma, delta);
     }
     uint8_t useWarp = getUseWarp(w, h, refFrame);
     Mv mv = m_frame.Mvs[candRow][candCol][refList];
@@ -1058,7 +1059,7 @@ void Block::FindMvStack::setupGlobalMV(uint8_t refList)
     GlobalMotionType typ;
     uint8_t ref = m_block.RefFrame[refList];
     if (ref != INTRA_FRAME)
-        typ = IDENTITY;
+        typ = m_frame.GmType[ref];
     if (ref == INTRA_FRAME || typ == IDENTITY) {
         mv.mv[0] = mv.mv[1] = 0;
     } else if (typ == TRANSLATION) {
@@ -1077,7 +1078,7 @@ void Block::FindMvStack::setupGlobalMV(uint8_t refList)
             mv.mv[1] = ROUND2SIGNED(xc, WARPEDMODEL_PREC_BITS - 2) * 2;
         }
     }
-    lower_mv_precision(mv);
+    //lower_mv_precision(mv);
 }
 void Block::FindMvStack::lower_mv_precision(Mv& mv)
 {
