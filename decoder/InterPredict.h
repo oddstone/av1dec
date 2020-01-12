@@ -43,7 +43,7 @@ private:
     int startY = 0;
     int xStep = 0;
     int yStep = 0;
-    std::vector<std::vector<uint8_t>> preds[2];
+    std::vector<std::vector<int16_t>> preds[2];
     std::vector<std::vector<uint8_t>> Mask;
 };
 

@@ -170,8 +170,8 @@ const static int Subpel_Filters[6][16][8] = {
 };
 void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, uint32_t w, uint32_t h, int candRow, int candCol)
 {
-    std::vector<std::vector<uint8_t>>& pred = preds[refList];
-    pred.assign(h, std::vector<uint8_t>(w));
+    std::vector<std::vector<int16_t>>& pred = preds[refList];
+    pred.assign(h, std::vector<int16_t>(w));
     YuvFrame& ref = (refIdx == NONE_FRAME ? m_yuv : *m_frameStore[refIdx]);
 
     int lastX, lastY;
@@ -317,7 +317,7 @@ static const int Warped_Filters[WARPEDPIXEL_PREC_SHIFTS * 3 + 1][8] = {
 void Block::InterPredict::blockWarp(int useWarp, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h)
 {
     YuvFrame& ref = *m_frameStore[refIdx];
-    std::vector<std::vector<uint8_t>>& pred = preds[refList];
+    std::vector<std::vector<int16_t>>& pred = preds[refList];
     auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
     int lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
     int lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
@@ -408,7 +408,7 @@ void Block::InterPredict::maskBlend(int dstX, int dstY, int w, int h)
             if (m_block.interintra) {
                 int pred0 = CLIP1(ROUND2(preds[0][y][x], InterPostRound));
                 int pred1 = m_yuv.getPixel(plane, dstX + x, dstY + y);
-                m_yuv.setPixel(plane, dstX + x, dstY + y, ROUND2(m * pred1 + (64 - m) * pred0, 6));
+                m_yuv.setPixel(plane, dstX + x, dstY + y, CLIP1(ROUND2(m * pred1 + (64 - m) * pred0, 6)));
             } else {
                 int pred0 = preds[0][y][x];
                 int pred1 = preds[1][y][x];
@@ -735,8 +735,8 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
         ASSERT(0);
     }
     if (useWarp) {
-        std::vector<std::vector<uint8_t>>& pred = preds[refList];
-        pred.assign(h, std::vector<uint8_t>(w));
+        std::vector<std::vector<int16_t>>& pred = preds[refList];
+        pred.assign(h, std::vector<int16_t>(w));
         for (int i8 = 0; i8 <= ((h - 1) >> 3); i8++) {
             for (int j8 = 0; j8 <= ((w - 1) >> 3); j8++) {
                 blockWarp(useWarp, refIdx, refList, x, y, i8, j8, w, h);
@@ -761,7 +761,7 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
     if (!isCompound && !IsInterIntra) {
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
-                m_yuv.setPixel(plane, x + j, y + i, preds[0][i][j]);
+                m_yuv.setPixel(plane, x + j, y + i, CLIP1(preds[0][i][j]));
             }
         }
     } else if (compound_type == COMPOUND_AVERAGE) {
