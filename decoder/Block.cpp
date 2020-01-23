@@ -927,11 +927,11 @@ void Block::inter_block_mode_info()
 
     FindMvStack find(*this);
     find.find_mv_stack();
-    printf("++++++++++(%d, %d)\r\n", MiCol*4, MiRow*4);
+    /*printf("++++++++++(%d, %d)\r\n", MiCol * 4, MiRow * 4);
     for (int i = 0; i < find.getNumMvFound(); i++) {
         printf("%d: (%d, %d)\r\n", i, find.RefStackMv[i]->mv[1], find.RefStackMv[i]->mv[0]);
     }
-    printf("----------\r\n");
+    printf("----------\r\n");*/
 
     if (skip_mode) {
         YMode = NEAREST_NEARESTMV;
