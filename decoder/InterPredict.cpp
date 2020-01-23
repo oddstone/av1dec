@@ -847,6 +847,14 @@ void Block::FindMvStack::add_tpl_ref_mv(int deltaRow, int deltaCol)
     }
 }
 
+bool Block::FindMvStack::check_sb_border(int deltaRow, int deltaCol) const
+{
+    int row = (MiRow & 15) + deltaRow;
+    int col = (MiCol & 15) + deltaCol;
+
+    return (row >= 0 && row < 16 && col >= 0 && col < 16);
+}
+
 void Block::FindMvStack::temporalScan()
 {
     int stepW4 = (bw4 >= 16) ? 4 : 2;
@@ -854,6 +862,25 @@ void Block::FindMvStack::temporalScan()
     for (int deltaRow = 0; deltaRow < std::min((int)bh4, 16); deltaRow += stepH4) {
         for (int deltaCol = 0; deltaCol < std::min((int)bw4, 16); deltaCol += stepW4) {
             add_tpl_ref_mv(deltaRow, deltaCol);
+        }
+    }
+    bool allowExtension = ((bh4 >= Num_4x4_Blocks_High[BLOCK_8X8])
+        && (bh4 < Num_4x4_Blocks_High[BLOCK_64X64])
+        && (bw4 >= Num_4x4_Blocks_Wide[BLOCK_8X8])
+        && (bw4 < Num_4x4_Blocks_Wide[BLOCK_64X64]));
+    if (allowExtension)
+    {
+        const int tplSamplePos[3][2] = {
+            { bh4, -2 }, { bh4, bw4 }, { bh4 - 2, bw4 }
+        };
+
+        for (int i = 0; i < 3; i++) {
+            int deltaRow = tplSamplePos[i][0];
+            int deltaCol = tplSamplePos[i][1];
+            if (check_sb_border(deltaRow, deltaCol))
+            {
+                add_tpl_ref_mv(deltaRow, deltaCol);
+            }
         }
     }
 }

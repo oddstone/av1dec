@@ -79,6 +79,8 @@ private:
     void lower_mv_precision(Mv& mv);
     void setupGlobalMV(uint8_t refList);
 
+    bool check_sb_border(int deltaRow, int deltaCol) const;
+
     void temporalScan();
     void extraSearch();
     void add_tpl_ref_mv(int deltaRow, int deltaCol);
