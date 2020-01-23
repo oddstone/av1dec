@@ -138,6 +138,7 @@ std::shared_ptr<YuvFrame> Decoder::decode_frame_wrapup(const std::shared_ptr<Yuv
     std::shared_ptr<YuvFrame> UpscaledCurrFrame = upscaling(frame);
     LoopRestoration restoration(m_frame, UpscaledCdefFrame, UpscaledCurrFrame);
     std::shared_ptr<YuvFrame> lrFrame = restoration.filter();
+    m_frame->motionVectorStorage();
     return lrFrame;
 }
 

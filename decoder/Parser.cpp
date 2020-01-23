@@ -873,13 +873,13 @@ void FrameHeader::motion_field_estimation(const RefInfo& refInfo)
     int refStamp = MFMV_STACK_SIZE - 2;
     uint8_t refHints[] = { BWDREF_FRAME, ALTREF2_FRAME, ALTREF_FRAME };
     for (int i = 0; i < 3; i++) {
-        uint8_t refHint = refHints[i];
-        bool use = get_relative_dist(refHint, OrderHint) > 0;
-        if (refHint == ALTREF_FRAME && use) {
+        uint8_t src = refHints[i];
+        bool use = get_relative_dist(src) > 0;
+        if (src == ALTREF_FRAME && use) {
             use = (refStamp >= 0);
         }
         if (use) {
-            bool projOutput = mvProject(refInfo, refHint, 1);
+            bool projOutput = mvProject(refInfo, src, 1);
             if (projOutput) {
                 refStamp -= 1;
             }
@@ -1224,6 +1224,12 @@ bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     } else {
         READ(refresh_frame_flags);
     }
+    if (!FrameIsIntra || refresh_frame_flags != allFrames) {
+        if (error_resilient_mode && sequence.enable_order_hint) {
+            ASSERT(0);
+        }
+    }
+
     if (FrameIsIntra) {
         if (!frame_size(br))
             return false;
@@ -1608,6 +1614,33 @@ int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int segmentId) const
         ASSERT(0);
     }
     return CLIP3(0, 255, qindex);
+}
+
+void FrameHeader::motionVectorStorage()
+{
+    for (uint32_t row = 0; row < MiRows; row++) {
+        for (uint32_t col = 0; col < MiCols; col++) {
+            for (int list = 0; list < 2; list++) {
+                int r = RefFrames[row][col][list];
+                if (r > INTRA_FRAME)
+                {
+                    int dist = get_relative_dist(r);
+                    if (dist < 0)
+                    {
+                        int16_t mvRow = Mvs[row][col][list].mv[0];
+                        int16_t mvCol = Mvs[row][col][list].mv[1];
+                        const static int16_t REFMVS_LIMIT = (1 << 12) - 1;
+                        if (std::abs(mvRow) <= REFMVS_LIMIT && std::abs(mvCol) <= REFMVS_LIMIT)
+                        {
+                            MfRefFrames[row][col] = r;
+                            MfMvs[row][col].mv[0] = mvRow;
+                            MfMvs[row][col].mv[1] = mvCol;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 bool Quantization::parse(BitReader& br, const SequenceHeader& seq)

@@ -532,6 +532,7 @@ struct FrameHeader {
     FrameHeader(ConstSequencePtr&);
     bool parse(BitReader& br, RefInfo&);
     int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
+    void motionVectorStorage();
 
 private:
     void setup_past_independence();
