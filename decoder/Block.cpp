@@ -121,8 +121,8 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
                 }
             }
             if (someUseIntra) {
-                predW = num4x4H * 4;
-                predH = num4x4W * 4;
+                predH = num4x4H * 4;
+                predW = num4x4W * 4;
                 candRow = MiRow;
                 candCol = MiCol;
             }
