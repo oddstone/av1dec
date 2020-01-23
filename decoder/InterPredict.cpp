@@ -706,6 +706,69 @@ void Block::InterPredict::wedgeMask(int w, int h)
     }
 }
 
+void Block::InterPredict::differenceWeightMask(int w, int h)
+{
+    Mask.assign(h, std::vector<uint8_t>(w));
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            int16_t diff = std::abs(preds[0][i][j] - preds[1][i][j]);
+            diff = ROUND2(diff, (m_sequence.BitDepth - 8) + InterPostRound);
+            uint8_t m = CLIP3(0, 64, 38 + diff / 16);
+            if (m_block.mask_type)
+                Mask[i][j] = 64 - m;
+            else
+                Mask[i][j] = m;
+        }
+    }
+}
+
+void Block::InterPredict::getDistanceWeights(int candRow, int candCol, int& FwdWeight, int& BckWeight)
+{
+    const static uint8_t Quant_Dist_Weight[4][2] = {
+        { 2, 3 },
+        { 2, 5 },
+        { 2, 7 },
+        { 1, MAX_FRAME_DISTANCE }
+    };
+    const static uint8_t Quant_Dist_Lookup[4][2] = {
+        { 9, 7 },
+        { 11, 5 },
+        { 12, 4 },
+        { 13, 3 },
+    };
+    int refList = 0;
+    int dist[2];
+    for (refList = 0; refList < 2; refList++)
+    {
+        uint8_t ref = m_frame.RefFrames[candRow][candCol][refList];
+        int d = std::abs(m_frame.get_relative_dist(ref));
+        dist[refList] = CLIP3(0, MAX_FRAME_DISTANCE, d);
+    }
+    int d0 = dist[1];
+    int d1 = dist[0];
+    int order = d0 <= d1;
+    if (d0 == 0 || d1 == 0)
+    {
+        FwdWeight = Quant_Dist_Lookup[3][order];
+        BckWeight = Quant_Dist_Lookup[3][1 - order];
+    } else  {
+        int i;
+        for (i = 0; i < 3; i++) {
+            int c0 = Quant_Dist_Weight[i][order];
+            int c1 = Quant_Dist_Weight[i][1 - order];
+            if (order) {
+                if (d0 * c0 > d1 * c1)
+                    break;
+            } else {
+                if (d0 * c0 < d1 * c1)
+                    break;
+            }
+        }
+        FwdWeight = Quant_Dist_Lookup[i][order];
+        BckWeight = Quant_Dist_Lookup[i][1 - order];
+    }
+}
+
 void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
 {
     isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
@@ -752,10 +815,11 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
     } else if (compound_type == COMPOUND_INTRA) {
         intraModeVariantMask(w, h);
     } else if (compound_type == COMPOUND_DIFFWTD && plane == 0) {
-        ASSERT(0);
+        differenceWeightMask(w, h);
     }
+    int FwdWeight, BckWeight;
     if (compound_type == COMPOUND_DISTANCE) {
-        ASSERT(0);
+        getDistanceWeights(candRow, candCol, FwdWeight, BckWeight);
     }
 
     bool IsInterIntra = (m_block.is_inter && m_block.RefFrame[1] == INTRA_FRAME);
@@ -766,9 +830,17 @@ void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, in
             }
         }
     } else if (compound_type == COMPOUND_AVERAGE) {
-        ASSERT(0);
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                m_yuv.setPixel(plane, x + j, y + i, CLIP1(ROUND2(preds[0][i][j] + preds[1][i][j], 1 + InterPostRound)));
+            }
+        }
     } else if (compound_type == COMPOUND_DISTANCE) {
-        ASSERT(0);
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                m_yuv.setPixel(plane, x + j, y + i, CLIP1(ROUND2(FwdWeight * preds[0][i][j] + BckWeight * preds[1][i][j], 4 + InterPostRound)));
+            }
+        }
     } else {
         //if (compound_type != COMPOUND_WEDGE || plane == 0)
         maskBlend(x, y, w, h);

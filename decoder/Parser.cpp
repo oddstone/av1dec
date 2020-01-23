@@ -690,7 +690,7 @@ private:
     uint8_t OrderHint;
 };
 
-int8_t FrameHeader::get_relative_dist(uint8_t a, uint8_t b)
+int8_t FrameHeader::get_relative_dist(uint8_t a, uint8_t b) const
 {
     if (!m_sequence->enable_order_hint) {
         return 0;
@@ -701,7 +701,7 @@ int8_t FrameHeader::get_relative_dist(uint8_t a, uint8_t b)
     return diff;
 }
 
-int8_t FrameHeader::get_relative_dist(uint8_t ref)
+int8_t FrameHeader::get_relative_dist(uint8_t ref) const
 {
     return get_relative_dist(OrderHints[ref], OrderHint);
 }

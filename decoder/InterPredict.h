@@ -22,6 +22,8 @@ private:
     void predict_overlap(int pass, int candRow, int candCol, int x4, int y4, int predW, int predH, const uint8_t* mask);
     void overlappedMotionCompensation(int w, int h);
     void wedgeMask(int w, int h);
+    void differenceWeightMask(int w, int h);
+    void getDistanceWeights(int candRow, int candCol, int& FwdWeight, int& BckWeight);
     const Block& m_block;
     const FrameHeader& m_frame;
     const SequenceHeader& m_sequence;

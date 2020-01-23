@@ -522,8 +522,8 @@ struct FrameHeader {
 
 private:
     void setup_past_independence();
-    int8_t get_relative_dist(uint8_t a, uint8_t b);
-    int8_t get_relative_dist(uint8_t ref);
+    int8_t get_relative_dist(uint8_t a, uint8_t b) const;
+    int8_t get_relative_dist(uint8_t ref) const;
     void mark_ref_frames(uint8_t idLen, RefInfo& refInfo);
     void set_frame_refs(const RefInfo& refInfo);
     bool frame_size(BitReader& br);
