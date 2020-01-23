@@ -1481,14 +1481,14 @@ bool parseTileLog2(BitReader& br, uint32_t& tileLog2, uint32_t min, uint32_t max
     return true;
 }
 
-void getMiStarts(std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t tileLog2)
+void getMiStarts(std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t tileLog2, uint32_t end)
 {
     starts.clear();
     uint32_t step = (sbMax + (1 << tileLog2)) >> tileLog2;
     for (uint32_t start = 0; start < sbMax; start += step) {
         starts.push_back(start << sbShift);
     }
-    starts.push_back(sbMax << sbShift);
+    starts.push_back(end);
 }
 
 bool FrameHeader::parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)
@@ -1546,7 +1546,7 @@ bool FrameHeader::parseTileInfo(BitReader& br)
         if (!parseTileLog2(br, TileColsLog2, minLog2TileCols, maxLog2TileCols)) {
             return false;
         }
-        getMiStarts(MiColStarts, sbCols, sbShift, TileColsLog2);
+        getMiStarts(MiColStarts, sbCols, sbShift, TileColsLog2, MiCols);
 
         uint32_t minLog2TileRows = std::max(minLog2Tiles - TileColsLog2, (uint32_t)0);
         uint32_t maxTileHeightSb = sbRows >> minLog2TileRows;
@@ -1554,7 +1554,7 @@ bool FrameHeader::parseTileInfo(BitReader& br)
         if (!parseTileLog2(br, TileRowsLog2, minLog2TileRows, maxLog2TileRows)) {
             return false;
         }
-        getMiStarts(MiRowStarts, sbRows, sbShift, TileRowsLog2);
+        getMiStarts(MiRowStarts, sbRows, sbShift, TileRowsLog2, MiRows);
         TileCols = 1 << TileColsLog2;
         TileRows = 1 << TileRowsLog2;
 
