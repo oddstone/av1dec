@@ -794,11 +794,11 @@ bool project(int& v8, int delta, int dstSign, int max8, int maxOff8)
     }
     v8 += dstSign * offset8;
 
-    bool posValid;
+    bool posValid = true;
     if (v8 < 0 || v8 >= max8 || v8 < base8 - maxOff8 || v8 >= base8 + 8 + maxOff8) {
         posValid = false;
     }
-    return false;
+    return posValid;
 }
 
 bool FrameHeader::get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv)
@@ -816,7 +816,8 @@ bool FrameHeader::mvProject(const RefInfo& refInfo, uint8_t src, int dstSign)
     const RefFrame& ref = refInfo.m_refs[srcIdx];
     if (ref.RefMiCols != MiCols
         || ref.RefMiRows != MiRows
-        || FrameIsIntra)
+        || ref.RefFrameType == INTRA_ONLY_FRAME
+        || ref.RefFrameType == KEY_FRAME)
         return false;
     int PosX8;
     int PosY8;
@@ -824,7 +825,7 @@ bool FrameHeader::mvProject(const RefInfo& refInfo, uint8_t src, int dstSign)
         for (uint32_t x8 = 0; x8 < w8; x8++) {
             uint32_t row = 2 * y8 + 1;
             uint32_t col = 2 * x8 + 1;
-            uint8_t srcRef = ref.SavedRefFrames[row][col];
+            int8_t srcRef = ref.SavedRefFrames[row][col];
             if (srcRef > INTRA_FRAME) {
                 int8_t refToCur = get_relative_dist(OrderHints[src], OrderHint);
                 int8_t refOffset = get_relative_dist(OrderHints[src], ref.SavedOrderHints[srcRef]);
