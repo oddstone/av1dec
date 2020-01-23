@@ -206,7 +206,7 @@ void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, uint
             int p = (startY & 1023) + yStep * r;
             for (int t = 0; t < 8; t++)
                 s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * intermediate[(p >> 10) + t][c];
-            pred[r][c] = CLIP1(ROUND2(s, InterRound1));
+            pred[r][c] = ROUND2(s, InterRound1);
         }
     }
 }
@@ -430,7 +430,7 @@ void Block::InterPredict::predict_overlap(int pass, int candRow, int candCol, in
         for (int j = 0; j < predW; j++) {
             int m = pass ? mask[j] : mask[i];
             uint8_t pixel = m_yuv.getPixel(plane, predX + j, predY + i);
-            pixel = ROUND2(m * pixel + (64 - m) * CLIP1(preds[0][i][j]), 6);
+            pixel = CLIP1(ROUND2(m * pixel + (64 - m) * CLIP1(preds[0][i][j]), 6));
             m_yuv.setPixel(plane, predX + j, predY + i, pixel);
         }
     }
