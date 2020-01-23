@@ -199,8 +199,8 @@ private:
     int MaxLumaH;
 
     //for inter
-    uint8_t LeftRefFrame[2];
-    uint8_t AboveRefFrame[2];
+    int8_t LeftRefFrame[2];
+    int8_t AboveRefFrame[2];
     bool LeftIntra;
     bool AboveIntra;
     bool LeftSingle;

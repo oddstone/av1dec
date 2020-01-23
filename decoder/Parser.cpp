@@ -519,7 +519,7 @@ void FrameHeader::initGeometry()
     for (int i = 0; i < FRAME_LF_COUNT; i++) {
         DeltaLFs[i].assign(AlignedMiRows, std::vector<int8_t>(AlignedMiCols));
     }
-    MfRefFrames.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+    MfRefFrames.assign(AlignedMiRows, std::vector<int8_t>(AlignedMiCols));
     MfMvs.assign(AlignedMiRows, std::vector<Mv>(AlignedMiCols));
     Mvs.resize(AlignedMiRows);
     for (int i = 0; i < AlignedMiRows; i++) {

@@ -362,7 +362,7 @@ public:
     uint8_t SavedOrderHints[NUM_REF_FRAMES];
 
     //FrameStore
-    std::vector<std::vector<uint8_t>> SavedRefFrames;
+    std::vector<std::vector<int8_t>> SavedRefFrames;
     std::vector<std::vector<Mv>> SavedMvs;
     //SavedGmParams
     //SavedSegmentIds;
@@ -494,7 +494,7 @@ struct FrameHeader {
     std::vector<std::vector<TX_SIZE>> LoopfilterTxSizes[MAX_PLANES];
     std::vector<std::vector<uint8_t>> SegmentIds;
     std::vector<std::vector<int8_t>> DeltaLFs[FRAME_LF_COUNT];
-    std::vector<std::vector<uint8_t>> MfRefFrames;
+    std::vector<std::vector<int8_t>> MfRefFrames;
     std::vector<std::vector<Mv>> MfMvs;
     std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;
     std::vector<std::vector<std::vector<Mv>>> Mvs;
