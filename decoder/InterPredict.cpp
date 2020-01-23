@@ -708,43 +708,42 @@ void Block::InterPredict::wedgeMask(int w, int h)
 void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
 {
     isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
-    if (isCompound) {
-        ASSERT(0);
-    }
     roundingVariablesDerivation(isCompound, m_sequence.BitDepth, InterRound0, InterRound1, InterPostRound);
     if (!plane && m_block.motion_mode == LOCALWARP) {
         m_localWarp.warpEstimation();
         m_localWarp.setupShear();
     }
     int refList = 0;
-    int refFrame = m_frame.RefFrames[candRow][candCol][refList];
-    if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV) && m_frame.GmType[refFrame] > TRANSLATION) {
-        int alpha, beta, gamma, delta;
-        globaValid = m_localWarp.setupShear(m_frame.gm_params[refFrame], alpha, beta, gamma, delta);
-    }
-    uint8_t useWarp = getUseWarp(w, h, refFrame);
-    Mv mv = m_frame.Mvs[candRow][candCol][refList];
-    uint8_t refIdx;
-    if (!m_block.use_intrabc) {
-        refIdx = m_frame.ref_frame_idx[refFrame - LAST_FRAME];
-    } else {
-        ASSERT(0);
-    }
-    motionVectorScaling(refIdx, x, y, mv);
-
-    if (m_block.use_intrabc) {
-        ASSERT(0);
-    }
-    if (useWarp) {
-        std::vector<std::vector<int16_t>>& pred = preds[refList];
-        pred.assign(h, std::vector<int16_t>(w));
-        for (int i8 = 0; i8 <= ((h - 1) >> 3); i8++) {
-            for (int j8 = 0; j8 <= ((w - 1) >> 3); j8++) {
-                blockWarp(useWarp, refIdx, refList, x, y, i8, j8, w, h);
-            }
+    for (refList = 0; refList < 1 + isCompound; refList++) {
+        int refFrame = m_frame.RefFrames[candRow][candCol][refList];
+        if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV) && m_frame.GmType[refFrame] > TRANSLATION) {
+            int alpha, beta, gamma, delta;
+            globaValid = m_localWarp.setupShear(m_frame.gm_params[refFrame], alpha, beta, gamma, delta);
         }
-    } else {
-        blockInterPrediction(refIdx, refList, w, h, candRow, candCol);
+        uint8_t useWarp = getUseWarp(w, h, refFrame);
+        Mv mv = m_frame.Mvs[candRow][candCol][refList];
+        uint8_t refIdx;
+        if (!m_block.use_intrabc) {
+            refIdx = m_frame.ref_frame_idx[refFrame - LAST_FRAME];
+        } else {
+            ASSERT(0);
+        }
+        motionVectorScaling(refIdx, x, y, mv);
+
+        if (m_block.use_intrabc) {
+            ASSERT(0);
+        }
+        if (useWarp) {
+            std::vector<std::vector<int16_t>>& pred = preds[refList];
+            pred.assign(h, std::vector<int16_t>(w));
+            for (int i8 = 0; i8 <= ((h - 1) >> 3); i8++) {
+                for (int j8 = 0; j8 <= ((w - 1) >> 3); j8++) {
+                    blockWarp(useWarp, refIdx, refList, x, y, i8, j8, w, h);
+                }
+            }
+        } else {
+            blockInterPrediction(refIdx, refList, w, h, candRow, candCol);
+        }
     }
     COMPOUND_TYPE compound_type = m_block.compound_type;
     if (compound_type == COMPOUND_WEDGE) {
