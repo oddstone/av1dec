@@ -1078,10 +1078,12 @@ void Block::FindMvStack::setupGlobalMV(uint8_t refList)
             mv.mv[1] = ROUND2SIGNED(xc, WARPEDMODEL_PREC_BITS - 2) * 2;
         }
     }
-    //lower_mv_precision(mv);
+    lower_mv_precision(mv);
 }
 void Block::FindMvStack::lower_mv_precision(Mv& mv)
 {
+    if (m_frame.allow_high_precision_mv)
+        return;
     int16_t* candMv = &mv.mv[0];
     for (int i = 0; i < 2; i++) {
         if (m_frame.force_integer_mv) {
@@ -1147,7 +1149,7 @@ void Block::FindMvStack::searchStack(uint32_t mvRow, uint32_t mvCol, int candLis
     } else {
         candMv = m_frame.Mvs[mvRow][mvCol][candList];
     }
-    //lower_mv_precision(candMv);
+    lower_mv_precision(candMv);
     if (has_newmv(candMode))
         NewMvCount++;
     FoundMatch = true;
