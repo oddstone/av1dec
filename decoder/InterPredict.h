@@ -8,7 +8,7 @@ namespace YamiAv1 {
 
 class Block::InterPredict {
 public:
-    InterPredict(Block& block, int plane, YuvFrame& yuv, const FrameStore& frameStore);
+    InterPredict(Block& block, int plane, YuvFrame& yuv, const FrameStore& frameStore, std::vector<std::vector<uint8_t>>& mask);
     void predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol);
 
 private:
@@ -44,7 +44,7 @@ private:
     int xStep = 0;
     int yStep = 0;
     std::vector<std::vector<int16_t>> preds[2];
-    std::vector<std::vector<uint8_t>> Mask;
+    std::vector<std::vector<uint8_t>>& Mask;
 };
 
 class Block::FindMvStack {

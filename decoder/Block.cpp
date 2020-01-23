@@ -71,6 +71,7 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
 
     uint32_t subBlockMiRow = MiRow & sbMask;
     uint32_t subBlockMiCol = MiCol & sbMask;
+    std::vector<std::vector<uint8_t>> mask;
     for (int plane = 0; plane < 1 + HasChroma * 2; plane++) {
         int planeSz = get_plane_residual_size(MiSize, plane);
         int num4x4W = Num_4x4_Blocks_Wide[planeSz];
@@ -130,7 +131,7 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
             for (uint32_t y = 0; y < num4x4H * 4; y += predH) {
                 uint32_t c = 0;
                 for (uint32_t x = 0; x < num4x4W * 4; x += predW) {
-                    InterPredict inter(*this, plane, *frame, frameStore);
+                    InterPredict inter(*this, plane, *frame, frameStore, mask);
                     inter.predict_inter(baseX + x, baseY + y, predW, predH, candRow + r, candCol + c);
                     c++;
                 }

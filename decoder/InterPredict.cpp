@@ -6,7 +6,7 @@
 
 namespace YamiAv1 {
 
-Block::InterPredict::InterPredict(Block& block, int p, YuvFrame& yuv, const FrameStore& frameStore)
+Block::InterPredict::InterPredict(Block& block, int p, YuvFrame& yuv, const FrameStore& frameStore, std::vector<std::vector<uint8_t>>& mask)
     : m_localWarp(block.m_localWarp)
     , m_block(block)
     , m_frame(block.m_frame)
@@ -18,6 +18,7 @@ Block::InterPredict::InterPredict(Block& block, int p, YuvFrame& yuv, const Fram
     , MiCol(m_block.MiCol)
     , m_yuv(yuv)
     , m_frameStore(frameStore)
+    , Mask(mask)
 {
 }
 
