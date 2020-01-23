@@ -1104,6 +1104,31 @@ bool FrameHeader::global_motion_params(BitReader& br)
     return true;
 }
 
+void FrameHeader::load_cdfs(const RefInfo& refInfo)
+{
+    m_cdfs->load_cdfs(*refInfo.m_refs[ref_frame_idx[primary_ref_frame]].SavedCdfs);
+}
+
+void FrameHeader::load_previous(const RefInfo& refInfo)
+{
+    uint8_t prevFrame = ref_frame_idx[primary_ref_frame];
+    const RefFrame& ref = refInfo.m_refs[prevFrame];
+    memcpy(&PrevGmParams, &ref.SavedGmParams, sizeof(PrevGmParams));
+    m_loopFilter.load_loop_filter_params(ref);
+    m_segmentation.load_segmentation_params(ref);
+}
+
+void FrameHeader::load_previous_segment_ids(const RefInfo& refInfo)
+{
+    uint8_t prevFrame = ref_frame_idx[primary_ref_frame];
+    const RefFrame& ref = refInfo.m_refs[prevFrame];
+    if (m_segmentation.segmentation_enabled && ref.RefMiCols == MiCols && ref.RefMiRows == MiRows) {
+        PrevSegmentIds = ref.SavedSegmentIds;
+    } else {
+        PrevSegmentIds.assign(MiCols, std::vector<uint8_t>(MiRows, 0));
+    }
+}
+
 bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
 {
     const SequenceHeader& sequence = *m_sequence;
@@ -1264,11 +1289,13 @@ bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     } else {
         READ(disable_frame_end_update_cdf);
     }
+    m_cdfs.reset(new Cdfs());
     if (primary_ref_frame == PRIMARY_REF_NONE) {
-        //init_non_coeff_cdfs()
+        m_cdfs->init_non_coeff_cdfs();
         setup_past_independence();
     } else {
-        ASSERT(0);
+        load_cdfs(refInfo);
+        load_previous(refInfo);
     }
     if (use_ref_frame_mvs)
         motion_field_estimation(refInfo);
@@ -1284,9 +1311,9 @@ bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     if (!m_deltaLf.parse(br, m_deltaQ))
         return false;
     if (primary_ref_frame == PRIMARY_REF_NONE) {
-        //init_coeff_cdfs()
+        m_cdfs->init_coeff_cdfs(m_quant.base_q_idx);
     } else {
-        //load_previous_segment_ids()
+        load_previous_segment_ids(refInfo);
     }
     {
         CodedLossless = true;
@@ -1668,6 +1695,13 @@ void Parser::finishFrame()
             }
             ref.SavedRefFrames = frame.MfRefFrames;
             ref.SavedMvs = frame.MfMvs;
+            ref.SavedCdfs.reset(new Cdfs(*frame.m_cdfs));
+            memcpy(ref.SavedGmParams, frame.gm_params, sizeof(frame.gm_params));
+            ref.SavedSegmentIds = frame.SegmentIds;
+            frame.m_loopFilter.save_loop_filter_params(ref);
+            frame.m_segmentation.save_segmentation_params(ref);
+            ref.RefOrderHint = frame.OrderHint;
+            
         }
     }
 }
@@ -1714,6 +1748,18 @@ void Segmentation::setup_past_independence()
     resetFeatures();
 }
 
+void Segmentation::load_segmentation_params(const RefFrame& ref)
+{
+    memcpy(FeatureEnabled, ref.FeatureEnabled, sizeof(FeatureEnabled));
+    memcpy(FeatureData, ref.FeatureData, sizeof(FeatureData));
+}
+
+void Segmentation::save_segmentation_params(RefFrame& ref)
+{
+    memcpy(ref.FeatureEnabled, FeatureEnabled, sizeof(FeatureEnabled));
+    memcpy(ref.FeatureData, FeatureData, sizeof(FeatureData));
+}
+
 bool DeltaQ::parse(BitReader& br, const Quantization& quant)
 {
     delta_q_res = 0;
@@ -1746,6 +1792,16 @@ void LoopFilterParams::setup_past_independence()
 {
     loop_filter_delta_enabled = true;
     resetDeltas();
+}
+
+void LoopFilterParams::load_loop_filter_params(const RefFrame& ref)
+{
+    memcpy(loop_filter_mode_deltas, ref.loop_filter_mode_deltas, sizeof(loop_filter_mode_deltas));
+}
+
+void LoopFilterParams::save_loop_filter_params(RefFrame& ref)
+{
+    memcpy(ref.loop_filter_mode_deltas, loop_filter_mode_deltas, sizeof(loop_filter_mode_deltas));
 }
 
 void LoopFilterParams::resetDeltas()

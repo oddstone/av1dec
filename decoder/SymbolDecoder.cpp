@@ -4,6 +4,9 @@
 #include <algorithm>
 
 namespace YamiAv1 {
+
+using std::vector;
+
 SymbolDecoder::SymbolDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update)
     : DisableCdfUpdate(disable_cdf_update)
 {
@@ -38,20 +41,21 @@ static uint8_t log(uint16_t n)
 
 uint8_t SymbolDecoder::readBool()
 {
-    static uint16_t icdf[] = { AOM_CDF2(1 << 14) };
-    return read(icdf, 2, true);
+    static vector <aom_cdf_prob> icdf = { AOM_CDF2(1 << 14) };
+    return read(icdf, true);
 }
 
-uint8_t SymbolDecoder::read(uint16_t* icdf, uint8_t nicdf)
+uint8_t SymbolDecoder::read(vector<aom_cdf_prob>& icdf)
 {
-    return read(icdf, nicdf, DisableCdfUpdate);
+    return read(icdf, DisableCdfUpdate);
 }
 
-uint8_t SymbolDecoder::read(uint16_t* icdf, uint8_t nicdf, bool disableUpdate)
+uint8_t SymbolDecoder::read(vector<aom_cdf_prob>& icdf, bool disableUpdate)
 {
     uint16_t cur = SymbolRange;
     uint8_t symbol = -1;
     uint16_t prev;
+    uint8_t nicdf = icdf.size() - 1;
     uint8_t N = nicdf - 1;
     do {
         symbol++;
@@ -65,16 +69,16 @@ uint8_t SymbolDecoder::read(uint16_t* icdf, uint8_t nicdf, bool disableUpdate)
     SymbolValue -= cur;
     renormalize();
     if (!disableUpdate)
-        updateCdf(icdf, nicdf, symbol);
+        updateCdf(icdf, symbol);
     static FILE* fp = fopen("symbol.txt", "w");
     fprintf(fp, "%d\r\n", SymbolRange);
     fflush(fp);
     return symbol;
 }
 
-void SymbolDecoder::updateCdf(uint16_t* cdf, uint8_t ncdf, uint8_t symbol)
+void SymbolDecoder::updateCdf(vector<aom_cdf_prob>& cdf, uint8_t symbol)
 {
-    uint16_t N = ncdf;
+    uint16_t N = cdf.size() - 1;
     uint8_t two = 2;
     uint8_t rate = 3 + (cdf[N] > 15) + (cdf[N] > 31) + std::min(log(N), two);
     uint16_t tmp = 1 << 15;
@@ -100,4 +104,5 @@ void SymbolDecoder::renormalize()
     SymbolValue = paddedData ^ (((SymbolValue + 1) << bits) - 1);
     SymbolMaxBits = SymbolMaxBits - bits;
 }
+
 }

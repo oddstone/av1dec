@@ -663,6 +663,7 @@ enum MV_CLASS_TYPE {
 #define MV_IN_USE_BITS 14
 #define MV_UPP (1 << MV_IN_USE_BITS)
 #define MV_LOW (-(1 << MV_IN_USE_BITS))
+/*
 typedef struct {
     aom_cdf_prob classes_cdf[CDF_SIZE(MV_CLASSES)];
     aom_cdf_prob class0_fp_cdf[CLASS0_SIZE][CDF_SIZE(MV_FP_SIZE)];
@@ -678,6 +679,7 @@ typedef struct {
     aom_cdf_prob joints_cdf[CDF_SIZE(MV_JOINTS)];
     nmv_component comps[2];
 } NmvContext;
+*/
 
 #ifdef __cplusplus
 }  // extern "C"

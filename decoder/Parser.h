@@ -229,6 +229,60 @@ const static uint32_t MAX_TILE_AREA = 4906 * 2304;
 const static uint32_t MAX_TILE_COLS = 64;
 const static uint32_t MAX_TILE_ROWS = 64;
 
+class RefFrame {
+public:
+    RefFrame()
+        : RefValid(false)
+    {
+    }
+
+    bool RefValid;
+    uint32_t RefFrameId;
+    uint32_t RefUpscaledWidth;
+    uint32_t RefFrameWidth;
+    uint32_t RefFrameHeight;
+    uint32_t RefRenderWidth;
+    uint32_t RefRenderHeight;
+    uint32_t RefMiCols;
+    uint32_t RefMiRows;
+    uint8_t RefFrameType;
+    int RefSubsamplingX;
+    int RefSubsamplingY;
+    uint8_t RefBitDepth;
+    uint8_t RefOrderHint;
+    uint8_t SavedOrderHints[NUM_REF_FRAMES];
+
+    //FrameStore
+    std::vector<std::vector<int8_t>> SavedRefFrames;
+    std::vector<std::vector<Mv>> SavedMvs;
+
+    std::shared_ptr<Cdfs> SavedCdfs;
+    int SavedGmParams[NUM_REF_FRAMES][6];
+    std::vector<std::vector<uint8_t>> SavedSegmentIds;
+
+    int8_t loop_filter_mode_deltas[2];
+    int8_t loop_filter_ref_deltas[TOTAL_REFS_PER_FRAME];
+
+    bool FeatureEnabled[MAX_SEGMENTS][SEG_LVL_MAX];
+    int16_t FeatureData[MAX_SEGMENTS][SEG_LVL_MAX];
+};
+
+class RefInfo {
+public:
+    std::vector<RefFrame> m_refs;
+    RefInfo()
+    {
+        m_refs.resize(NUM_REF_FRAMES);
+    }
+    void resetRefs()
+    {
+        for (auto& r : m_refs) {
+            r.RefValid = false;
+            r.RefOrderHint = 0;
+        }
+    }
+};
+
 struct Quantization {
     uint8_t base_q_idx;
     int8_t DeltaQYDc;
@@ -263,6 +317,8 @@ struct Segmentation {
     uint8_t LastActiveSegId;
     bool seg_feature_active_idx(int segmentId, SEG_LVL_FEATURE) const;
     void setup_past_independence();
+    void load_segmentation_params(const RefFrame& ref);
+    void save_segmentation_params(RefFrame& ref);
 
 private:
     void resetFeatures();
@@ -283,14 +339,15 @@ struct DeltaLf {
 
 struct LoopFilterParams {
     const static int LOOP_FILTER_LEVEL_COUNT = 4;
-    const static int LOOP_FILTER_MODE_DELTA_COUNT = 2;
     bool loop_filter_delta_enabled;
     uint8_t loop_filter_level[LOOP_FILTER_LEVEL_COUNT];
     int8_t loop_filter_ref_deltas[TOTAL_REFS_PER_FRAME];
     uint8_t loop_filter_sharpness;
-    int8_t loop_filter_mode_deltas[LOOP_FILTER_MODE_DELTA_COUNT];
+    int8_t loop_filter_mode_deltas[2];
     bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
     void setup_past_independence();
+    void load_loop_filter_params(const RefFrame& ref);
+    void save_loop_filter_params(RefFrame& ref);
 
 private:
     void resetDeltas();
@@ -336,52 +393,6 @@ private:
         int plane, int unitRow, int unitCol);
     int unitRows[MAX_PLANES];
     int unitCols[MAX_PLANES];
-};
-
-class RefFrame {
-public:
-    RefFrame()
-        : RefValid(false)
-    {
-    }
-
-    bool RefValid;
-    uint32_t RefFrameId;
-    uint32_t RefUpscaledWidth;
-    uint32_t RefFrameWidth;
-    uint32_t RefFrameHeight;
-    uint32_t RefRenderWidth;
-    uint32_t RefRenderHeight;
-    uint32_t RefMiCols;
-    uint32_t RefMiRows;
-    uint8_t RefFrameType;
-    int RefSubsamplingX;
-    int RefSubsamplingY;
-    uint8_t RefBitDepth;
-    uint8_t RefOrderHint;
-    uint8_t SavedOrderHints[NUM_REF_FRAMES];
-
-    //FrameStore
-    std::vector<std::vector<int8_t>> SavedRefFrames;
-    std::vector<std::vector<Mv>> SavedMvs;
-    //SavedGmParams
-    //SavedSegmentIds;
-};
-
-class RefInfo {
-public:
-    std::vector<RefFrame> m_refs;
-    RefInfo()
-    {
-        m_refs.resize(NUM_REF_FRAMES);
-    }
-    void resetRefs()
-    {
-        for (auto& r : m_refs) {
-            r.RefValid = false;
-            r.RefOrderHint = 0;
-        }
-    }
 };
 
 const static uint8_t REF_SCALE_SHIFT = 14;
@@ -501,6 +512,8 @@ struct FrameHeader {
     std::vector<std::vector<uint8_t>> CompGroupIdxs;
     std::vector<std::vector<uint8_t>> CompoundIdxs;
     std::vector<std::vector<std::vector<InterpFilter>>> InterpFilters;
+    std::shared_ptr<Cdfs> m_cdfs;
+    std::vector<std::vector<uint8_t>> PrevSegmentIds;
     //std::vector<std::vector<uint32_t>> PaletteSizes[2];
     //PaletteColors
 
@@ -522,6 +535,7 @@ struct FrameHeader {
 
 private:
     void setup_past_independence();
+    void load_cdfs();
     int8_t get_relative_dist(uint8_t a, uint8_t b) const;
     int8_t get_relative_dist(uint8_t ref) const;
     void mark_ref_frames(uint8_t idLen, RefInfo& refInfo);
@@ -555,6 +569,9 @@ private:
     bool read_global_param(BitReader& br, GlobalMotionType type, uint8_t ref, int idx);
 
     bool global_motion_params(BitReader& br);
+    void load_cdfs(const RefInfo& refInfo);
+    void load_previous(const RefInfo& refInfo);
+    void load_previous_segment_ids(const RefInfo& refInfo);
 
     const static uint8_t SUPERRES_DENOM_MIN = 9;
 

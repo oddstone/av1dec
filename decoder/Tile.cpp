@@ -94,7 +94,7 @@ bool Tile::decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 
 bool Tile::parse(const uint8_t* data, uint32_t size)
 {
-    m_entropy.reset(new EntropyDecoder(data, size, m_frame->disable_cdf_update, m_frame->m_quant.base_q_idx));
+    m_entropy.reset(new EntropyDecoder(data, size, m_frame->disable_cdf_update, *m_frame->m_cdfs));
     clear_above_context();
     for (int i = 0; i < FRAME_LF_COUNT; i++)
         DeltaLF[i] = 0;
