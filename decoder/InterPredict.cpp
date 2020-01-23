@@ -1294,6 +1294,7 @@ void Block::FindMvStack::searchCompoundStack(uint32_t mvRow, uint32_t mvCol, uin
     } else if (idx < MAX_REF_MV_STACK_SIZE) {
         RefStackMv[NumMvFound][0] = candMvs[0];
         RefStackMv[NumMvFound][1] = candMvs[1];
+        WeightStack[NumMvFound] = weight;
         NumMvFound++;
     }
 }
@@ -1302,14 +1303,14 @@ void Block::FindMvStack::add_ref_mv_candidate(uint32_t mvRow, uint32_t mvCol, ui
     if (!m_frame.IsInters[mvRow][mvCol])
         return;
     if (!isCompound) {
-        for (int candList = 0; candList <= 0; candList++) {
+        for (int candList = 0; candList <= 1; candList++) {
             if (m_frame.RefFrames[mvRow][mvCol][candList] == m_block.RefFrame[0]) {
                 searchStack(mvRow, mvCol, candList, weight);
             }
         }
     } else {
         if (m_frame.RefFrames[mvRow][mvCol][0] == m_block.RefFrame[0]
-            || m_frame.RefFrames[mvRow][mvCol][1] == m_block.RefFrame[1]) {
+            && m_frame.RefFrames[mvRow][mvCol][1] == m_block.RefFrame[1]) {
             searchCompoundStack(mvRow, mvCol, weight);
         }
     }
