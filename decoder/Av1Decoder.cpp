@@ -109,8 +109,9 @@ bool Decoder::decodeFrame(TileGroup tiles)
     if (i == 2) {
         m_output.push_back(filtered);
     }
-#else    
-    m_output.push_back(filtered);
+#else
+    if (m_frame->show_frame)
+        m_output.push_back(filtered);
 #endif
     updateFrameStore(h, filtered);
     m_parser->finishFrame();
