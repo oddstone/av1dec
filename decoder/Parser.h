@@ -405,6 +405,7 @@ struct FrameHeader {
     friend class SetFrameRefs;
     bool show_existing_frame;
     uint8_t frame_to_show_map_idx;
+    uint32_t display_frame_id;
     uint8_t refresh_frame_flags;
     uint8_t frame_type;
     bool FrameIsIntra;
@@ -532,6 +533,7 @@ struct FrameHeader {
     FrameHeader(ConstSequencePtr&);
     bool parse(BitReader& br, RefInfo&);
     int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
+    void referenceFrameLoading();
     void motionVectorStorage();
 
 private:
@@ -544,6 +546,7 @@ private:
     bool frame_size(BitReader& br);
     bool superres_params(BitReader& br);
     bool render_size(BitReader& br);
+    void computeAlignedSize();
     void compute_image_size();
     bool frame_size_with_refs(BitReader& br, const RefInfo& refInfo);
     bool read_interpolation_filter(BitReader& br);

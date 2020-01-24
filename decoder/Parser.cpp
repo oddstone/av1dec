@@ -1147,13 +1147,24 @@ bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
         showable_frame = false;
     } else {
         READ(show_existing_frame);
-        if (show_existing_frame == 1) {
+        if (show_existing_frame) {
             READ_BITS(frame_to_show_map_idx, 3);
+            if (m_sequence->decoder_model_info_present_flag && !m_sequence->equal_picture_interval) {
+                ASSERT(0 && "temporal_point_info");
+            }
             refresh_frame_flags = 0;
-            /*if (sequence.frame_id_numbers_present_flag) {
-				READ_BITS(display_frame_id, idLen);
-			}*/
-            ASSERT(0);
+            if (sequence.frame_id_numbers_present_flag) {
+                READ_BITS(display_frame_id, idLen);
+            }
+            frame_type = refInfo.m_refs[frame_to_show_map_idx].RefFrameType;
+            if (frame_type == KEY_FRAME) {
+                refresh_frame_flags = allFrames;
+            }
+            if (m_sequence->film_grain_params_present) {
+                ASSERT(0 && "load_grain_params");
+                //load_grain_params(frame_to_show_map_idx)
+            }
+            m_refInfo = refInfo;
             return true;
         }
         READ_BITS(frame_type, 2);
@@ -1391,6 +1402,14 @@ void FrameHeader::mark_ref_frames(uint8_t idLen, RefInfo& refInfo)
 }
 
 #define ROOF(b, a) ((b + (a - 1)) & ~(a - 1))
+
+void FrameHeader::computeAlignedSize()
+{
+    uint32_t align = m_sequence->use_128x128_superblock ? 128 : 64;
+    AlignedMiCols = ROOF(FrameWidth, align) >> 2;
+    AlignedMiRows = ROOF(FrameHeight, align) >> 2;
+}
+
 void FrameHeader::compute_image_size()
 {
     MiCols = 2 * ((FrameWidth + 7) >> 3);
@@ -1398,10 +1417,7 @@ void FrameHeader::compute_image_size()
 
     w8 = MiCols >> 1;
     h8 = MiRows >> 1;
-
-    uint32_t align = m_sequence->use_128x128_superblock ? 128 : 64;
-    AlignedMiCols = ROOF(FrameWidth, align) >> 2;
-    AlignedMiRows = ROOF(FrameHeight, align) >> 2;
+    computeAlignedSize();
 }
 
 bool FrameHeader::frame_size(BitReader& br)
@@ -1615,6 +1631,33 @@ int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int segmentId) const
         ASSERT(0);
     }
     return CLIP3(0, 255, qindex);
+}
+
+void FrameHeader::referenceFrameLoading()
+{
+    const RefFrame& ref = m_refInfo.m_refs[frame_to_show_map_idx];
+    current_frame_id = ref.RefFrameId;
+    UpscaledWidth = ref.RefUpscaledWidth;
+    FrameWidth = ref.RefFrameWidth;
+    FrameHeight = ref.RefFrameHeight;
+    RenderWidth = ref.RefRenderWidth;
+    RenderHeight = ref.RefRenderHeight;
+    MiCols = ref.RefMiCols;
+    MiRows = ref.RefMiRows;
+    OrderHint = ref.RefOrderHint;
+    for (int j = 0; j < REFS_PER_FRAME; j++) {
+        OrderHints[j + LAST_FRAME] = ref.SavedOrderHints[j + LAST_FRAME];
+    }
+    MfRefFrames = ref.SavedRefFrames;
+    MfMvs = ref.SavedMvs;
+    m_cdfs.reset(new Cdfs(*ref.SavedCdfs));
+    memcpy(gm_params, ref.SavedGmParams, sizeof(gm_params));
+    SegmentIds = ref.SavedSegmentIds;
+    m_loopFilter.load_loop_filter_params(ref);
+    m_segmentation.load_segmentation_params(ref);
+
+    computeAlignedSize();
+    initGeometry();
 }
 
 void FrameHeader::motionVectorStorage()

@@ -27,6 +27,7 @@ public:
 
 private:
     bool decodeFrame(Tiles tiles);
+    void showExistingFrame();
     std::shared_ptr<Yami::YuvFrame> decode_frame_wrapup(const std::shared_ptr<Yami::YuvFrame>&);
     void updateFrameStore(const FrameHeader& h, const std::shared_ptr<Yami::YuvFrame> frame);
     std::shared_ptr<Yami::YuvFrame> upscaling(const std::shared_ptr<Yami::YuvFrame>&);

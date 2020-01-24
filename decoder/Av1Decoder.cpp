@@ -40,6 +40,11 @@ bool Decoder::decode(uint8_t* data, size_t size)
         } else if (type == OBU_FRAME_HEADER) {
             m_frame = m_parser->parseFrameHeader(br);
             ret = bool(m_frame);
+            if (ret) {
+                if (m_frame->show_existing_frame) {
+                    showExistingFrame();
+                }
+            }
         } else if (type == OBU_TILE_GROUP) {
             if (!m_frame) {
                 ASSERT(0 && "no frame header");
@@ -118,11 +123,22 @@ bool Decoder::decodeFrame(TileGroup tiles)
     return true;
 }
 
+void Decoder::showExistingFrame()
+{
+    FrameHeader& h = *m_frame;
+
+    const std::shared_ptr<YuvFrame>& frame = m_store[h.frame_to_show_map_idx];
+    m_output.push_back(frame);
+    updateFrameStore(h, frame);
+
+    h.referenceFrameLoading();
+    h.motionVectorStorage();
+    m_parser->finishFrame();
+}
+
 std::shared_ptr<YuvFrame> Decoder::decode_frame_wrapup(const std::shared_ptr<YuvFrame>& frame)
 {
     FrameHeader& h = *m_frame;
-    if (h.show_existing_frame)
-        return frame;
 #ifdef DUMP
     static int i = 0;
     i++;
