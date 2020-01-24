@@ -4569,6 +4569,12 @@ void Cdfs::init_coeff_cdfs(uint32_t baseQ)
     av1_copy(eob_flag_cdf1024, av1_default_eob_multi1024_cdfs[index]);
 }
 
+void resetCdfs(vector<aom_cdf_prob>& v)
+{
+    if (v[v.size() - 1] > 0)
+        v[v.size() - 1] = 0;
+}
+
 template <class T>
 void resetCdfs(vector<T>& v)
 {
@@ -4576,16 +4582,10 @@ void resetCdfs(vector<T>& v)
         resetCdfs(a);
 }
 
-void resetCdfs(vector<aom_cdf_prob>& v)
-{
-    if (v[v.size() - 1] > 0)
-        v[v.size() - 1] = 0;
-}
-
-#define load(array)          \
-    do {                     \
-        array = rhs.##array; \
-        resetCdfs(array);    \
+#define load(array)        \
+    do {                   \
+        array = rhs.array; \
+        resetCdfs(array);  \
     } while (0)
 
 void Cdfs::load_cdfs(const Cdfs& rhs)

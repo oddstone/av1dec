@@ -572,9 +572,7 @@ public:
         , curFrameHint(1 << (frame.m_sequence->OrderHintBits - 1))
         , OrderHint(frame.OrderHint)
     {
-        usedFrame.resize(NUM_REF_FRAMES);
-        for (auto& b : usedFrame)
-            b = false;
+        usedFrame.resize(NUM_REF_FRAMES, false);
 
         memset(ref_frame_idx, INVALID_REF, sizeof(*ref_frame_idx) * REFS_PER_FRAME);
         ref_frame_idx[LAST_FRAME - LAST_FRAME] = last_frame_idx;
