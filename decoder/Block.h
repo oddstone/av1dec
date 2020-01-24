@@ -1,9 +1,9 @@
 #pragma once
 
 #include "../aom/enums.h"
-#include "Tile.h"
 #include "BlockTree.h"
 #include "EntropyDecoder.h"
+#include "Tile.h"
 #include <memory>
 #include <stdint.h>
 

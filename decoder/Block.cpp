@@ -273,8 +273,8 @@ void Block::reset_block_context()
     for (int plane = 0; plane < 1 + 2 * HasChroma; plane++) {
         int subX = (plane > 0) ? subsampling_x : 0;
         int subY = (plane > 0) ? subsampling_y : 0;
-        m_tile.m_above.reset(plane, MiCol >> subX, bw4>>subX);
-        m_tile.m_left.reset(plane, MiRow >> subY, bh4>>subY);
+        m_tile.m_above.reset(plane, MiCol >> subX, bw4 >> subX);
+        m_tile.m_left.reset(plane, MiRow >> subY, bh4 >> subY);
     }
 }
 
@@ -1306,7 +1306,7 @@ void Block::LocalWarp::warpEstimation()
             By[1] += ls_product(sy, dy) + 8;
         }
     }
-    int64_t det =A[0][0] * A[1][1] - A[0][1] * A[0][1];
+    int64_t det = A[0][0] * A[1][1] - A[0][1] * A[0][1];
     LocalValid = (det != 0);
     if (!LocalValid)
         return;
