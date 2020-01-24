@@ -524,12 +524,12 @@ void Block::inter_segment_id(bool preSkip)
     }
 }
 
-bool Block::seg_feature_active(SEG_LVL_FEATURE feature)
+bool Block::seg_feature_active(SEG_LVL_FEATURE feature) const
 {
     return m_frame.m_segmentation.seg_feature_active_idx(segment_id, feature);
 }
 
-int16_t Block::getSegFeature(SEG_LVL_FEATURE feature)
+int16_t Block::getSegFeature(SEG_LVL_FEATURE feature) const
 {
     return m_frame.m_segmentation.FeatureData[segment_id][feature];
 }
@@ -586,307 +586,58 @@ void Block::read_is_inter()
     }
 }
 
-static uint8_t check_backward(uint8_t refFrame)
-{
-    return ((refFrame >= BWDREF_FRAME) && (refFrame <= ALTREF_FRAME));
-}
-uint8_t Block::getCompModeCtx()
-{
-    uint8_t ctx;
-    if (AvailU && AvailL) {
-        if (AboveSingle && LeftSingle)
-            ctx = check_backward(AboveRefFrame[0])
-                ^ check_backward(LeftRefFrame[0]);
-        else if (AboveSingle)
-            ctx = 2 + (check_backward(AboveRefFrame[0]) || AboveIntra);
-        else if (LeftSingle)
-            ctx = 2 + (check_backward(LeftRefFrame[0]) || LeftIntra);
-        else
-            ctx = 4;
-    } else if (AvailU) {
-        if (AboveSingle)
-            ctx = check_backward(AboveRefFrame[0]);
-        else
-            ctx = 3;
-    } else if (AvailL) {
-        if (LeftSingle)
-            ctx = check_backward(LeftRefFrame[0]);
-        else
-            ctx = 3;
-    } else {
-        ctx = 1;
-    };
-    return ctx;
-}
-static bool is_samedir_ref_pair(uint8_t ref0, uint8_t ref1)
-{
-    return (ref0 >= BWDREF_FRAME) == (ref1 >= BWDREF_FRAME);
-}
-uint8_t Block::getCompReferenceTypeCtx()
-{
-    uint8_t ctx;
-    uint8_t above0 = AboveRefFrame[0];
-    uint8_t above1 = AboveRefFrame[1];
-    uint8_t left0 = LeftRefFrame[0];
-    uint8_t left1 = LeftRefFrame[1];
-    bool aboveCompInter = AvailU && !AboveIntra && !AboveSingle;
-    bool leftCompInter = AvailL && !LeftIntra && !LeftSingle;
-    bool aboveUniComp = aboveCompInter && is_samedir_ref_pair(above0, above1);
-    bool leftUniComp = leftCompInter && is_samedir_ref_pair(left0, left1);
-    if (AvailU && !AboveIntra && AvailL && !LeftIntra) {
-        bool samedir = is_samedir_ref_pair(above0, left0);
-        if (!aboveCompInter && !leftCompInter) {
-            ctx = 1 + 2 * samedir;
-        } else if (!aboveCompInter) {
-            if (!leftUniComp)
-                ctx = 1;
-            else
-                ctx = 3 + samedir;
-        } else if (!leftCompInter) {
-            if (!aboveUniComp)
-                ctx = 1;
-            else
-                ctx = 3 + samedir;
-        } else {
-            if (!aboveUniComp && !leftUniComp)
-                ctx = 0;
-            else if (!aboveUniComp || !leftUniComp)
-                ctx = 2;
-            else
-                ctx = 3 + ((above0 == BWDREF_FRAME) == (left0 == BWDREF_FRAME));
-        }
-    } else if (AvailU && AvailL) {
-        if (aboveCompInter)
-            ctx = 1 + 2 * aboveUniComp;
-        else if (leftCompInter)
-            ctx = 1 + 2 * leftUniComp;
-        else
-            ctx = 2;
-    } else if (aboveCompInter) {
-        ctx = 4 * aboveUniComp;
-    } else if (leftCompInter) {
-        ctx = 4 * leftUniComp;
-    } else {
-        ctx = 2;
-    }
-    return ctx;
-}
-uint8_t Block::count_refs(uint8_t frameType)
-{
-    uint8_t c = 0;
-    if (AvailU) {
-        if (AboveRefFrame[0] == frameType)
-            c++;
-        if (AboveRefFrame[1] == frameType)
-            c++;
-    }
-    if (AvailL) {
-        if (LeftRefFrame[0] == frameType)
-            c++;
-        if (LeftRefFrame[1] == frameType)
-            c++;
-    }
-    return c;
-}
 
-uint8_t Block::ref_count_ctx(uint8_t counts0, uint8_t counts1)
-{
-    if (counts0 < counts1)
-        return 0;
-    else if (counts0 == counts1)
-        return 1;
-    else
-        return 2;
-}
+class Block::ReadRefFrames {
+public:
+    ReadRefFrames(Block& block);
+    void read_ref_frames();
 
-uint8_t Block::getUniCompRefCtx()
-{
-    return getSingleRefP1Ctx();
-}
+private:
+    uint8_t getCompModeCtx();
+    uint8_t getCompReferenceTypeCtx();
 
-uint8_t Block::getUniCompRefP1Ctx()
-{
-    uint8_t last2Count = count_refs(LAST2_FRAME);
-    uint8_t last3GoldCount = count_refs(LAST3_FRAME) + count_refs(GOLDEN_FRAME);
-    uint8_t ctx = ref_count_ctx(last2Count, last3GoldCount);
-    return ctx;
-}
+    uint8_t count_refs(uint8_t frameType);
+    uint8_t ref_count_ctx(uint8_t counts0, uint8_t counts1);
 
-uint8_t Block::getUniCompRefP2Ctx()
-{
-    return getCompRefP2Ctx();
-}
+    uint8_t getUniCompRefCtx();
+    uint8_t getUniCompRefP1Ctx();
+    uint8_t getUniCompRefP2Ctx();
 
-uint8_t Block::getCompRefCtx()
-{
-    uint8_t last12Count = count_refs(LAST_FRAME) + count_refs(LAST2_FRAME);
-    uint8_t last3GoldCount = count_refs(LAST3_FRAME) + count_refs(GOLDEN_FRAME);
-    uint8_t ctx = ref_count_ctx(last12Count, last3GoldCount);
-    return ctx;
-}
+    uint8_t getCompRefCtx();
+    uint8_t getCompRefP1Ctx();
+    uint8_t getCompRefP2Ctx();
+    uint8_t getCompBwdRefCtx();
+    uint8_t getCompBwdRefP1Ctx();
 
-uint8_t Block::getCompRefP1Ctx()
-{
-    uint8_t lastCount = count_refs(LAST_FRAME);
-    uint8_t last2Count = count_refs(LAST2_FRAME);
-    uint8_t ctx = ref_count_ctx(lastCount, last2Count);
-    return ctx;
-}
+    uint8_t getSingleRefP1Ctx();
+    uint8_t getSingleRefP2Ctx();
+    uint8_t getSingleRefP3Ctx();
+    uint8_t getSingleRefP4Ctx();
+    uint8_t getSingleRefP5Ctx();
+    uint8_t getSingleRefP6Ctx();
 
-uint8_t Block::getCompRefP2Ctx()
-{
-    uint8_t last3Count = count_refs(LAST3_FRAME);
-    uint8_t goldCount = count_refs(GOLDEN_FRAME);
-    uint8_t ctx = ref_count_ctx(last3Count, goldCount);
-    return ctx;
-}
+    void readCompReference();
+    void readSingleReference();
 
-uint8_t Block::getCompBwdRefCtx()
-{
-    uint8_t brfarf2Count = count_refs(BWDREF_FRAME) + count_refs(ALTREF2_FRAME);
-    uint8_t arfCount = count_refs(ALTREF_FRAME);
-    uint8_t ctx = ref_count_ctx(brfarf2Count, arfCount);
-    return ctx;
-}
+    const FrameHeader& m_frame;
+    const Block& m_block;
+    int8_t* RefFrame;
+    EntropyDecoder& m_entropy;
+    const bool AvailU;
+    const bool AvailL;
+    const bool AboveSingle;
+    const bool LeftSingle;
+    const int8_t* AboveRefFrame;
+    const int8_t* LeftRefFrame;
+    const bool AboveIntra;
+    const bool LeftIntra;
+};
 
-uint8_t Block::getCompBwdRefP1Ctx()
-{
-    uint8_t brfCount = count_refs(BWDREF_FRAME);
-    uint8_t arf2Count = count_refs(ALTREF2_FRAME);
-    uint8_t ctx = ref_count_ctx(brfCount, arf2Count);
-    return ctx;
-}
 
-void Block::readCompReference()
-{
-    COMP_REFERENCE_TYPE comp_ref_type = m_entropy.readCompReferenceType(getCompReferenceTypeCtx());
-    if (comp_ref_type == UNIDIR_COMP_REFERENCE) {
-        bool uni_comp_ref = m_entropy.readUniCompRef(getUniCompRefCtx());
-        if (uni_comp_ref) {
-            RefFrame[0] = BWDREF_FRAME;
-            RefFrame[1] = ALTREF_FRAME;
-        } else {
-            bool uni_comp_ref_p1 = m_entropy.readUniCompRefP1(getUniCompRefP1Ctx());
-            if (uni_comp_ref_p1) {
-                bool uni_comp_ref_p2 = m_entropy.readUniCompRefP2(getUniCompRefP2Ctx());
-                if (uni_comp_ref_p2) {
-                    RefFrame[0] = LAST_FRAME;
-                    RefFrame[1] = GOLDEN_FRAME;
-                } else {
-                    RefFrame[0] = LAST_FRAME;
-                    RefFrame[1] = LAST3_FRAME;
-                }
-            } else {
-                RefFrame[0] = LAST_FRAME;
-                RefFrame[1] = LAST2_FRAME;
-            }
-        }
-    } else {
-        bool comp_ref = m_entropy.readCompRef(getCompRefCtx());
-        if (!comp_ref) {
-            bool comp_ref_p1 = m_entropy.readCompRefP1(getCompRefP1Ctx());
-            RefFrame[0] = comp_ref_p1 ? LAST2_FRAME : LAST_FRAME;
-        } else {
-            bool comp_ref_p2 = m_entropy.readCompRefP2(getCompRefP2Ctx());
-            RefFrame[0] = comp_ref_p2 ? GOLDEN_FRAME : LAST3_FRAME;
-        }
-        bool comp_bwdref = m_entropy.readCompBwdRef(getCompBwdRefCtx());
-        if (!comp_bwdref) {
-            bool comp_bwdref_p1 = m_entropy.readCompBwdRefP1(getCompBwdRefP1Ctx());
-            RefFrame[1] = comp_bwdref_p1 ? ALTREF2_FRAME : BWDREF_FRAME;
-        } else {
-            RefFrame[1] = ALTREF_FRAME;
-        }
-    }
-}
-
-uint8_t Block::getSingleRefP1Ctx()
-{
-    uint8_t fwdCount, bwdCount;
-    fwdCount = count_refs(LAST_FRAME);
-    fwdCount += count_refs(LAST2_FRAME);
-    fwdCount += count_refs(LAST3_FRAME);
-    fwdCount += count_refs(GOLDEN_FRAME);
-    bwdCount = count_refs(BWDREF_FRAME);
-    bwdCount += count_refs(ALTREF2_FRAME);
-    bwdCount += count_refs(ALTREF_FRAME);
-    uint8_t ctx = ref_count_ctx(fwdCount, bwdCount);
-    return ctx;
-}
-
-uint8_t Block::getSingleRefP2Ctx()
-{
-    return getCompBwdRefCtx();
-}
-
-uint8_t Block::getSingleRefP3Ctx()
-{
-    return getCompRefCtx();
-}
-
-uint8_t Block::getSingleRefP4Ctx()
-{
-    return getCompRefP1Ctx();
-}
-
-uint8_t Block::getSingleRefP5Ctx()
-{
-    return getCompRefP2Ctx();
-}
-
-uint8_t Block::getSingleRefP6Ctx()
-{
-    return getCompBwdRefP1Ctx();
-}
-
-void Block::readSingleReference()
-{
-    bool single_ref_p1 = m_entropy.readSingleRef(getSingleRefP1Ctx(), 1);
-    if (single_ref_p1) {
-        bool single_ref_p2 = m_entropy.readSingleRef(getSingleRefP2Ctx(), 2);
-        if (!single_ref_p2) {
-            bool single_ref_p6 = m_entropy.readSingleRef(getSingleRefP6Ctx(), 6);
-            RefFrame[0] = single_ref_p6 ? ALTREF2_FRAME : BWDREF_FRAME;
-        } else {
-            RefFrame[0] = ALTREF_FRAME;
-        }
-    } else {
-        bool single_ref_p3 = m_entropy.readSingleRef(getSingleRefP3Ctx(), 3);
-        if (single_ref_p3) {
-            bool single_ref_p5 = m_entropy.readSingleRef(getSingleRefP5Ctx(), 5);
-            RefFrame[0] = single_ref_p5 ? GOLDEN_FRAME : LAST3_FRAME;
-        } else {
-            bool single_ref_p4 = m_entropy.readSingleRef(getSingleRefP4Ctx(), 4);
-            RefFrame[0] = single_ref_p4 ? LAST2_FRAME : LAST_FRAME;
-        }
-    }
-    RefFrame[1] = NONE_FRAME;
-}
 void Block::read_ref_frames()
 {
-    if (skip_mode) {
-        RefFrame[0] = m_frame.SkipModeFrame[0];
-        RefFrame[1] = m_frame.SkipModeFrame[1];
-    } else if (seg_feature_active(SEG_LVL_REF_FRAME)) {
-        RefFrame[0] = getSegFeature(SEG_LVL_REF_FRAME);
-        RefFrame[1] = NONE_FRAME;
-    } else if (seg_feature_active(SEG_LVL_SKIP)
-        || seg_feature_active(SEG_LVL_GLOBALMV)) {
-        RefFrame[0] = LAST_FRAME;
-        RefFrame[1] = NONE_FRAME;
-    } else {
-        CompMode comp_mode;
-        if (m_frame.reference_select && (std::min(bw4, bh4) >= 2)) {
-            comp_mode = m_entropy.readCompMode(getCompModeCtx());
-        } else {
-            comp_mode = SINGLE_REFERENCE;
-        }
-        if (comp_mode == COMPOUND_REFERENCE) {
-            readCompReference();
-        } else {
-            readSingleReference();
-        }
-    }
+    ReadRefFrames read(*this);
+    read.read_ref_frames();
 }
 
 bool Block::needs_interp_filter()
@@ -1752,5 +1503,327 @@ bool Block::has_nearmv() const
         || YMode == NEAR_NEWMV
         || YMode == NEW_NEARMV);
 }
+
+
+Block::ReadRefFrames::ReadRefFrames(Block& block)
+    : m_frame(block.m_frame)
+    , m_block(block)
+    , RefFrame(block.RefFrame)
+    , m_entropy(block.m_entropy)
+    , AvailU(block.AvailU)
+    , AvailL(block.AvailL)
+    , AboveSingle(block.AboveSingle)
+    , LeftSingle(block.LeftSingle)
+    , AboveRefFrame(block.AboveRefFrame)
+    , LeftRefFrame(block.LeftRefFrame)
+    , AboveIntra(block.AboveIntra)
+    , LeftIntra(block.LeftIntra)
+{
+}
+
+void Block::ReadRefFrames::read_ref_frames()
+{
+    if (m_block.skip_mode) {
+        RefFrame[0] = m_frame.SkipModeFrame[0];
+        RefFrame[1] = m_frame.SkipModeFrame[1];
+    } else if (m_block.seg_feature_active(SEG_LVL_REF_FRAME)) {
+        RefFrame[0] = m_block.getSegFeature(SEG_LVL_REF_FRAME);
+        RefFrame[1] = NONE_FRAME;
+    } else if (m_block.seg_feature_active(SEG_LVL_SKIP)
+        || m_block.seg_feature_active(SEG_LVL_GLOBALMV)) {
+        RefFrame[0] = LAST_FRAME;
+        RefFrame[1] = NONE_FRAME;
+    } else {
+        CompMode comp_mode;
+        if (m_frame.reference_select && (std::min(m_block.bw4, m_block.bh4) >= 2)) {
+            comp_mode = m_entropy.readCompMode(getCompModeCtx());
+        } else {
+            comp_mode = SINGLE_REFERENCE;
+        }
+        if (comp_mode == COMPOUND_REFERENCE) {
+            readCompReference();
+        } else {
+            readSingleReference();
+        }
+    }
+}
+
+static uint8_t check_backward(uint8_t refFrame)
+{
+    return ((refFrame >= BWDREF_FRAME) && (refFrame <= ALTREF_FRAME));
+}
+uint8_t Block::ReadRefFrames::getCompModeCtx()
+{
+    uint8_t ctx;
+    if (AvailU && AvailL) {
+        if (AboveSingle && LeftSingle)
+            ctx = check_backward(AboveRefFrame[0])
+                ^ check_backward(LeftRefFrame[0]);
+        else if (AboveSingle)
+            ctx = 2 + (check_backward(AboveRefFrame[0]) || AboveIntra);
+        else if (LeftSingle)
+            ctx = 2 + (check_backward(LeftRefFrame[0]) || LeftIntra);
+        else
+            ctx = 4;
+    } else if (AvailU) {
+        if (AboveSingle)
+            ctx = check_backward(AboveRefFrame[0]);
+        else
+            ctx = 3;
+    } else if (AvailL) {
+        if (LeftSingle)
+            ctx = check_backward(LeftRefFrame[0]);
+        else
+            ctx = 3;
+    } else {
+        ctx = 1;
+    };
+    return ctx;
+}
+static bool is_samedir_ref_pair(uint8_t ref0, uint8_t ref1)
+{
+    return (ref0 >= BWDREF_FRAME) == (ref1 >= BWDREF_FRAME);
+}
+uint8_t Block::ReadRefFrames::getCompReferenceTypeCtx()
+{
+    uint8_t ctx;
+    uint8_t above0 = AboveRefFrame[0];
+    uint8_t above1 = AboveRefFrame[1];
+    uint8_t left0 = LeftRefFrame[0];
+    uint8_t left1 = LeftRefFrame[1];
+    bool aboveCompInter = AvailU && !AboveIntra && !AboveSingle;
+    bool leftCompInter = AvailL && !LeftIntra && !LeftSingle;
+    bool aboveUniComp = aboveCompInter && is_samedir_ref_pair(above0, above1);
+    bool leftUniComp = leftCompInter && is_samedir_ref_pair(left0, left1);
+    if (AvailU && !AboveIntra && AvailL && !LeftIntra) {
+        bool samedir = is_samedir_ref_pair(above0, left0);
+        if (!aboveCompInter && !leftCompInter) {
+            ctx = 1 + 2 * samedir;
+        } else if (!aboveCompInter) {
+            if (!leftUniComp)
+                ctx = 1;
+            else
+                ctx = 3 + samedir;
+        } else if (!leftCompInter) {
+            if (!aboveUniComp)
+                ctx = 1;
+            else
+                ctx = 3 + samedir;
+        } else {
+            if (!aboveUniComp && !leftUniComp)
+                ctx = 0;
+            else if (!aboveUniComp || !leftUniComp)
+                ctx = 2;
+            else
+                ctx = 3 + ((above0 == BWDREF_FRAME) == (left0 == BWDREF_FRAME));
+        }
+    } else if (AvailU && AvailL) {
+        if (aboveCompInter)
+            ctx = 1 + 2 * aboveUniComp;
+        else if (leftCompInter)
+            ctx = 1 + 2 * leftUniComp;
+        else
+            ctx = 2;
+    } else if (aboveCompInter) {
+        ctx = 4 * aboveUniComp;
+    } else if (leftCompInter) {
+        ctx = 4 * leftUniComp;
+    } else {
+        ctx = 2;
+    }
+    return ctx;
+}
+uint8_t Block::ReadRefFrames::count_refs(uint8_t frameType)
+{
+    uint8_t c = 0;
+    if (AvailU) {
+        if (AboveRefFrame[0] == frameType)
+            c++;
+        if (AboveRefFrame[1] == frameType)
+            c++;
+    }
+    if (AvailL) {
+        if (LeftRefFrame[0] == frameType)
+            c++;
+        if (LeftRefFrame[1] == frameType)
+            c++;
+    }
+    return c;
+}
+
+uint8_t Block::ReadRefFrames::ref_count_ctx(uint8_t counts0, uint8_t counts1)
+{
+    if (counts0 < counts1)
+        return 0;
+    else if (counts0 == counts1)
+        return 1;
+    else
+        return 2;
+}
+
+uint8_t Block::ReadRefFrames::getUniCompRefCtx()
+{
+    return getSingleRefP1Ctx();
+}
+
+uint8_t Block::ReadRefFrames::getUniCompRefP1Ctx()
+{
+    uint8_t last2Count = count_refs(LAST2_FRAME);
+    uint8_t last3GoldCount = count_refs(LAST3_FRAME) + count_refs(GOLDEN_FRAME);
+    uint8_t ctx = ref_count_ctx(last2Count, last3GoldCount);
+    return ctx;
+}
+
+uint8_t Block::ReadRefFrames::getUniCompRefP2Ctx()
+{
+    return getCompRefP2Ctx();
+}
+
+uint8_t Block::ReadRefFrames::getCompRefCtx()
+{
+    uint8_t last12Count = count_refs(LAST_FRAME) + count_refs(LAST2_FRAME);
+    uint8_t last3GoldCount = count_refs(LAST3_FRAME) + count_refs(GOLDEN_FRAME);
+    uint8_t ctx = ref_count_ctx(last12Count, last3GoldCount);
+    return ctx;
+}
+
+uint8_t Block::ReadRefFrames::getCompRefP1Ctx()
+{
+    uint8_t lastCount = count_refs(LAST_FRAME);
+    uint8_t last2Count = count_refs(LAST2_FRAME);
+    uint8_t ctx = ref_count_ctx(lastCount, last2Count);
+    return ctx;
+}
+
+uint8_t Block::ReadRefFrames::getCompRefP2Ctx()
+{
+    uint8_t last3Count = count_refs(LAST3_FRAME);
+    uint8_t goldCount = count_refs(GOLDEN_FRAME);
+    uint8_t ctx = ref_count_ctx(last3Count, goldCount);
+    return ctx;
+}
+
+uint8_t Block::ReadRefFrames::getCompBwdRefCtx()
+{
+    uint8_t brfarf2Count = count_refs(BWDREF_FRAME) + count_refs(ALTREF2_FRAME);
+    uint8_t arfCount = count_refs(ALTREF_FRAME);
+    uint8_t ctx = ref_count_ctx(brfarf2Count, arfCount);
+    return ctx;
+}
+
+uint8_t Block::ReadRefFrames::getCompBwdRefP1Ctx()
+{
+    uint8_t brfCount = count_refs(BWDREF_FRAME);
+    uint8_t arf2Count = count_refs(ALTREF2_FRAME);
+    uint8_t ctx = ref_count_ctx(brfCount, arf2Count);
+    return ctx;
+}
+
+void Block::ReadRefFrames::readCompReference()
+{
+    COMP_REFERENCE_TYPE comp_ref_type = m_entropy.readCompReferenceType(getCompReferenceTypeCtx());
+    if (comp_ref_type == UNIDIR_COMP_REFERENCE) {
+        bool uni_comp_ref = m_entropy.readUniCompRef(getUniCompRefCtx());
+        if (uni_comp_ref) {
+            RefFrame[0] = BWDREF_FRAME;
+            RefFrame[1] = ALTREF_FRAME;
+        } else {
+            bool uni_comp_ref_p1 = m_entropy.readUniCompRefP1(getUniCompRefP1Ctx());
+            if (uni_comp_ref_p1) {
+                bool uni_comp_ref_p2 = m_entropy.readUniCompRefP2(getUniCompRefP2Ctx());
+                if (uni_comp_ref_p2) {
+                    RefFrame[0] = LAST_FRAME;
+                    RefFrame[1] = GOLDEN_FRAME;
+                } else {
+                    RefFrame[0] = LAST_FRAME;
+                    RefFrame[1] = LAST3_FRAME;
+                }
+            } else {
+                RefFrame[0] = LAST_FRAME;
+                RefFrame[1] = LAST2_FRAME;
+            }
+        }
+    } else {
+        bool comp_ref = m_entropy.readCompRef(getCompRefCtx());
+        if (!comp_ref) {
+            bool comp_ref_p1 = m_entropy.readCompRefP1(getCompRefP1Ctx());
+            RefFrame[0] = comp_ref_p1 ? LAST2_FRAME : LAST_FRAME;
+        } else {
+            bool comp_ref_p2 = m_entropy.readCompRefP2(getCompRefP2Ctx());
+            RefFrame[0] = comp_ref_p2 ? GOLDEN_FRAME : LAST3_FRAME;
+        }
+        bool comp_bwdref = m_entropy.readCompBwdRef(getCompBwdRefCtx());
+        if (!comp_bwdref) {
+            bool comp_bwdref_p1 = m_entropy.readCompBwdRefP1(getCompBwdRefP1Ctx());
+            RefFrame[1] = comp_bwdref_p1 ? ALTREF2_FRAME : BWDREF_FRAME;
+        } else {
+            RefFrame[1] = ALTREF_FRAME;
+        }
+    }
+}
+
+uint8_t Block::ReadRefFrames::getSingleRefP1Ctx()
+{
+    uint8_t fwdCount, bwdCount;
+    fwdCount = count_refs(LAST_FRAME);
+    fwdCount += count_refs(LAST2_FRAME);
+    fwdCount += count_refs(LAST3_FRAME);
+    fwdCount += count_refs(GOLDEN_FRAME);
+    bwdCount = count_refs(BWDREF_FRAME);
+    bwdCount += count_refs(ALTREF2_FRAME);
+    bwdCount += count_refs(ALTREF_FRAME);
+    uint8_t ctx = ref_count_ctx(fwdCount, bwdCount);
+    return ctx;
+}
+
+uint8_t Block::ReadRefFrames::getSingleRefP2Ctx()
+{
+    return getCompBwdRefCtx();
+}
+
+uint8_t Block::ReadRefFrames::getSingleRefP3Ctx()
+{
+    return getCompRefCtx();
+}
+
+uint8_t Block::ReadRefFrames::getSingleRefP4Ctx()
+{
+    return getCompRefP1Ctx();
+}
+
+uint8_t Block::ReadRefFrames::getSingleRefP5Ctx()
+{
+    return getCompRefP2Ctx();
+}
+
+uint8_t Block::ReadRefFrames::getSingleRefP6Ctx()
+{
+    return getCompBwdRefP1Ctx();
+}
+
+void Block::ReadRefFrames::readSingleReference()
+{
+    bool single_ref_p1 = m_entropy.readSingleRef(getSingleRefP1Ctx(), 1);
+    if (single_ref_p1) {
+        bool single_ref_p2 = m_entropy.readSingleRef(getSingleRefP2Ctx(), 2);
+        if (!single_ref_p2) {
+            bool single_ref_p6 = m_entropy.readSingleRef(getSingleRefP6Ctx(), 6);
+            RefFrame[0] = single_ref_p6 ? ALTREF2_FRAME : BWDREF_FRAME;
+        } else {
+            RefFrame[0] = ALTREF_FRAME;
+        }
+    } else {
+        bool single_ref_p3 = m_entropy.readSingleRef(getSingleRefP3Ctx(), 3);
+        if (single_ref_p3) {
+            bool single_ref_p5 = m_entropy.readSingleRef(getSingleRefP5Ctx(), 5);
+            RefFrame[0] = single_ref_p5 ? GOLDEN_FRAME : LAST3_FRAME;
+        } else {
+            bool single_ref_p4 = m_entropy.readSingleRef(getSingleRefP4Ctx(), 4);
+            RefFrame[0] = single_ref_p4 ? LAST2_FRAME : LAST_FRAME;
+        }
+    }
+    RefFrame[1] = NONE_FRAME;
+}
+
 
 }

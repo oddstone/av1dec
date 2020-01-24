@@ -23,6 +23,7 @@ class Block : public BlockTree {
     class FindMvStack;
     class InterPredict;
     class IntraPredict;
+    class ReadRefFrames;
 
     class LocalWarp {
         friend class InterPredict;
@@ -114,34 +115,9 @@ private:
     void inter_block_mode_info();
     void intra_block_mode_info();
     void read_ref_frames();
-    bool seg_feature_active(SEG_LVL_FEATURE feature);
-    int16_t getSegFeature(SEG_LVL_FEATURE feature);
-    uint8_t getCompModeCtx();
-    uint8_t getCompReferenceTypeCtx();
+    bool seg_feature_active(SEG_LVL_FEATURE feature) const;
+    int16_t getSegFeature(SEG_LVL_FEATURE feature) const;
     uint8_t getInterpFilterCtx();
-
-    uint8_t count_refs(uint8_t frameType);
-    uint8_t ref_count_ctx(uint8_t counts0, uint8_t counts1);
-
-    uint8_t getUniCompRefCtx();
-    uint8_t getUniCompRefP1Ctx();
-    uint8_t getUniCompRefP2Ctx();
-
-    uint8_t getCompRefCtx();
-    uint8_t getCompRefP1Ctx();
-    uint8_t getCompRefP2Ctx();
-    uint8_t getCompBwdRefCtx();
-    uint8_t getCompBwdRefP1Ctx();
-
-    uint8_t getSingleRefP1Ctx();
-    uint8_t getSingleRefP2Ctx();
-    uint8_t getSingleRefP3Ctx();
-    uint8_t getSingleRefP4Ctx();
-    uint8_t getSingleRefP5Ctx();
-    uint8_t getSingleRefP6Ctx();
-
-    void readCompReference();
-    void readSingleReference();
 
     int16_t read_mv_component(uint8_t MvCtx, uint8_t comp);
     void read_mv(Mv PredMv[2], int ref);
