@@ -1831,11 +1831,13 @@ void LoopFilterParams::setup_past_independence()
 void LoopFilterParams::load_loop_filter_params(const RefFrame& ref)
 {
     memcpy(loop_filter_mode_deltas, ref.loop_filter_mode_deltas, sizeof(loop_filter_mode_deltas));
+    memcpy(loop_filter_ref_deltas, ref.loop_filter_ref_deltas, sizeof(loop_filter_ref_deltas));
 }
 
 void LoopFilterParams::save_loop_filter_params(RefFrame& ref)
 {
     memcpy(ref.loop_filter_mode_deltas, loop_filter_mode_deltas, sizeof(loop_filter_mode_deltas));
+    memcpy(ref.loop_filter_ref_deltas, loop_filter_ref_deltas, sizeof(loop_filter_ref_deltas));
 }
 
 void LoopFilterParams::resetDeltas()
