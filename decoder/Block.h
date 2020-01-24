@@ -106,6 +106,7 @@ private:
 
     //for inter
     void inter_segment_id(bool preSkip);
+    bool getSkipModeCtx();
     bool read_skip_mode();
     uint8_t getIsInterCtx();
     void read_is_inter();

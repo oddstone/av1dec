@@ -497,7 +497,7 @@ struct FrameHeader {
     std::vector<std::vector<std::vector<int>>> RefFrames;
     std::vector<std::vector<TX_TYPE>> TxTypes;
     std::vector<std::vector<bool>> IsInters;
-    //SkipModes[r + y][c + x] = skip_mode
+    std::vector<std::vector<bool>> SkipModes;
     std::vector<std::vector<bool>> Skips;
     std::vector<std::vector<TX_SIZE>> InterTxSizes;
     std::vector<std::vector<TX_SIZE>> TxSizes;

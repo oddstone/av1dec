@@ -508,6 +508,7 @@ void FrameHeader::initGeometry()
     }
     TxTypes.assign(AlignedMiRows, std::vector<TX_TYPE>(AlignedMiCols));
     IsInters.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
+    SkipModes.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
     InterTxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
     TxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
     MiSizes.assign(AlignedMiRows, std::vector<BLOCK_SIZE>(AlignedMiCols));

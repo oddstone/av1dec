@@ -217,6 +217,11 @@ bool EntropyDecoder::readIsInter(uint8_t ctx)
     return (bool)m_symbol->read(m_cdfs.intra_inter_cdf[ctx]);
 }
 
+bool EntropyDecoder::readSkipMode(uint8_t ctx)
+{
+    return (bool)m_symbol->read(m_cdfs.skip_mode_cdfs[ctx]);
+}
+
 const static uint8_t Size_Group[BLOCK_SIZES_ALL] = {
     0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3,
     3, 3, 3, 3, 3, 0, 0, 1, 1, 2, 2

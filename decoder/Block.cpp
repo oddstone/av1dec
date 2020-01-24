@@ -314,7 +314,7 @@ void Block::parse()
     for (int y = 0; y < bh4; y++) {
         for (int x = 0; x < bw4; x++) {
             m_frame.IsInters[r + y][c + x] = is_inter;
-            //SkipModes[r + y][c + x] = skip_mode
+            m_frame.SkipModes[r + y][c + x] = skip_mode;
             m_frame.Skips[r + y][c + x] = skip;
             m_frame.TxSizes[r + y][c + x] = TxSize;
             m_frame.MiSizes[r + y][c + x] = MiSize;
@@ -534,6 +534,16 @@ int16_t Block::getSegFeature(SEG_LVL_FEATURE feature)
     return m_frame.m_segmentation.FeatureData[segment_id][feature];
 }
 
+bool Block::getSkipModeCtx()
+{
+    int ctx = 0;
+    if (AvailU)
+        ctx += m_frame.SkipModes[MiRow - 1][MiCol];
+    if (AvailL)
+        ctx += m_frame.SkipModes[MiRow][MiCol - 1];
+    return ctx;
+}
+
 bool Block::read_skip_mode()
 {
     const Segmentation& seg = m_frame.m_segmentation;
@@ -545,7 +555,7 @@ bool Block::read_skip_mode()
         || Block_Height[MiSize] < 8) {
         skip_mode = false;
     } else {
-        ASSERT(0);
+        skip_mode = m_entropy.readSkipMode(getSkipModeCtx());
     }
     return skip_mode;
 }

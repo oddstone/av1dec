@@ -47,6 +47,7 @@ public:
     RestorationType readRestorationType();
     //for inter
     bool readIsInter(uint8_t ctx);
+    bool readSkipMode(uint8_t ctx);
     PREDICTION_MODE readYMode(BLOCK_SIZE MiSize);
     CompMode readCompMode(uint8_t ctx);
     COMP_REFERENCE_TYPE readCompReferenceType(uint8_t ctx);
