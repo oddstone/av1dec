@@ -10,21 +10,14 @@ using std::vector;
 SymbolDecoder::SymbolDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update)
     : DisableCdfUpdate(disable_cdf_update)
 {
-    m_reader.reset(new Yami::BitReader(data, sz));
-    uint8_t numBits;
-    if (sz <= 1)
-        numBits = 8;
-    else
-        numBits = 15;
-    uint16_t buf = m_reader->read(numBits);
-    uint16_t paddedBuf = (buf << (15 - numBits));
-    SymbolValue = ((1 << 15) - 1) ^ paddedBuf;
-    SymbolRange = 1 << 15;
-    SymbolMaxBits = 8 * sz - 15;
-}
-
-SymbolDecoder::~SymbolDecoder()
-{
+    m_buf = data;
+    m_tell_offs = 10 - (OD_EC_WINDOW_SIZE - 8);
+    m_end = data + sz;
+    m_bptr = data;
+    m_dif = ((od_ec_window)1 << (OD_EC_WINDOW_SIZE - 1)) - 1;
+    m_rng = 0x8000;
+    m_cnt = -15;
+    refill();
 }
 
 static const uint8_t EC_PROB_SHIFT = 6;
@@ -41,7 +34,7 @@ static uint8_t log(uint16_t n)
 
 uint8_t SymbolDecoder::readBool()
 {
-    static vector <aom_cdf_prob> icdf = { AOM_CDF2(1 << 14) };
+    static vector<aom_cdf_prob> icdf = { AOM_CDF2(1 << 14) };
     return read(icdf, true);
 }
 
@@ -52,28 +45,36 @@ uint8_t SymbolDecoder::read(vector<aom_cdf_prob>& icdf)
 
 uint8_t SymbolDecoder::read(vector<aom_cdf_prob>& icdf, bool disableUpdate)
 {
-    uint16_t cur = SymbolRange;
-    uint8_t symbol = -1;
-    uint16_t prev;
-    uint8_t nicdf = icdf.size() - 1;
-    uint8_t N = nicdf - 1;
-    do {
-        symbol++;
-        prev = cur;
-        uint16_t f = icdf[symbol];
-        cur = ((SymbolRange >> 8) * (f >> EC_PROB_SHIFT)) >> (7 - EC_PROB_SHIFT);
-        cur += EC_MIN_PROB * (N - symbol);
+    od_ec_window dif;
+    unsigned r;
+    unsigned c;
+    unsigned u;
+    unsigned v;
+    int ret;
+    dif = m_dif;
+    r = m_rng;
+    const int nsyms = icdf.size() - 1;
+    const int N = nsyms - 1;
 
-    } while (SymbolValue < cur);
-    SymbolRange = prev - cur;
-    SymbolValue -= cur;
-    renormalize();
-    if (!disableUpdate)
-        updateCdf(icdf, symbol);
     static FILE* fp = fopen("symbol.txt", "w");
-    fprintf(fp, "%d\r\n", SymbolRange);
+    fprintf(fp, "dif = %u, rng = %d, cnt = %d\r\n", m_dif, m_rng, m_cnt);
     fflush(fp);
-    return symbol;
+
+    c = (unsigned)(dif >> (OD_EC_WINDOW_SIZE - 16));
+    v = r;
+    ret = -1;
+    do {
+        u = v;
+        v = ((r >> 8) * (uint32_t)(icdf[++ret] >> EC_PROB_SHIFT) >> (7 - EC_PROB_SHIFT - CDF_SHIFT));
+        v += EC_MIN_PROB * (N - ret);
+    } while (c < v);
+
+    r = u - v;
+    dif -= (od_ec_window)v << (OD_EC_WINDOW_SIZE - 16);
+
+    if (!disableUpdate)
+        updateCdf(icdf, ret);
+    return renormalize(dif, r, ret);
 }
 
 void SymbolDecoder::updateCdf(vector<aom_cdf_prob>& cdf, uint8_t symbol)
@@ -94,15 +95,61 @@ void SymbolDecoder::updateCdf(vector<aom_cdf_prob>& cdf, uint8_t symbol)
     cdf[N] += (cdf[N] < 32);
 }
 
-void SymbolDecoder::renormalize()
+int SymbolDecoder::renormalize(od_ec_window dif, unsigned rng, int ret)
 {
-    uint32_t bits = 15 - log(SymbolRange);
-    SymbolRange <<= bits;
-    uint32_t numBits = std::min(bits, std::max(0U, SymbolMaxBits));
-    uint16_t newData = m_reader->read(numBits);
-    uint16_t paddedData = newData << (bits - numBits);
-    SymbolValue = paddedData ^ (((SymbolValue + 1) << bits) - 1);
-    SymbolMaxBits = SymbolMaxBits - bits;
+    int d;
+    /*The number of leading zeros in the 16-bit binary representation of rng.*/
+    d = 15 - log(rng);
+    /*d bits in m_dif are consumed.*/
+    m_cnt -= d;
+    /*This is equivalent to shifting in 1's instead of 0's.*/
+    m_dif = ((dif + 1) << d) - 1;
+    m_rng = rng << d;
+    if (m_cnt < 0)
+        refill();
+    return ret;
+}
+
+#define OD_EC_LOTS_OF_BITS (0x4000)
+
+void SymbolDecoder::refill()
+{
+    int s;
+    od_ec_window dif;
+    int16_t cnt;
+    const unsigned char* bptr;
+    const unsigned char* end;
+    dif = m_dif;
+    cnt = m_cnt;
+    bptr = m_bptr;
+    end = m_end;
+    s = OD_EC_WINDOW_SIZE - 9 - (cnt + 15);
+    for (; s >= 0 && bptr < end; s -= 8, bptr++) {
+        /*Each time a byte is inserted into the window (dif), bptr advances and cnt
+       is incremented by 8, so the total number of consumed bits (the return
+       value of od_ec_dec_tell) does not change.*/
+        assert(s <= OD_EC_WINDOW_SIZE - 8);
+        dif ^= (od_ec_window)bptr[0] << s;
+        cnt += 8;
+    }
+    if (bptr >= end) {
+        /*We've reached the end of the buffer. It is perfectly valid for us to need
+       to fill the window with additional bits past the end of the buffer (and
+       this happens in normal operation). These bits should all just be taken
+       as zero. But we cannot increment bptr past 'end' (this is undefined
+       behavior), so we start to increment m_tell_offs. We also don't want
+       to keep testing bptr against 'end', so we set cnt to OD_EC_LOTS_OF_BITS
+       and adjust m_tell_offs so that the total number of unconsumed bits in
+       the window (m_cnt - m_tell_offs) does not change. This effectively
+       puts lots of zero bits into the window, and means we won't try to refill
+       it from the buffer for a very long time (at which point we'll put lots
+       of zero bits into the window again).*/
+        m_tell_offs += OD_EC_LOTS_OF_BITS - cnt;
+        cnt = OD_EC_LOTS_OF_BITS;
+    }
+    m_dif = dif;
+    m_cnt = cnt;
+    m_bptr = bptr;
 }
 
 }
