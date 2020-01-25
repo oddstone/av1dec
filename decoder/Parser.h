@@ -225,9 +225,9 @@ const static uint8_t NUM_REF_FRAMES = 8;
 const static uint8_t REFS_PER_FRAME = 7;
 const static uint8_t PRIMARY_REF_NONE = 7;
 const static uint16_t MAX_TILE_WIDTH = 4096;
-const static uint32_t MAX_TILE_AREA = 4906 * 2304;
-const static uint32_t MAX_TILE_COLS = 64;
-const static uint32_t MAX_TILE_ROWS = 64;
+const static int MAX_TILE_AREA = 4906 * 2304;
+const static int MAX_TILE_COLS = 64;
+const static int MAX_TILE_ROWS = 64;
 
 class RefFrame {
 public:

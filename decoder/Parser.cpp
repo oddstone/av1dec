@@ -1474,9 +1474,9 @@ bool FrameHeader::render_size(BitReader& br)
     return true;
 }
 
-uint32_t tile_log2(uint32_t blkSize, uint32_t target)
+int tile_log2(int blkSize, int target)
 {
-    uint32_t k;
+    int k;
     for (k = 0; (blkSize << k) < target; k++) {
     }
     return k;
@@ -1543,16 +1543,16 @@ bool FrameHeader::read_tx_mode(BitReader& br)
 bool FrameHeader::parseTileInfo(BitReader& br)
 {
     const SequenceHeader& sequence = *m_sequence;
-    uint32_t sbCols = sequence.use_128x128_superblock ? ((MiCols + 31) >> 5) : ((MiCols + 15) >> 4);
-    uint32_t sbRows = sequence.use_128x128_superblock ? ((MiRows + 31) >> 5) : ((MiRows + 15) >> 4);
+    int sbCols = sequence.use_128x128_superblock ? ((MiCols + 31) >> 5) : ((MiCols + 15) >> 4);
+    int sbRows = sequence.use_128x128_superblock ? ((MiRows + 31) >> 5) : ((MiRows + 15) >> 4);
     uint8_t sbShift = sequence.use_128x128_superblock ? 5 : 4;
     uint8_t sbSize = sbShift + 2;
-    uint32_t maxTileWidthSb = MAX_TILE_WIDTH >> sbSize;
-    uint32_t maxTileAreaSb = MAX_TILE_AREA >> (2 * sbSize);
-    uint32_t minLog2TileCols = tile_log2(maxTileWidthSb, sbCols);
-    uint32_t maxLog2TileCols = tile_log2(1, std::min(sbCols, MAX_TILE_COLS));
-    uint32_t maxLog2TileRows = tile_log2(1, std::min(sbRows, MAX_TILE_ROWS));
-    uint32_t minLog2Tiles = std::max(minLog2TileCols,
+    int maxTileWidthSb = MAX_TILE_WIDTH >> sbSize;
+    int maxTileAreaSb = MAX_TILE_AREA >> (2 * sbSize);
+    int minLog2TileCols = tile_log2(maxTileWidthSb, sbCols);
+    int maxLog2TileCols = tile_log2(1, std::min(sbCols, MAX_TILE_COLS));
+    int maxLog2TileRows = tile_log2(1, std::min(sbRows, MAX_TILE_ROWS));
+    int minLog2Tiles = std::max(minLog2TileCols,
         tile_log2(maxTileAreaSb, sbRows * sbCols));
 
     bool uniform_tile_spacing_flag;
@@ -1563,7 +1563,7 @@ bool FrameHeader::parseTileInfo(BitReader& br)
         }
         getMiStarts(MiColStarts, sbCols, sbShift, TileColsLog2, MiCols);
 
-        uint32_t minLog2TileRows = std::max(minLog2Tiles - TileColsLog2, (uint32_t)0);
+        uint32_t minLog2TileRows = std::max(minLog2Tiles - (int)TileColsLog2, 0);
         uint32_t maxTileHeightSb = sbRows >> minLog2TileRows;
 
         if (!parseTileLog2(br, TileRowsLog2, minLog2TileRows, maxLog2TileRows)) {
@@ -1574,15 +1574,15 @@ bool FrameHeader::parseTileInfo(BitReader& br)
         TileRows = 1 << TileRowsLog2;
 
     } else {
-        uint32_t widestTileSb = 0;
-        uint32_t startSb = 0;
-        uint32_t i;
+        int widestTileSb = 0;
+        int startSb = 0;
+        int i;
         for (i = 0; startSb < sbCols && i < MAX_TILE_COLS; i++) {
             MiColStarts.push_back(startSb << sbShift);
             uint32_t maxWidth = std::min(sbCols - startSb, maxTileWidthSb);
             uint32_t width_in_sbs_minus_1;
             READ_NS(width_in_sbs_minus_1, maxWidth);
-            uint32_t sizeSb = width_in_sbs_minus_1 + 1;
+            int sizeSb = width_in_sbs_minus_1 + 1;
             widestTileSb = std::max(sizeSb, widestTileSb);
             startSb += sizeSb;
         }
@@ -1593,8 +1593,8 @@ bool FrameHeader::parseTileInfo(BitReader& br)
             maxTileAreaSb = (sbRows * sbCols) >> (minLog2Tiles + 1);
         else
             maxTileAreaSb = sbRows * sbCols;
-        uint32_t one = 1;
-        uint32_t maxTileHeightSb = std::max(maxTileAreaSb / widestTileSb, one);
+        int one = 1;
+        int maxTileHeightSb = std::max(maxTileAreaSb / widestTileSb, one);
         startSb = 0;
         for (i = 0; startSb < sbRows && i < MAX_TILE_ROWS; i++) {
             MiRowStarts.push_back(startSb << sbShift);
