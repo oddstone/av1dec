@@ -1597,6 +1597,7 @@ int16_t TransformBlock::getLevel()
     do {
         length++;
         golomb_length_bit = m_entropy.readLiteral(1);
+        ASSERT(length <= 32);
     } while (!golomb_length_bit);
     uint32_t x = 1;
     for (int i = length - 2; i >= 0; i--) {
