@@ -460,23 +460,37 @@ bool Parser::parseTileGroup(BitReader& br, const FramePtr& frame, TileGroup& gro
     skipTrailingBits(br);
 
     //group.reset(new TileGroup);
+    const uint8_t* data = br.getCurrent();
+    uint32_t size = br.getRemainingBitsCount() / 8;
 
     for (uint32_t TileNum = tg_start; TileNum <= tg_end; TileNum++) {
 
         bool lastTile = (TileNum == tg_end);
         uint32_t tileSize;
         if (lastTile) {
-            tileSize = br.getRemainingBitsCount() / 8;
+            tileSize = size;
         } else {
             uint32_t tile_size_minus_1;
-            READ_LE(tile_size_minus_1, frame->TileSizeBytes);
+            BitReader reader(data, size);
+            if (!reader.readLe(tile_size_minus_1, frame->TileSizeBytes)) {
+                ERROR("read tile_size_minus_1 failed");
+                return false;            
+            }
+            data += frame->TileSizeBytes;
+            size -= frame->TileSizeBytes;
             tileSize = tile_size_minus_1 + 1;
         }
+        if (tileSize > size) {
+            ERROR("tile size %d > remaining size %d", tileSize, size);
+            return false;
+        }
         std::shared_ptr<Tile> tile(new Tile(m_sequence, frame, TileNum));
-        if (!tile->parse(br.getCurrent(), br.getRemainingBitsCount() >> 3)) {
+        if (!tile->parse(data, tileSize)) {
             ERROR("decode tile failed");
             return false;
         }
+        data += tileSize;
+        size -= tileSize;
         group.push_back(tile);
     }
     //br.
