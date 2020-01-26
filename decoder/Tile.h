@@ -31,7 +31,7 @@ class BlockDecoded {
 public:
     BlockDecoded();
     void init(const Tile& tile);
-    void clearFlags(int r, int c, int sbSize4);
+    void clear_block_decoded_flags(int r, int c, int sbSize4);
     void setFlag(int plane, int r, int c);
     bool getFlag(int plane, int r, int c) const;
 

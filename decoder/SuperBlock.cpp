@@ -20,7 +20,7 @@ void SuperBlock::parse()
 bool SuperBlock::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
 {
     int sbSize4 = Num_4x4_Blocks_Wide[m_bSize];
-    m_tile.m_decoded.clearFlags(m_r, m_c, sbSize4);
+    m_tile.m_decoded.clear_block_decoded_flags(m_r, m_c, sbSize4);
     return Partition::decode(frame, frameStore);
 }
 }

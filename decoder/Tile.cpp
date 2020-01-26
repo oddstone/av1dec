@@ -26,7 +26,7 @@ void BlockDecoded::init(const Tile& tile)
     MiRowEnd = tile.MiRowEnd;
 }
 
-void BlockDecoded::clearFlags(int r, int c, int sbSize4)
+void BlockDecoded::clear_block_decoded_flags(int r, int c, int sbSize4)
 {
     for (int plane = 0; plane < NumPlanes; plane++) {
         int subX = (plane > 0) ? subsampling_x : 0;
