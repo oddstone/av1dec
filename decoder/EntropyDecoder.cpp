@@ -147,7 +147,7 @@ bool EntropyDecoder::readAllZero(uint8_t txSzCtx, uint8_t ctx)
 
 uint8_t EntropyDecoder::readEobPt(uint8_t eobMultisize, PLANE_TYPE planeType, uint8_t ctx)
 {
-    vector<aom_cdf_prob> *cdf;
+    vector<aom_cdf_prob>* cdf;
     if (eobMultisize == 0) {
         cdf = &m_cdfs.eob_flag_cdf16[planeType][ctx];
     } else if (eobMultisize == 1) {

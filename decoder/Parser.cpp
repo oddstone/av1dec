@@ -1053,7 +1053,7 @@ bool FrameHeader::read_global_param(BitReader& br, GlobalMotionType type, uint8_
     return true;
 }
 
-#define READ_GLOBAL_PARAM(idx) \
+#define READ_GLOBAL_PARAM(idx)                  \
     if (!read_global_param(br, type, ref, idx)) \
         return false;
 
@@ -1664,16 +1664,13 @@ void FrameHeader::motionVectorStorage()
         for (uint32_t col = 0; col < MiCols; col++) {
             for (int list = 0; list < 2; list++) {
                 int r = RefFrames[row][col][list];
-                if (r > INTRA_FRAME)
-                {
+                if (r > INTRA_FRAME) {
                     int dist = get_relative_dist(r);
-                    if (dist < 0)
-                    {
+                    if (dist < 0) {
                         int16_t mvRow = Mvs[row][col][list].mv[0];
                         int16_t mvCol = Mvs[row][col][list].mv[1];
                         const static int16_t REFMVS_LIMIT = (1 << 12) - 1;
-                        if (std::abs(mvRow) <= REFMVS_LIMIT && std::abs(mvCol) <= REFMVS_LIMIT)
-                        {
+                        if (std::abs(mvRow) <= REFMVS_LIMIT && std::abs(mvCol) <= REFMVS_LIMIT) {
                             MfRefFrames[row][col] = r;
                             MfMvs[row][col].mv[0] = mvRow;
                             MfMvs[row][col].mv[1] = mvCol;
@@ -1777,7 +1774,6 @@ void Parser::finishFrame()
             frame.m_loopFilter.save_loop_filter_params(ref);
             frame.m_segmentation.save_segmentation_params(ref);
             ref.RefOrderHint = frame.OrderHint;
-            
         }
     }
 }

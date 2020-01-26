@@ -15,6 +15,7 @@ namespace YamiAv1 {
 class SymbolDecoder {
     typedef uint32_t od_ec_window;
     const int OD_EC_WINDOW_SIZE = ((int)sizeof(od_ec_window) * 8);
+
 public:
     SymbolDecoder(const uint8_t* data, uint32_t sz, bool disable_cdf_update);
     uint8_t read(std::vector<aom_cdf_prob>& icdf);

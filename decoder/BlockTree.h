@@ -1,6 +1,6 @@
 #pragma once
-#include <memory>
 #include "Av1Common.h"
+#include <memory>
 
 namespace YamiAv1 {
 

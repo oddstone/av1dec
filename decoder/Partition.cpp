@@ -1,7 +1,7 @@
 #include "Partition.h"
 #include "Av1Common.h"
-#include "Parser.h"
 #include "Block.h"
+#include "Parser.h"
 #include "VideoFrame.h"
 #include "log.h"
 namespace YamiAv1 {

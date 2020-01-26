@@ -3,7 +3,6 @@
 
 #include <vector>
 
-
 namespace YamiAv1 {
 
 class Block::IntraPredict {
@@ -44,6 +43,6 @@ private:
     int h;
     std::shared_ptr<YuvFrame> m_yuv;
     std::vector<std::vector<uint8_t>>& m_pred;
-}; 
+};
 
 }

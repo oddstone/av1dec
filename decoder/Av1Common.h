@@ -156,7 +156,8 @@ static const int Tx_Height_Log2[TX_SIZES_ALL] = {
 #define ROUND2_64(x, n) (((n) == 0) ? (x) : (((x) + ((int64_t)1 << (n - 1))) >> (n)))
 #define ROUND2SIGNED_64(x, n) ((x) >= 0 ? ROUND2_64((x), (n)) : -ROUND2_64(-(x), (n)))
 
-template<class T> T FloorLog2(T x)
+template <class T>
+T FloorLog2(T x)
 {
     T s = 0;
     while (x != 0) {

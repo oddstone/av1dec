@@ -7,8 +7,8 @@
 #include "../aom/prob.h"
 #include "../aom/seg_common.h"
 #include "Av1Common.h"
-#include "SymbolDecoder.h"
 #include "Cdfs.h"
+#include "SymbolDecoder.h"
 #include <memory>
 
 namespace YamiAv1 {

@@ -586,7 +586,6 @@ void Block::read_is_inter()
     }
 }
 
-
 class Block::ReadRefFrames {
 public:
     ReadRefFrames(Block& block);
@@ -632,7 +631,6 @@ private:
     const bool AboveIntra;
     const bool LeftIntra;
 };
-
 
 void Block::read_ref_frames()
 {
@@ -1504,7 +1502,6 @@ bool Block::has_nearmv() const
         || YMode == NEW_NEARMV);
 }
 
-
 Block::ReadRefFrames::ReadRefFrames(Block& block)
     : m_frame(block.m_frame)
     , m_block(block)
@@ -1824,6 +1821,5 @@ void Block::ReadRefFrames::readSingleReference()
     }
     RefFrame[1] = NONE_FRAME;
 }
-
 
 }

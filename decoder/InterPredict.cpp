@@ -738,8 +738,7 @@ void Block::InterPredict::getDistanceWeights(int candRow, int candCol, int& FwdW
     };
     int refList = 0;
     int dist[2];
-    for (refList = 0; refList < 2; refList++)
-    {
+    for (refList = 0; refList < 2; refList++) {
         uint8_t ref = m_frame.RefFrames[candRow][candCol][refList];
         int d = std::abs(m_frame.get_relative_dist(ref));
         dist[refList] = CLIP3(0, MAX_FRAME_DISTANCE, d);
@@ -747,11 +746,10 @@ void Block::InterPredict::getDistanceWeights(int candRow, int candCol, int& FwdW
     int d0 = dist[1];
     int d1 = dist[0];
     int order = d0 <= d1;
-    if (d0 == 0 || d1 == 0)
-    {
+    if (d0 == 0 || d1 == 0) {
         FwdWeight = Quant_Dist_Lookup[3][order];
         BckWeight = Quant_Dist_Lookup[3][1 - order];
-    } else  {
+    } else {
         int i;
         for (i = 0; i < 3; i++) {
             int c0 = Quant_Dist_Weight[i][order];
@@ -940,8 +938,7 @@ void Block::FindMvStack::temporalScan()
         && (bh4 < Num_4x4_Blocks_High[BLOCK_64X64])
         && (bw4 >= Num_4x4_Blocks_Wide[BLOCK_8X8])
         && (bw4 < Num_4x4_Blocks_Wide[BLOCK_64X64]));
-    if (allowExtension)
-    {
+    if (allowExtension) {
         const int tplSamplePos[3][2] = {
             { bh4, -2 }, { bh4, bw4 }, { bh4 - 2, bw4 }
         };
@@ -949,8 +946,7 @@ void Block::FindMvStack::temporalScan()
         for (int i = 0; i < 3; i++) {
             int deltaRow = tplSamplePos[i][0];
             int deltaCol = tplSamplePos[i][1];
-            if (check_sb_border(deltaRow, deltaCol))
-            {
+            if (check_sb_border(deltaRow, deltaCol)) {
                 add_tpl_ref_mv(deltaRow, deltaCol);
             }
         }

@@ -3,7 +3,6 @@
 
 #include <vector>
 
-
 namespace YamiAv1 {
 
 class Block::InterPredict {

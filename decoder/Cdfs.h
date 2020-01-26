@@ -7,6 +7,7 @@ namespace YamiAv1 {
 
 class Cdfs {
     friend class EntropyDecoder;
+
 public:
     void init_non_coeff_cdfs();
     void init_coeff_cdfs(uint32_t baseQ);

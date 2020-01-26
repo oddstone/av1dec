@@ -1,7 +1,7 @@
 #include "Tile.h"
 #include "Av1Common.h"
-#include "Parser.h"
 #include "Block.h"
+#include "Parser.h"
 #include "Partition.h"
 #include "SuperBlock.h"
 #include "SymbolDecoder.h"

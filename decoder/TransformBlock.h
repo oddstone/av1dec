@@ -55,7 +55,6 @@ private:
     void reconstruct();
     PREDICTION_MODE getIntraDir();
 
-
     EntropyDecoder& m_entropy;
     Block& m_block;
     Tile& m_tile;
