@@ -117,9 +117,9 @@ bool Decoder::decodeFrame(Tiles& tiles)
 #ifdef DUMP
     static int i = 0;
     i++;
-    if (i == 2) {
+    //if (i == 2) {
         m_output.push_back(filtered);
-    }
+    //}
 #else
     if (m_frame->show_frame)
         m_output.push_back(filtered);

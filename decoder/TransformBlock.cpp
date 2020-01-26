@@ -1163,7 +1163,6 @@ TransformBlock::TransformBlock(Block& block, int p, int baseX, int baseY, int st
     , h4(h >> 2)
     , tw(std::min(w, 32))
     , th(std::min(h, 32))
-    , m_eob(0)
 {
     switch (txSz) {
     case TX_32X32:
@@ -1622,7 +1621,6 @@ int TransformBlock::coeffs()
     int dcCategory = 0;
 
     bool all_zero = m_entropy.readAllZero(txSzCtx, getAllZeroCtx());
-
     if (all_zero) {
         if (plane == 0) {
             transform_type(DCT_DCT);
@@ -1632,8 +1630,6 @@ int TransformBlock::coeffs()
             transform_type();
         }
         PlaneTxType = compute_tx_type();
-        flipUD = false;
-        flipLR = false;
         switch (PlaneTxType) {
         case FLIPADST_DCT:
         case FLIPADST_ADST:

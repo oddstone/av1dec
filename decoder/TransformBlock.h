@@ -92,8 +92,8 @@ private:
     int dqDenom;
     int tw;
     int th;
-    bool flipUD;
-    bool flipLR;
-    int m_eob;
+    bool flipUD = false;
+    bool flipLR = false;
+    int m_eob = 0;
 };
 }

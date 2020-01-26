@@ -471,6 +471,7 @@ void Block::intra_frame_mode_info()
     bool SegIdPreSkip = m_frame.m_segmentation.SegIdPreSkip;
     if (SegIdPreSkip)
         intra_segment_id();
+    skip_mode = false;
     skip = read_skip();
     if (!SegIdPreSkip)
         intra_segment_id();
