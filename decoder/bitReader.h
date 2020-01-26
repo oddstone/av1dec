@@ -49,7 +49,7 @@ public:
     bool readSu(int8_t& v, uint32_t n);
     bool readSu(int16_t& v, uint32_t n);
 
-    bool readLe(uint32_t& v, uint32_t nBits);
+    bool readLe(uint32_t& v, uint32_t nBytes);
 
     /*read the next nbits bits from the bitstream but not advance the bitstream pointer*/
     uint32_t peek(uint32_t nbits) const;

@@ -170,16 +170,16 @@ bool BitReader::readSu(int16_t& v, uint32_t n)
     return true;
 }
 
-bool BitReader::readLe(uint32_t& v, uint32_t nBits)
+bool BitReader::readLe(uint32_t& v, uint32_t nBytes)
 {
-    uint32_t t = 0;
-    for (uint32_t i = 0; i < nBits; i++) {
+    v = 0;
+    for (uint32_t i = 0; i < nBytes; i++) {
         uint8_t byte;
         if (!readT(byte))
             return false;
-        t += (byte << (i * 8));
+        v += (byte << (i * 8));
     }
-    return t;
+    return true;
 }
 
 bool BitReader::readUe(uint32_t& v)
