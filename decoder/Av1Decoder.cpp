@@ -92,7 +92,14 @@ void Decoder::updateFrameStore(const FrameHeader& h, const std::shared_ptr<YuvFr
     }
 }
 
-bool Decoder::decodeFrame(TileGroup tiles)
+void Decoder::frame_end_update_cdf(Tiles& tiles)
+{
+    for (auto& t : tiles) {
+        t->frame_end_update_cdf();
+    }
+}
+
+bool Decoder::decodeFrame(Tiles& tiles)
 {
     FrameHeader& h = *m_frame;
     std::shared_ptr<YuvFrame> frame = YuvFrame::create(h.FrameWidth, h.FrameHeight);
@@ -103,9 +110,8 @@ bool Decoder::decodeFrame(TileGroup tiles)
             return false;
         }
     }
-    if (!h.disable_frame_end_update_cdf) {
-        printf("warning: disable_frame_end_update_cdf is not supported");
-    }
+    frame_end_update_cdf(tiles);
+
     std::shared_ptr<YuvFrame> filtered = decode_frame_wrapup(frame);
 //#define DUMP
 #ifdef DUMP

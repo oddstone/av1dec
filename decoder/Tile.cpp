@@ -66,6 +66,7 @@ void BlockDecoded::clearFlag(int plane, int r, int c)
 Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<FrameHeader> frame, uint32_t TileNum)
     : m_sequence(sequence)
     , m_frame(frame)
+    , m_tileNum(TileNum)
 {
     uint32_t TileRow = TileNum / frame->TileCols;
     uint32_t TileCol = TileNum % frame->TileCols;
@@ -94,7 +95,8 @@ bool Tile::decodeBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 
 bool Tile::parse(const uint8_t* data, uint32_t size)
 {
-    m_entropy.reset(new EntropyDecoder(data, size, m_frame->disable_cdf_update, *m_frame->m_cdfs));
+    m_cdfs = *m_frame->m_cdfs;
+    m_entropy.reset(new EntropyDecoder(data, size, m_frame->disable_cdf_update, m_cdfs));
     clear_above_context();
     for (int i = 0; i < FRAME_LF_COUNT; i++)
         DeltaLF[i] = 0;
@@ -148,6 +150,14 @@ bool Tile::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore
             return false;
     }
     return true;
+}
+
+void Tile::frame_end_update_cdf()
+{
+    if (!m_frame->disable_frame_end_update_cdf
+        && m_tileNum == m_frame->context_update_tile_id) {
+        *m_frame->m_cdfs = m_cdfs;
+    }
 }
 
 const static int kMaxPlanes = 3;

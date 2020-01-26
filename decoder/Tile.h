@@ -68,6 +68,8 @@ public:
     bool parse(const uint8_t* data, uint32_t size);
     bool decode(std::shared_ptr<Yami::YuvFrame>& frame, const FrameStore& frameStore);
 
+    void frame_end_update_cdf();
+
     std::shared_ptr<FrameHeader> m_frame;
     std::shared_ptr<const SequenceHeader> m_sequence;
     std::unique_ptr<EntropyDecoder> m_entropy;
@@ -90,5 +92,7 @@ private:
     BlockContext m_left;
     std::deque<std::shared_ptr<SuperBlock>> m_sbs;
     int8_t DeltaLF[FRAME_LF_COUNT];
+    Cdfs m_cdfs;
+    const uint32_t m_tileNum;
 };
 }
