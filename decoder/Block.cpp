@@ -158,7 +158,7 @@ void Block::transform_block(int plane, int baseX, int baseY, TX_SIZE txSz, int x
     if (startX >= maxX || startY >= maxY) {
         return;
     }
-    std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, startX, startY, txSz, skip));
+    std::shared_ptr<TransformBlock> tb(new TransformBlock(*this, plane, baseX, baseY, startX, startY, txSz, skip));
     tb->parse();
     m_transformBlocks.push_back(tb);
     for (int i = 0; i < stepY; i++) {

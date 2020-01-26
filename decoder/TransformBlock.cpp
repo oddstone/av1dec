@@ -1136,7 +1136,7 @@ static const int Ac_Qlookup[3][256] = {
         25551, 26047, 26559, 27071, 27599, 28143, 28687, 29247 }
 };
 
-TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_SIZE txSize, bool skip)
+TransformBlock::TransformBlock(Block& block, int p, int baseX, int baseY, int startX, int startY, TX_SIZE txSize, bool skip)
     : m_entropy(block.m_entropy)
     , m_block(block)
     , m_tile(block.m_tile)
@@ -1145,6 +1145,8 @@ TransformBlock::TransformBlock(Block& block, int p, int startX, int startY, TX_S
     , m_skip(skip)
     , plane(p)
     , ptype(p > 0 ? PLANE_TYPE_UV : PLANE_TYPE_Y)
+    , m_baseX(baseX)
+    , m_baseY(baseY)
     , x(startX)
     , y(startY)
     , x4(startX >> 2)
@@ -2384,8 +2386,8 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
             bool haveBelowLeft = m_block.m_decoded.getFlag(plane, (subBlockMiRow >> subY) + stepY, (subBlockMiCol >> subX) - 1);
 
             predict.predict_intra(
-                (plane == 0 ? m_block.AvailL : m_block.AvailLChroma) || x > 0,
-                (plane == 0 ? m_block.AvailU : m_block.AvailUChroma) || y > 0,
+                (plane == 0 ? m_block.AvailL : m_block.AvailLChroma) || x > m_baseX,
+                (plane == 0 ? m_block.AvailU : m_block.AvailUChroma) || y > m_baseY,
                 haveAboveRight, haveBelowLeft, mode);
             if (isCfl) {
                 predict.predict_chroma_from_luma(txSz);
