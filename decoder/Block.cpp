@@ -535,7 +535,7 @@ int16_t Block::getSegFeature(SEG_LVL_FEATURE feature) const
     return m_frame.m_segmentation.FeatureData[segment_id][feature];
 }
 
-bool Block::getSkipModeCtx()
+int Block::getSkipModeCtx()
 {
     int ctx = 0;
     if (AvailU)
