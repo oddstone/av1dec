@@ -45,6 +45,15 @@ public:
     bool readUseSgrproj();
     uint8_t readLrSgrSet();
     RestorationType readRestorationType();
+
+    //for palette
+    bool readHasPaletteY(uint8_t bsizeCtx, uint8_t ctx);
+    uint8_t readPaletteSizeY(uint8_t bsizeCtx);
+    bool readHasPaletteUV(uint8_t ctx);
+    uint8_t readPaletteSizeUV(uint8_t bsizeCtx);
+    uint8_t readPaletteColorIdxY(uint8_t PaletteSize, uint8_t ColorContextHash);
+    uint8_t readPaletteColorIdxUV(uint8_t PaletteSize, uint8_t ColorContextHash);
+
     //for inter
     bool readIsInter(uint8_t ctx);
     bool readSkipMode(uint8_t ctx);
@@ -103,11 +112,12 @@ public:
     uint32_t readLiteral(uint32_t n);
     int decode_signed_subexp_with_ref_bool(int low, int high, int k, int r);
 
+    uint32_t readNS(int n);
+
 private:
     uint8_t getPartitionCdfCount(uint8_t bsl);
     int decode_unsigned_subexp_with_ref_bool(int mx, int k, int r);
     int decode_subexp_bool(int numSyms, int k);
-    uint32_t readNS(int n);
     std::unique_ptr<SymbolDecoder> m_symbol;
     Cdfs& m_cdfs;
 };

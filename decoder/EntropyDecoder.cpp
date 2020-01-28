@@ -207,6 +207,41 @@ RestorationType EntropyDecoder::readRestorationType()
     return (RestorationType)m_symbol->read(m_cdfs.switchable_restore_cdf);
 }
 
+bool EntropyDecoder::readHasPaletteY(uint8_t bsizeCtx, uint8_t ctx)
+{
+    return (bool)m_symbol->read(m_cdfs.palette_y_mode_cdf[bsizeCtx+2][ctx]);
+}
+
+uint8_t EntropyDecoder::readPaletteSizeY(uint8_t bsizeCtx)
+{
+    return (uint8_t)m_symbol->read(m_cdfs.palette_y_size_cdf[bsizeCtx+2]) + 2;
+}
+
+bool EntropyDecoder::readHasPaletteUV(uint8_t ctx)
+{
+    return (bool)m_symbol->read(m_cdfs.palette_uv_mode_cdf[ctx]);
+}
+
+uint8_t EntropyDecoder::readPaletteSizeUV(uint8_t bsizeCtx)
+{
+    return (uint8_t)m_symbol->read(m_cdfs.palette_uv_size_cdf[bsizeCtx+2]) + 2;
+}
+
+static const int PALETTE_MAX_COLOR_CONTEXT_HASH = 8;
+static const int Palette_Color_Context[PALETTE_MAX_COLOR_CONTEXT_HASH + 1] = { -1, -1, 0, -1, -1, 4, 3, 2, 1 };
+
+uint8_t EntropyDecoder::readPaletteColorIdxY(uint8_t PaletteSize, uint8_t ColorContextHash)
+{
+    int ctx = Palette_Color_Context[ColorContextHash];
+    return (uint8_t)m_symbol->read(m_cdfs.palette_y_color_index_cdf[PaletteSize-2][ctx]);
+}
+
+uint8_t EntropyDecoder::readPaletteColorIdxUV(uint8_t PaletteSize, uint8_t ColorContextHash)
+{
+    int ctx = Palette_Color_Context[ColorContextHash];
+    return (uint8_t)m_symbol->read(m_cdfs.palette_uv_color_index_cdf[PaletteSize - 2][ctx]);
+}
+
 uint8_t EntropyDecoder::readLrSgrSet()
 {
     return readLiteral(SGRPROJ_PARAMS_BITS);

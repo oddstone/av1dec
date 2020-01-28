@@ -6,6 +6,7 @@
 #include "Tile.h"
 #include <memory>
 #include <stdint.h>
+#include <vector>
 
 namespace Yami {
 
@@ -24,6 +25,38 @@ class Block : public BlockTree {
     class InterPredict;
     class IntraPredict;
     class ReadRefFrames;
+
+    class Palette {
+    public:
+        Palette(Block& block);
+        void palette_mode_info();
+        void palette_tokens();
+        bool isPalettePredict(int plane) const;
+        void predict_palette(int plane, int startX, int startY, int x, int y, TX_SIZE txSz, std::shared_ptr<YuvFrame>& frame) const;
+        void updateFrameContext(int y, int x);
+
+    private:
+        uint8_t getHasPaletteYCtx();
+        uint8_t getHasPaletteUVCtx();
+        uint32_t getPaletteBits(uint32_t minBits);
+        std::vector<uint8_t> get_palette_cache(int plane) const;
+
+        const Block& m_block;
+        FrameHeader& m_frame;
+        const SequenceHeader& m_sequence;
+        EntropyDecoder& m_entropy;
+        const uint32_t bw;
+        const uint32_t bh;
+        const uint32_t MiCol;
+        const uint32_t MiRow;
+        uint8_t& PaletteSizeY;
+        uint8_t& PaletteSizeUV;
+        std::vector<uint8_t> palette_colors_y;
+        std::vector<uint8_t> palette_colors_u;
+        std::vector<uint8_t> palette_colors_v;
+        std::vector<std::vector<uint8_t>> ColorMapY;
+        std::vector<std::vector<uint8_t>> ColorMapUV;
+    };
 
     class LocalWarp {
         friend class InterPredict;
@@ -163,8 +196,8 @@ private:
     int8_t AngleDeltaUV;
     int8_t CflAlphaU;
     int8_t CflAlphaV;
-    uint32_t PaletteSizeY = 0;
-    uint32_t PaletteSizeUV = 0;
+    uint8_t PaletteSizeY = 0;
+    uint8_t PaletteSizeUV = 0;
     bool use_filter_intra;
     FILTER_INTRA_MODE filter_intra_mode;
     TX_SIZE TxSize;
@@ -204,6 +237,7 @@ private:
     LocalWarp m_localWarp;
 
     bool has_nearmv() const;
+    Palette m_palette;
 };
 
 inline bool is_directional_mode(PREDICTION_MODE mode)

@@ -474,7 +474,7 @@ bool Parser::parseTileGroup(BitReader& br, const FramePtr& frame, TileGroup& gro
             BitReader reader(data, size);
             if (!reader.readLe(tile_size_minus_1, frame->TileSizeBytes)) {
                 ERROR("read tile_size_minus_1 failed");
-                return false;            
+                return false;
             }
             data += frame->TileSizeBytes;
             size -= frame->TileSizeBytes;
@@ -545,6 +545,11 @@ void FrameHeader::initGeometry()
     InterpFilters.resize(AlignedMiRows);
     for (auto& i : InterpFilters) {
         i.assign(AlignedMiCols, std::vector<InterpFilter>(2));
+    }
+    for (int i = 0; i < 2; i++) {
+        PaletteSizes[i].resize(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
+        std::vector<uint8_t> v;
+        PaletteColors[i].resize(AlignedMiRows, std::vector<std::vector<uint8_t>>(AlignedMiCols, v));
     }
 }
 

@@ -2364,9 +2364,8 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
     }
     std::vector<std::vector<uint8_t>> pred;
     if (!m_block.is_inter) {
-        if (((plane == 0) && m_block.PaletteSizeY) || ((plane != 0) && m_block.PaletteSizeUV)) {
-            ASSERT(0 && "predict_palette");
-            //predict_palette( plane, startX, startY, x, y, txSz )
+        if (m_block.m_palette.isPalettePredict(plane)) {
+            m_block.m_palette.predict_palette(plane, x, y, x - m_baseX, y - m_baseY, txSz, frame);
         } else {
             Block::IntraPredict predict(m_block, frame, plane, x, y, log2W, log2H, pred);
             bool isCfl = (plane > 0 && m_block.UVMode == UV_CFL_PRED);
@@ -2396,7 +2395,7 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
         }
     }
     reconstruct();
-    if (!m_block.is_inter) {
+    if (!m_block.is_inter && !m_block.m_palette.isPalettePredict(plane)) {
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
                 int xx = flipLR ? (w - j - 1) : j;

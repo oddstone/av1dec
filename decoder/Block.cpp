@@ -9,11 +9,13 @@
 #include "VideoFrame.h"
 #include "log.h"
 
+#include <functional>
 #include <limits>
 
 namespace YamiAv1 {
 
 using namespace Yami;
+using std::vector;
 
 Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
     : m_frame(*tile.m_frame)
@@ -34,6 +36,7 @@ Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
     , AngleDeltaY(0)
     , AngleDeltaUV(0)
     , m_localWarp(*this)
+    , m_palette(*this)
 {
     if (bh4 == 1 && subsampling_y && (MiRow & 1) == 0)
         HasChroma = false;
@@ -281,7 +284,7 @@ void Block::reset_block_context()
 void Block::parse()
 {
     mode_info();
-    palette_tokens();
+    m_palette.palette_tokens();
     read_block_tx_size();
     if (skip)
         reset_block_context();
@@ -319,14 +322,8 @@ void Block::parse()
             m_frame.TxSizes[r + y][c + x] = TxSize;
             m_frame.MiSizes[r + y][c + x] = MiSize;
             m_frame.SegmentIds[r + y][c + x] = segment_id;
-            /*PaletteSizes[0][r + y][c + x] = PaletteSizeY
-                PaletteSizes[1][r + y][c + x] = PaletteSizeUV
-                    for (i = 0; i < PaletteSizeY; i++)
-                        PaletteColors[0][r + y][c + x][i] = palette_colors_y[i]
-                        for (i = 0; i < PaletteSizeUV; i++)
-                            PaletteColors[1][r + y][c + x][i] = palette_colors_u[i]
+            m_palette.updateFrameContext(r + y, c + x);
 
-                */
             for (int i = 0; i < FRAME_LF_COUNT; i++) {
                 m_frame.DeltaLFs[i][r + y][c + x] = m_tile.DeltaLF[i];
             }
@@ -506,9 +503,11 @@ void Block::intra_frame_mode_info()
 
         PaletteSizeY = 0;
         PaletteSizeUV = 0;
-        if (MiSize >= BLOCK_8X8 && bw4 <= 16 && bh4 <= 16 && m_frame.allow_screen_content_tools) {
-            ASSERT(0);
-            //palette_mode_info( )
+        if (MiSize >= BLOCK_8X8
+            && bw4 <= 16
+            && bh4 <= 16
+            && m_frame.allow_screen_content_tools) {
+            m_palette.palette_mode_info();
         }
 
         filter_intra_mode_info();
@@ -1316,8 +1315,11 @@ void Block::intra_block_mode_info()
     }
     PaletteSizeY = 0;
     PaletteSizeUV = 0;
-    if (MiSize >= BLOCK_8X8 && Block_Width[MiSize] <= 64 && Block_Height[MiSize] <= 64 && m_frame.allow_screen_content_tools) {
-        ASSERT(0);
+    if (MiSize >= BLOCK_8X8
+        && Block_Width[MiSize] <= 64
+        && Block_Height[MiSize] <= 64
+        && m_frame.allow_screen_content_tools) {
+        m_palette.palette_mode_info();
     }
     filter_intra_mode_info();
 }
@@ -1821,6 +1823,367 @@ void Block::ReadRefFrames::readSingleReference()
         }
     }
     RefFrame[1] = NONE_FRAME;
+}
+
+Block::Palette::Palette(Block& block)
+    : m_block(block)
+    , m_frame(block.m_frame)
+    , m_sequence(block.m_sequence)
+    , m_entropy(block.m_entropy)
+    , bw(m_block.bw)
+    , bh(m_block.bh)
+    , MiCol(m_block.MiCol)
+    , MiRow(m_block.MiRow)
+    , PaletteSizeY(block.PaletteSizeY)
+    , PaletteSizeUV(block.PaletteSizeUV)
+{
+}
+
+uint8_t Block::Palette::getHasPaletteYCtx()
+{
+    uint8_t ctx = 0;
+    if (m_block.AvailU && m_frame.PaletteSizes[0][MiRow - 1][MiCol] > 0)
+        ctx += 1;
+    if (m_block.AvailL && m_frame.PaletteSizes[0][MiRow][MiCol - 1] > 0)
+        ctx += 1;
+    return ctx;
+}
+
+template <class T>
+uint32_t CeilLog2(T x)
+{
+    if (x < 2)
+        return 0;
+    uint32_t i = 1;
+    T p = 2;
+    while (p < x) {
+        i++;
+        p = p << 1;
+    }
+    return i;
+}
+
+uint8_t Block::Palette::getHasPaletteUVCtx()
+{
+    return (PaletteSizeY > 0) ? 1 : 0;
+}
+
+uint32_t Block::Palette::getPaletteBits(uint32_t minBits)
+{
+    uint32_t palette_num_extra_bits = m_entropy.readLiteral(2);
+    uint32_t paletteBits = minBits + palette_num_extra_bits;
+    return paletteBits;
+}
+
+std::vector<uint8_t> Block::Palette::get_palette_cache(int plane) const
+{
+    int aboveN = 0;
+    if ((MiRow * MI_SIZE) % 64) {
+        aboveN = m_frame.PaletteSizes[plane][MiRow - 1][MiCol];
+    }
+    int leftN = 0;
+    if (m_block.AvailL) {
+        leftN = m_frame.PaletteSizes[plane][MiRow][MiCol - 1];
+    }
+
+    std::vector<uint8_t> PaletteCache(aboveN + leftN);
+
+    int aboveIdx = 0;
+    int leftIdx = 0;
+    int n = 0;
+    while (aboveIdx < aboveN && leftIdx < leftN) {
+        uint8_t aboveC = m_frame.PaletteColors[plane][MiRow - 1][MiCol][aboveIdx];
+        uint8_t leftC = m_frame.PaletteColors[plane][MiRow][MiCol - 1][leftIdx];
+        if (leftC < aboveC) {
+            if (n == 0 || leftC != PaletteCache[n - 1]) {
+                PaletteCache[n] = leftC;
+                n++;
+            }
+            leftIdx++;
+        } else {
+            if (n == 0 || aboveC != PaletteCache[n - 1]) {
+                PaletteCache[n] = aboveC;
+                n++;
+            }
+            aboveIdx++;
+            if (leftC == aboveC) {
+                leftIdx++;
+            }
+        }
+    }
+    while (aboveIdx < aboveN) {
+        uint8_t val = m_frame.PaletteColors[plane][MiRow - 1][MiCol][aboveIdx];
+        aboveIdx++;
+        if (n == 0 || val != PaletteCache[n - 1]) {
+            PaletteCache[n] = val;
+            n++;
+        }
+    }
+    while (leftIdx < leftN) {
+        uint8_t val = m_frame.PaletteColors[plane][MiRow][MiCol - 1][leftIdx];
+        leftIdx++;
+        if (n == 0 || val != PaletteCache[n - 1]) {
+            PaletteCache[n] = val;
+            n++;
+        }
+    }
+    PaletteCache.resize(n);
+    return std::move(PaletteCache);
+}
+
+void Block::Palette::updateFrameContext(int y, int x)
+{
+
+    m_frame.PaletteSizes[0][y][x] = PaletteSizeY;
+    m_frame.PaletteSizes[1][y][x] = PaletteSizeUV;
+    m_frame.PaletteColors[0][y][x] = palette_colors_y;
+    m_frame.PaletteColors[1][y][x] = palette_colors_u;
+}
+
+void Block::Palette::palette_mode_info()
+{
+    const uint8_t bsizeCtx = Mi_Width_Log2[m_block.MiSize] + Mi_Height_Log2[m_block.MiSize] - 2;
+    const uint32_t BitDepth = m_sequence.BitDepth;
+    if (m_block.YMode == DC_PRED) {
+        bool has_palette_y = m_entropy.readHasPaletteY(bsizeCtx, getHasPaletteYCtx());
+        if (has_palette_y) {
+            PaletteSizeY = m_entropy.readPaletteSizeY(bsizeCtx);
+            palette_colors_y.resize(PaletteSizeY);
+
+            std::vector<uint8_t> PaletteCache = get_palette_cache(0);
+
+            uint32_t cacheN = (uint32_t)PaletteCache.size();
+            uint32_t idx = 0;
+            for (uint32_t i = 0; i < cacheN && idx < PaletteSizeY; i++) {
+                bool use_palette_color_cache_y = m_entropy.readLiteral(1);
+                if (use_palette_color_cache_y) {
+                    palette_colors_y[idx] = PaletteCache[i];
+                    idx++;
+                }
+            }
+
+            if (idx < PaletteSizeY) {
+                palette_colors_y[idx] = m_entropy.readLiteral(BitDepth);
+                idx++;
+            }
+            uint32_t paletteBits = 0;
+            if (idx < PaletteSizeY) {
+                paletteBits = getPaletteBits(BitDepth - 3);
+            }
+            while (idx < PaletteSizeY) {
+                uint32_t palette_delta_y = m_entropy.readLiteral(paletteBits) + 1;
+                palette_colors_y[idx] = CLIP1(palette_colors_y[idx - 1] + palette_delta_y);
+                uint32_t range = (1 << BitDepth) - palette_colors_y[idx] - 1;
+                paletteBits = std::min(paletteBits, CeilLog2(range));
+                idx++;
+            }
+            std::sort(palette_colors_y.begin(), palette_colors_y.end());
+        }
+    }
+    if (m_block.HasChroma && m_block.UVMode == DC_PRED) {
+        bool has_palette_uv = m_entropy.readHasPaletteUV(getHasPaletteUVCtx());
+        if (has_palette_uv) {
+            PaletteSizeUV = m_entropy.readPaletteSizeUV(bsizeCtx);
+            palette_colors_u.resize(PaletteSizeUV);
+            std::vector<uint8_t> PaletteCache = get_palette_cache(1);
+            uint32_t cacheN = (uint32_t)PaletteCache.size();
+            uint32_t idx = 0;
+            for (uint32_t i = 0; i < cacheN && idx < PaletteSizeUV; i++) {
+                bool use_palette_color_cache_u = m_entropy.readLiteral(1);
+                if (use_palette_color_cache_u) {
+                    palette_colors_u[idx] = PaletteCache[i];
+                    idx++;
+                }
+            }
+
+            if (idx < PaletteSizeUV) {
+                palette_colors_u[idx] = m_entropy.readLiteral(BitDepth);
+                idx++;
+            }
+            uint32_t paletteBits = 0;
+            if (idx < PaletteSizeUV) {
+                paletteBits = getPaletteBits(BitDepth - 3);
+            }
+            while (idx < PaletteSizeUV) {
+                uint32_t palette_delta_u = m_entropy.readLiteral(paletteBits);
+                palette_colors_u[idx] = CLIP1(palette_colors_u[idx - 1] + palette_delta_u);
+                uint32_t range = (1 << BitDepth) - palette_colors_u[idx];
+                paletteBits = std::min(paletteBits, CeilLog2(range));
+                idx++;
+            }
+            sort(palette_colors_u.begin(), palette_colors_u.end());
+
+            palette_colors_v.resize(PaletteSizeUV);
+            bool delta_encode_palette_colors_v = m_entropy.readLiteral(1);
+            if (delta_encode_palette_colors_v) {
+                uint8_t maxVal = 1 << BitDepth;
+                paletteBits = getPaletteBits(BitDepth - 4);
+                palette_colors_v[0] = m_entropy.readLiteral(BitDepth);
+                for (idx = 1; idx < PaletteSizeUV; idx++) {
+                    int palette_delta_v = m_entropy.readLiteral(paletteBits);
+                    if (palette_delta_v) {
+                        uint32_t palette_delta_sign_bit_v = m_entropy.readLiteral(1);
+                        if (palette_delta_sign_bit_v) {
+                            palette_delta_v = -palette_delta_v;
+                        }
+                    }
+                    int val = palette_colors_v[idx - 1] + palette_delta_v;
+                    if (val < 0)
+                        val += maxVal;
+                    if (val >= maxVal)
+                        val -= maxVal;
+                    palette_colors_v[idx] = CLIP1(val);
+                }
+            } else {
+                for (uint32_t idx = 0; idx < PaletteSizeUV; idx++) {
+                    palette_colors_v[idx] = m_entropy.readLiteral(BitDepth);
+                }
+            }
+        }
+    }
+}
+
+static void extendBorder(vector<vector<uint8_t>>& ColorMap, uint32_t onscreenWidth, uint32_t onscreenHeight,
+    uint32_t blockWidth, uint32_t blockHeight)
+{
+    for (uint32_t i = 0; i < onscreenHeight; i++) {
+        for (uint32_t j = onscreenWidth; j < blockWidth; j++) {
+            ColorMap[i][j] = ColorMap[i][onscreenWidth - 1];
+        }
+    }
+    for (uint32_t i = onscreenHeight; i < blockHeight; i++) {
+        for (uint32_t j = 0; j < blockWidth; j++) {
+            ColorMap[i][j] = ColorMap[onscreenHeight - 1][j];
+        }
+    }
+}
+
+static const int PALETTE_NUM_NEIGHBORS = 3;
+static const int Palette_Color_Hash_Multipliers[PALETTE_NUM_NEIGHBORS] = { 1, 2, 2 };
+
+static void get_palette_color_context(const vector<vector<uint8_t>>& colorMap, uint32_t r, uint32_t c,
+    uint8_t n, uint8_t ColorOrder[PALETTE_COLORS], uint8_t& ColorContextHash)
+{
+    uint32_t scores[PALETTE_COLORS];
+    for (uint32_t i = 0; i < PALETTE_COLORS; i++) {
+        scores[i] = 0;
+        ColorOrder[i] = i;
+    }
+    if (c > 0) {
+        uint8_t neighbor = colorMap[r][c - 1];
+        scores[neighbor] += 2;
+    }
+    if ((r > 0) && (c > 0)) {
+        uint8_t neighbor = colorMap[r - 1][c - 1];
+        scores[neighbor] += 1;
+    }
+    if (r > 0) {
+        uint8_t neighbor = colorMap[r - 1][c];
+        scores[neighbor] += 2;
+    }
+    for (uint32_t i = 0; i < PALETTE_NUM_NEIGHBORS; i++) {
+        uint32_t maxScore = scores[i];
+        uint32_t maxIdx = i;
+        for (uint32_t j = i + 1; j < n; j++) {
+            if (scores[j] > maxScore) {
+                maxScore = scores[j];
+                maxIdx = j;
+            }
+        }
+        if (maxIdx != i) {
+            maxScore = scores[maxIdx];
+            uint8_t maxColorOrder = ColorOrder[maxIdx];
+
+            for (uint32_t k = maxIdx; k > i; k--) {
+                scores[k] = scores[k - 1];
+                ColorOrder[k] = ColorOrder[k - 1];
+            }
+            scores[i] = maxScore;
+            ColorOrder[i] = maxColorOrder;
+        }
+    }
+    ColorContextHash = 0;
+    for (uint32_t i = 0; i < PALETTE_NUM_NEIGHBORS; i++) {
+        ColorContextHash += scores[i] * Palette_Color_Hash_Multipliers[i];
+    }
+}
+
+void Block::Palette::palette_tokens()
+{
+    uint32_t onscreenWidth = std::min(bw, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
+    uint32_t onscreenHeight = std::min(bh, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
+    uint32_t blockWidth = bw;
+    uint32_t blockHeight = bh;
+    uint8_t ColorOrder[PALETTE_COLORS];
+    uint8_t ColorContextHash;
+
+    if (PaletteSizeY) {
+        ColorMapY.assign(blockHeight, std::vector<uint8_t>(blockWidth));
+        uint8_t color_index_map_y = (uint8_t)m_entropy.readNS(PaletteSizeY);
+        ColorMapY[0][0] = color_index_map_y;
+        for (int i = 1; i < onscreenHeight + onscreenWidth - 1; i++) {
+            for (int j = std::min(i, (int)onscreenWidth - 1);
+                 j >= std::max(0, i - (int)onscreenHeight + 1); j--) {
+                get_palette_color_context(ColorMapY, (i - j), j, PaletteSizeY, ColorOrder, ColorContextHash);
+                uint8_t palette_color_idx_y = m_entropy.readPaletteColorIdxY(PaletteSizeY, ColorContextHash);
+                ColorMapY[i - j][j] = ColorOrder[palette_color_idx_y];
+            }
+        }
+        extendBorder(ColorMapY, onscreenWidth, onscreenHeight, blockWidth, blockHeight);
+    }
+    if (PaletteSizeUV) {
+        blockHeight = blockHeight >> m_sequence.subsampling_y;
+        blockWidth = blockWidth >> m_sequence.subsampling_x;
+        onscreenHeight = onscreenHeight >> m_sequence.subsampling_y;
+        onscreenWidth = onscreenWidth >> m_sequence.subsampling_x;
+        if (blockWidth < 4) {
+            blockWidth += 2;
+            onscreenWidth += 2;
+        }
+        if (blockHeight < 4) {
+            blockHeight += 2;
+            onscreenHeight += 2;
+        }
+        ColorMapUV.assign(blockHeight, std::vector<uint8_t>(blockWidth));
+        uint8_t color_index_map_uv = (uint8_t)m_entropy.readNS(PaletteSizeUV);
+        ColorMapUV[0][0] = color_index_map_uv;
+        for (int i = 1; i < onscreenHeight + onscreenWidth - 1; i++) {
+            for (int j = std::min(i, (int)onscreenWidth - 1);
+                 j >= std::max(0, i - (int)onscreenHeight + 1); j--) {
+                get_palette_color_context(ColorMapUV, (i - j), j, PaletteSizeUV, ColorOrder, ColorContextHash);
+                uint8_t palette_color_idx_uv = m_entropy.readPaletteColorIdxUV(PaletteSizeUV, ColorContextHash);
+                ColorMapUV[i - j][j] = ColorOrder[palette_color_idx_uv];
+            }
+        }
+        extendBorder(ColorMapUV, onscreenWidth, onscreenHeight, blockWidth, blockHeight);
+    }
+}
+
+bool Block::Palette::isPalettePredict(int plane) const
+{
+    return ((plane == 0) && PaletteSizeY)
+        || ((plane != 0) && PaletteSizeUV);
+}
+
+void Block::Palette::predict_palette(int plane, int startX, int startY,
+    int x, int y, TX_SIZE txSz, std::shared_ptr<YuvFrame>& frame) const
+{
+    const uint8_t* palette;
+    if (!plane) {
+        palette = &palette_colors_y[0];
+    } else if (plane == 1) {
+        palette = &palette_colors_u[0];
+    } else {
+        palette = &palette_colors_v[0];
+    }
+    const std::vector<std::vector<uint8_t>>& map = plane ? ColorMapUV : ColorMapY;
+    int w = Tx_Width[txSz];
+    int h = Tx_Height[txSz];
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            frame->setPixel(plane, startX + j, startY + i, palette[map[y + i][x + j]]);
+        }
+    }
 }
 
 }

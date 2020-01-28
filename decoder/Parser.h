@@ -515,8 +515,8 @@ struct FrameHeader {
     std::vector<std::vector<std::vector<InterpFilter>>> InterpFilters;
     std::shared_ptr<Cdfs> m_cdfs;
     std::vector<std::vector<uint8_t>> PrevSegmentIds;
-    //std::vector<std::vector<uint32_t>> PaletteSizes[2];
-    //PaletteColors
+    std::vector<std::vector<uint8_t>> PaletteSizes[2];
+    std::vector<std::vector<std::vector<uint8_t>>> PaletteColors[2];
 
     Quantization m_quant;
     Segmentation m_segmentation;
