@@ -145,9 +145,11 @@ void Tile::clear_left_context()
 
 bool Tile::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
 {
-    for (auto& sb : m_sbs) {
+    while (!m_sbs.empty()) {
+        auto& sb = m_sbs.front();
         if (!sb->decode(frame, frameStore))
             return false;
+        m_sbs.pop_front();
     }
     return true;
 }
