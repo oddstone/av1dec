@@ -1354,7 +1354,7 @@ bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
     {
         CodedLossless = true;
         for (int segmentId = 0; segmentId < MAX_SEGMENTS; segmentId++) {
-            int16_t qindex = get_qindex(1, segmentId);
+            int16_t qindex = get_qindex(segmentId);
             LosslessArray[segmentId] = qindex == 0 && m_quant.DeltaQYDc == 0 && m_quant.DeltaQUAc == 0 && m_quant.DeltaQUDc == 0 && m_quant.DeltaQVAc == 0 && m_quant.DeltaQVDc == 0;
             if (!LosslessArray[segmentId])
                 CodedLossless = 0;
@@ -1640,14 +1640,32 @@ bool FrameHeader::parseTileInfo(BitReader& br)
     return true;
 }
 
-int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int segmentId) const
+int16_t FrameHeader::get_qindex(int16_t CurrentQIndex, int segmentId) const
 {
-    int16_t data = m_segmentation.FeatureData[segmentId][SEG_LVL_ALT_Q];
-    int16_t qindex = m_quant.base_q_idx + data;
-    if (!ignoreDeltaQ && m_deltaQ.delta_q_present) {
-        ASSERT(0);
+    return get_qindex(false, CurrentQIndex, segmentId);
+}
+
+int16_t FrameHeader::get_qindex(int segmentId) const
+{
+    return get_qindex(true, 0, segmentId);
+}
+
+int16_t FrameHeader::get_qindex(bool ignoreDeltaQ, int16_t CurrentQIndex, int segmentId) const
+{
+    int16_t qindex;
+    if (m_segmentation.seg_feature_active_idx(segmentId, SEG_LVL_ALT_Q)) {
+        int16_t data = m_segmentation.FeatureData[segmentId][SEG_LVL_ALT_Q];
+
+        if (!ignoreDeltaQ && m_deltaQ.delta_q_present) {
+            qindex = CurrentQIndex + data;
+        } else {
+            qindex = m_quant.base_q_idx + data;
+        }
+        return CLIP3(0, 255, qindex);
     }
-    return CLIP3(0, 255, qindex);
+    if (!ignoreDeltaQ && m_deltaQ.delta_q_present)
+        return CurrentQIndex;
+    return m_quant.base_q_idx;
 }
 
 void FrameHeader::referenceFrameLoading()

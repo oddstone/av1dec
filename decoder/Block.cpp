@@ -37,6 +37,8 @@ Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
     , AngleDeltaUV(0)
     , m_localWarp(*this)
     , m_palette(*this)
+    , ReadDeltas(m_tile.ReadDeltas)
+    , CurrentQIndex(m_tile.CurrentQIndex)
 {
     if (bh4 == 1 && subsampling_y && (MiRow & 1) == 0)
         HasChroma = false;
@@ -66,7 +68,7 @@ BLOCK_SIZE Block::get_plane_residual_size(int subsize, int plane)
 
 int16_t Block::get_q_idx()
 {
-    return m_frame.m_segmentation.segmentation_enabled ? m_frame.get_qindex(true, segment_id) : m_frame.m_quant.base_q_idx;
+    return m_frame.m_segmentation.segmentation_enabled ? m_frame.get_qindex(segment_id) : m_frame.m_quant.base_q_idx;
 }
 
 void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
@@ -354,21 +356,61 @@ void Block::read_cdef()
     m_frame.m_cdef.read_cdef(m_entropy, MiRow, MiCol, MiSize);
 }
 
-void Block::read_delta_qindex(bool readDeltas)
+void Block::read_delta_qindex()
 {
     BLOCK_SIZE sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
     if (MiSize == sbSize && skip)
         return;
-    if (readDeltas) {
-        ASSERT(0);
+    if (ReadDeltas) {
+        uint32_t delta_q_abs = m_entropy.readDeltaQAbs();
+        if (delta_q_abs == DELTA_Q_SMALL)
+        {
+            uint8_t delta_q_rem_bits = m_entropy.readLiteral(3) + 1;
+            uint8_t delta_q_abs_bits = m_entropy.readLiteral(delta_q_rem_bits);
+            delta_q_abs = delta_q_abs_bits + (1 << delta_q_rem_bits) + 1;
+        }
+        if (delta_q_abs) {
+            uint8_t delta_q_sign_bit = m_entropy.readLiteral(1);
+            int reducedDeltaQIndex = delta_q_sign_bit ? -delta_q_abs : delta_q_abs;
+            m_tile.CurrentQIndex = CLIP3(1, 255, m_tile.CurrentQIndex + (reducedDeltaQIndex << m_frame.m_deltaQ.delta_q_res));
+            CurrentQIndex = m_tile.CurrentQIndex;
+        }
     }
 }
 
-void Block::read_delta_lf(bool ReadDeltas)
+void Block::read_delta_lf()
 {
-    if (!(ReadDeltas && m_frame.m_deltaLf.delta_lf_present))
+    BLOCK_SIZE sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
+
+    if (MiSize == sbSize && skip)
         return;
-    ASSERT(0);
+    const DeltaLf& deltaLf = m_frame.m_deltaLf;
+    if (!(ReadDeltas && deltaLf.delta_lf_present))
+        return;
+    int frameLfCount = 1;
+    if (deltaLf.delta_lf_multi)
+    {
+        frameLfCount = (m_sequence.NumPlanes > 1) ? FRAME_LF_COUNT : (FRAME_LF_COUNT - 2);
+    }
+    for (int i = 0; i < frameLfCount; i++) {
+        uint8_t delta_lf_abs = m_entropy.readDeltaLfAbs(deltaLf.delta_lf_multi, i);
+        uint32_t deltaLfAbs;
+        if (delta_lf_abs == DELTA_LF_SMALL)
+        {
+            uint8_t delta_lf_rem_bits;
+            delta_lf_rem_bits = m_entropy.readLiteral(3);
+            uint8_t n = delta_lf_rem_bits + 1;
+            uint8_t delta_lf_abs_bits = m_entropy.readLiteral(n);
+            deltaLfAbs = delta_lf_abs_bits + (1 << n) + 1;
+        } else {
+            deltaLfAbs = delta_lf_abs;
+        }
+        if (deltaLfAbs) {
+            uint32_t delta_lf_sign_bit = m_entropy.readLiteral(1);
+            int reducedDeltaLfLevel = delta_lf_sign_bit ? -deltaLfAbs : deltaLfAbs;
+            m_tile.DeltaLF[i] = CLIP3(-MAX_LOOP_FILTER, MAX_LOOP_FILTER, m_tile.DeltaLF[i] + (reducedDeltaLfLevel << deltaLf.delta_lf_res));
+        }
+    }
 }
 
 PREDICTION_MODE Block::intra_frame_y_mode()
@@ -473,9 +515,10 @@ void Block::intra_frame_mode_info()
     if (!SegIdPreSkip)
         intra_segment_id();
     read_cdef();
-    bool ReadDeltas = m_frame.m_deltaQ.delta_q_present;
-    read_delta_qindex(ReadDeltas);
-    read_delta_lf(ReadDeltas);
+
+    read_delta_qindex();
+    read_delta_lf();
+    ReadDeltas = false;
 
     RefFrame[0] = INTRA_FRAME;
     RefFrame[1] = NONE_FRAME;
@@ -1348,9 +1391,11 @@ void Block::inter_frame_mode_info()
     }
     Lossless = m_frame.LosslessArray[segment_id];
     read_cdef();
-    bool ReadDeltas = m_frame.m_deltaQ.delta_q_present;
-    read_delta_qindex(ReadDeltas);
-    read_delta_lf(ReadDeltas);
+
+    read_delta_qindex();
+    read_delta_lf();
+    ReadDeltas = false;
+
     read_is_inter();
     if (is_inter)
         inter_block_mode_info();

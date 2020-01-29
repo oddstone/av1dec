@@ -105,8 +105,8 @@ private:
     bool read_skip();
 
     void read_cdef();
-    void read_delta_qindex(bool readDeltas);
-    void read_delta_lf(bool readDeltas);
+    void read_delta_qindex();
+    void read_delta_lf();
 
     PREDICTION_MODE intra_frame_y_mode();
     void intra_angle_info_y();
@@ -238,6 +238,10 @@ private:
 
     bool has_nearmv() const;
     Palette m_palette;
+    //from tile
+    bool& ReadDeltas;
+    //keep a local copy of CurrentQIndex
+    uint32_t CurrentQIndex;
 };
 
 inline bool is_directional_mode(PREDICTION_MODE mode)

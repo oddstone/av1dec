@@ -1686,7 +1686,7 @@ int TransformBlock::get_dc_quant() const
 {
     Quantization& quant = m_frame.m_quant;
     int8_t quants[] = { quant.DeltaQYDc, quant.DeltaQUDc, quant.DeltaQVDc };
-    return dc_q(m_frame.get_qindex(false, m_block.segment_id) + quants[plane]);
+    return dc_q(m_frame.get_qindex(m_block.CurrentQIndex, m_block.segment_id) + quants[plane]);
 }
 
 int TransformBlock::ac_q(int16_t b) const
@@ -1698,7 +1698,7 @@ int TransformBlock::get_ac_quant() const
 {
     Quantization& quant = m_frame.m_quant;
     int8_t quants[] = { 0, quant.DeltaQUAc, quant.DeltaQVAc };
-    return ac_q(m_frame.get_qindex(false, m_block.segment_id) + quants[plane]);
+    return ac_q(m_frame.get_qindex(m_block.CurrentQIndex, m_block.segment_id) + quants[plane]);
 }
 
 int TransformBlock::getQ2(int i, int j) const

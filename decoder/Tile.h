@@ -94,5 +94,6 @@ private:
     int8_t DeltaLF[FRAME_LF_COUNT];
     Cdfs m_cdfs;
     const uint32_t m_tileNum;
+    bool ReadDeltas;
 };
 }

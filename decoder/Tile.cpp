@@ -119,7 +119,7 @@ bool Tile::parse(const uint8_t* data, uint32_t size)
     for (uint32_t r = MiRowStart; r < MiRowEnd; r += sbSize4) {
         clear_left_context();
         for (uint32_t c = MiColStart; c < MiColEnd; c += sbSize4) {
-            //ReadDeltas = delta_q_present
+            ReadDeltas = m_frame->m_deltaQ.delta_q_present;
             //clear_cdef(r, c)
             //clear_block_decoded_flags(r, c, sbSize4)
             //read_lr(r, c, sbSize)

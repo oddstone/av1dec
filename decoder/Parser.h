@@ -532,7 +532,9 @@ struct FrameHeader {
 
     FrameHeader(ConstSequencePtr&);
     bool parse(BitReader& br, RefInfo&);
-    int16_t get_qindex(bool ignoreDeltaQ, int segmentId) const;
+    int16_t get_qindex(int16_t CurrentQIndex, int segmentId) const;
+    int16_t get_qindex(int segmentId) const;
+
     void referenceFrameLoading();
     void motionVectorStorage();
 
@@ -576,6 +578,9 @@ private:
     void load_cdfs(const RefInfo& refInfo);
     void load_previous(const RefInfo& refInfo);
     void load_previous_segment_ids(const RefInfo& refInfo);
+
+    int16_t get_qindex(bool ignoreDeltaQ, int16_t CurrentQIndex, int segmentId) const;
+
 
     const static uint8_t SUPERRES_DENOM_MIN = 9;
 
