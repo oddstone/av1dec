@@ -56,10 +56,12 @@ uint8_t SymbolDecoder::read(vector<aom_cdf_prob>& icdf, bool disableUpdate)
     const int nsyms = icdf.size() - 1;
     const int N = nsyms - 1;
 
+//#define DUMP_SYMBOL
+#ifdef DUMP_SYMBOL
     static FILE* fp = fopen("symbol.txt", "w");
     fprintf(fp, "dif = %u, rng = %d, cnt = %d\r\n", m_dif, m_rng, m_cnt);
     fflush(fp);
-
+#endif
     c = (unsigned)(dif >> (OD_EC_WINDOW_SIZE - 16));
     v = r;
     ret = -1;
