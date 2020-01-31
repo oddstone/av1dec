@@ -67,6 +67,15 @@ class Fps {
     };
 
 public:
+    Fps()
+    {
+        for (int i = 0; i < COUNT_OF_TAG; i++) {
+            m_duration[i] = duration<float>::zero();
+            count[i] = 0;
+        }
+
+
+    }
     void startRead()
     {
         start(READ);
