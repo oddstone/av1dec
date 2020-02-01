@@ -1,0 +1,15 @@
+name: C/C++ CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: cmake -S . -B build && cd build && make -j32
+    - name: test
+      run: ./testscript/conformance.py
