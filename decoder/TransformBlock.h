@@ -87,27 +87,27 @@ private:
     FrameHeader& m_frame;
     const SequenceHeader& m_sequence;
 
-    bool m_skip;
+    const bool m_skip;
 
-    int plane;
-    PLANE_TYPE ptype;
+    const int plane;
+    const PLANE_TYPE ptype;
     const int m_baseX;
     const int m_baseY;
-    int x;
-    int y;
-    int x4;
-    int y4;
-    TX_SIZE txSz;
-    TX_SIZE txSzSqr;
-    TX_SIZE txSzSqrUp;
-    TX_SIZE txSzCtx;
+    const int x;
+    const int y;
+    const int x4;
+    const int y4;
+    const TX_SIZE txSz;
+    const TX_SIZE txSzSqr;
+    const TX_SIZE txSzSqrUp;
+    const TX_SIZE txSzCtx;
     TxClass txClass;
-    int w;
-    int h;
-    int w4;
-    int h4;
-    int log2W;
-    int log2H;
+    const int w;
+    const int h;
+    const int w4;
+    const int h4;
+    const int log2W;
+    const int log2H;
 
     TX_TYPE PlaneTxType;
     int Quant[1024];
@@ -116,8 +116,8 @@ private:
 
     //for reconstruction
     int dqDenom;
-    int tw;
-    int th;
+    const int tw;
+    const int th;
     bool flipUD = false;
     bool flipLR = false;
     int m_eob = 0;

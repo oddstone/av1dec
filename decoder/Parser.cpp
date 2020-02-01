@@ -1541,17 +1541,17 @@ bool parseTileLog2(BitReader& br, uint32_t& tileLog2, uint32_t min, uint32_t max
     return true;
 }
 
-void getMiStarts(std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t tileLog2, uint32_t end)
+void getMiStarts(std::vector<int>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t tileLog2, uint32_t end)
 {
     starts.clear();
-    uint32_t step = (sbMax + (1 << tileLog2) - 1) >> tileLog2;
-    for (uint32_t start = 0; start < sbMax; start += step) {
+    int step = (sbMax + (1 << tileLog2) - 1) >> tileLog2;
+    for (int start = 0; start < sbMax; start += step) {
         starts.push_back(start << sbShift);
     }
     starts.push_back(end);
 }
 
-bool FrameHeader::parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)
+bool FrameHeader::parseTileStarts(BitReader& br, std::vector<int>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb)
 {
     starts.clear();
     uint32_t widestTileSb = 0;

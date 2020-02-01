@@ -106,10 +106,13 @@ private:
     void clear_above_context();
     void clear_left_context();
 
-    int MiRowStart;
-    int MiRowEnd;
-    int MiColStart;
-    int MiColEnd;
+    const int TileRow;
+    const int TileCol;
+    const int MiRowStart;
+    const int MiRowEnd;
+    const int MiColStart;
+    const int MiColEnd;
+
     uint32_t CurrentQIndex;
 
     BlockDecoded m_decoded;

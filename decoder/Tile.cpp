@@ -93,13 +93,13 @@ Tile::Tile(std::shared_ptr<const SequenceHeader> sequence, std::shared_ptr<Frame
     : m_sequence(sequence)
     , m_frame(frame)
     , m_tileNum(TileNum)
+    , TileRow(TileNum / frame->TileCols)
+    , TileCol(TileNum % frame->TileCols)
+    , MiRowStart(frame->MiRowStarts[TileRow])
+    , MiRowEnd(frame->MiRowStarts[TileRow + 1])
+    , MiColStart(frame->MiColStarts[TileCol])
+    , MiColEnd(frame->MiColStarts[TileCol + 1])
 {
-    uint32_t TileRow = TileNum / frame->TileCols;
-    uint32_t TileCol = TileNum % frame->TileCols;
-    MiRowStart = frame->MiRowStarts[TileRow];
-    MiRowEnd = frame->MiRowStarts[TileRow + 1];
-    MiColStart = frame->MiColStarts[TileCol];
-    MiColEnd = frame->MiColStarts[TileCol + 1];
     CurrentQIndex = frame->m_quant.base_q_idx;
     m_decoded.init(*this);
 }

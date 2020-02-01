@@ -520,8 +520,8 @@ struct FrameHeader {
     int gm_params[NUM_REF_FRAMES][6];
     int PrevGmParams[NUM_REF_FRAMES][6];
 
-    std::vector<uint32_t> MiColStarts;
-    std::vector<uint32_t> MiRowStarts;
+    std::vector<int> MiColStarts;
+    std::vector<int> MiRowStarts;
     std::vector<std::vector<PREDICTION_MODE>> YModes;
     std::vector<std::vector<UV_PREDICTION_MODE>> UVModes;
     std::vector<std::vector<std::vector<int>>> RefFrames;
@@ -582,7 +582,7 @@ private:
     bool frame_size_with_refs(BitReader& br, const RefInfo& refInfo);
     bool read_interpolation_filter(BitReader& br);
     bool parseTileInfo(BitReader& br);
-    bool parseTileStarts(BitReader& br, std::vector<uint32_t>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
+    bool parseTileStarts(BitReader& br, std::vector<int>& starts, uint32_t sbMax, uint32_t sbShift, uint32_t maxTileSb);
     bool parseQuantizationParams(BitReader& br);
     bool loop_filter_params(BitReader& br);
     bool cdef_params(BitReader& br);

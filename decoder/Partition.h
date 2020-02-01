@@ -48,8 +48,8 @@ protected:
     Tile& m_tile;
     FrameHeader& m_frame;
     EntropyDecoder& m_entropy;
-    int m_r;
-    int m_c;
-    BLOCK_SIZE m_bSize;
+    const int m_r;
+    const int m_c;
+    const BLOCK_SIZE m_bSize;
 };
 }

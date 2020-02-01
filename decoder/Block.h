@@ -197,20 +197,20 @@ private:
     BlockDecoded& m_decoded;
 
     //from spec
-    int MiRow;
-    int MiCol;
-    BLOCK_SIZE MiSize;
-    int bw4;
-    int bh4;
-    int bw;
-    int bh;
+    const int MiRow;
+    const int MiCol;
+    const BLOCK_SIZE MiSize;
+    const int bw4;
+    const int bh4;
+    const int bw;
+    const int bh;
     bool HasChroma;
     bool AvailU;
     bool AvailL;
     bool AvailUChroma;
     bool AvailLChroma;
-    int subsampling_x;
-    int subsampling_y;
+    const int subsampling_x;
+    const int subsampling_y;
     bool is_inter;
     uint8_t segment_id;
     bool Lossless;
@@ -229,7 +229,7 @@ private:
     TX_SIZE TxSize;
     int8_t RefFrame[2];
     bool use_intrabc;
-    int sbMask;
+    const int sbMask;
 
     int MaxLumaW;
     int MaxLumaH;
