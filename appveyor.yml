@@ -1,0 +1,10 @@
+version: 1.0.{build}
+configuration: Release
+init:
+- ps: ''
+install:
+- ps: cmake -S . -B build
+build:
+  verbosity: minimal
+test_script:
+- ps: C:\Python38\python.exe C:\projects\av1dec\testscript\conformance.py
