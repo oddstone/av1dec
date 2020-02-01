@@ -63,7 +63,7 @@ uint8_t Block::InterPredict::getUseWarp(int w, int h, int refFrame)
     return 0;
 }
 
-void Block::InterPredict::motionVectorScaling(uint8_t refIdx, int x, int y, const Mv& mv)
+void Block::InterPredict::motionVectorScaling(int8_t refIdx, int x, int y, const Mv& mv)
 {
     uint32_t xScale, yScale;
     m_frame.getScale(refIdx, xScale, yScale);
@@ -194,20 +194,16 @@ const static int Subpel_Filters[6][16][8] = {
         { 0, 0, 4, 36, 62, 26, 0, 0 },
         { 0, 0, 2, 34, 62, 30, 0, 0 } }
 };
-void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, int w, int h, int candRow, int candCol)
+void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w, int h, int candRow, int candCol)
 {
     std::vector<std::vector<int16_t>>& pred = preds[refList];
     pred.assign(h, std::vector<int16_t>(w));
     YuvFrame& ref = (refIdx == NONE_FRAME ? m_yuv : *m_frameStore[refIdx]);
 
     int lastX, lastY;
-    if (refIdx == NONE_FRAME) {
-        ASSERT(0);
-    } else {
-        auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
-        lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
-        lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
-    }
+    auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
+    lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
+    lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
     const int intermediateHeight = (((h - 1) * yStep + (1 << SCALE_SUBPEL_BITS) - 1) >> SCALE_SUBPEL_BITS) + 8;
     std::vector<std::vector<int>> intermediate(intermediateHeight, std::vector<int>(w));
     int filterIdx = getFilterIdx(w, candRow, candCol, 1);
@@ -447,7 +443,7 @@ void Block::InterPredict::maskBlend(int dstX, int dstY, int w, int h)
 void Block::InterPredict::predict_overlap(int pass, int candRow, int candCol, int x4, int y4, int predW, int predH, const uint8_t* mask)
 {
     Mv mv = m_frame.Mvs[candRow][candCol][0];
-    int refIdx = m_frame.ref_frame_idx[m_frame.RefFrames[candRow][candCol][0] - LAST_FRAME];
+    int8_t refIdx = m_frame.ref_frame_idx[m_frame.RefFrames[candRow][candCol][0] - LAST_FRAME];
     int predX = (x4 * 4) >> subX;
     int predY = (y4 * 4) >> subY;
     motionVectorScaling(refIdx, predX, predY, mv);
@@ -809,16 +805,23 @@ void Block::InterPredict::predict_inter(int x, int y, int w, int h, int candRow,
         }
         uint8_t useWarp = getUseWarp(w, h, refFrame);
         Mv mv = m_frame.Mvs[candRow][candCol][refList];
-        uint8_t refIdx;
+        int8_t refIdx;
         if (!m_block.use_intrabc) {
             refIdx = m_frame.ref_frame_idx[refFrame - LAST_FRAME];
         } else {
-            ASSERT(0);
+            refIdx = NONE_FRAME;
+            auto& ref = m_frame.m_refInfo.m_refs[NONE_FRAME];
+            ref.RefFrameWidth = m_frame.FrameWidth;
+            ref.RefFrameHeight = m_frame.FrameHeight;
+            ref.RefUpscaledWidth = m_frame.UpscaledWidth;
         }
         motionVectorScaling(refIdx, x, y, mv);
 
         if (m_block.use_intrabc) {
-            ASSERT(0);
+            auto& ref = m_frame.m_refInfo.m_refs[NONE_FRAME];
+            ref.RefFrameWidth = m_frame.MiCols * MI_SIZE;
+            ref.RefFrameHeight = m_frame.MiRows * MI_SIZE;
+            ref.RefUpscaledWidth = m_frame.MiCols * MI_SIZE;
         }
         if (useWarp) {
             std::vector<std::vector<int16_t>>& pred = preds[refList];

@@ -245,6 +245,11 @@ uint8_t EntropyDecoder::readDeltaQAbs()
     return (uint8_t)m_symbol->read(m_cdfs.delta_q_cdf);
 }
 
+bool EntropyDecoder::readIntrabc()
+{
+    return (bool)m_symbol->read(m_cdfs.intrabc_cdf);
+}
+
 bool EntropyDecoder::readHasPaletteY(uint8_t bsizeCtx, uint8_t ctx)
 {
     return (bool)m_symbol->read(m_cdfs.palette_y_mode_cdf[bsizeCtx+2][ctx]);

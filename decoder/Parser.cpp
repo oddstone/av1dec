@@ -810,7 +810,7 @@ Mv FrameHeader::get_mv_projection(const Mv& mv, int numerator, int denominator)
     }
     return std::move(projMv);
 }
-void FrameHeader::getScale(uint8_t refIdx, uint32_t& xScale, uint32_t& yScale) const
+void FrameHeader::getScale(int8_t refIdx, uint32_t& xScale, uint32_t& yScale) const
 {
     const RefFrame& ref = m_refInfo.m_refs[refIdx];
     xScale = ((ref.RefUpscaledWidth << REF_SCALE_SHIFT) + (FrameWidth / 2)) / FrameWidth;
@@ -820,7 +820,7 @@ void FrameHeader::getScale(uint8_t refIdx, uint32_t& xScale, uint32_t& yScale) c
 bool FrameHeader::is_scaled(int refFrame) const
 {
     uint32_t xScale, yScale;
-    uint8_t refIdx = ref_frame_idx[refFrame - LAST_FRAME];
+    int8_t refIdx = ref_frame_idx[refFrame - LAST_FRAME];
     getScale(refIdx, xScale, yScale);
 
     const static uint32_t noScale = 1 << REF_SCALE_SHIFT;
@@ -1370,7 +1370,7 @@ bool FrameHeader::parse(BitReader& br, RefInfo& refInfo)
         return false;
     if (!m_deltaQ.parse(br, m_quant))
         return false;
-    if (!m_deltaLf.parse(br, m_deltaQ))
+    if (!m_deltaLf.parse(br, m_deltaQ, allow_intrabc))
         return false;
     if (primary_ref_frame == PRIMARY_REF_NONE) {
         m_cdfs->init_coeff_cdfs(m_quant.base_q_idx);
@@ -1908,13 +1908,14 @@ bool DeltaQ::parse(BitReader& br, const Quantization& quant)
     return true;
 }
 
-bool DeltaLf::parse(BitReader& br, const DeltaQ& deltaQ)
+bool DeltaLf::parse(BitReader& br, const DeltaQ& deltaQ, bool allow_intrabc)
 {
     delta_lf_present = 0;
     delta_lf_res = 0;
     delta_lf_multi = 0;
     if (deltaQ.delta_q_present) {
-        READ(delta_lf_present);
+        if (!allow_intrabc)
+            READ(delta_lf_present);
         if (delta_lf_present) {
             READ_BITS(delta_lf_res, 2);
             READ(delta_lf_multi);

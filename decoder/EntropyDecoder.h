@@ -75,6 +75,8 @@ public:
     uint8_t readDeltaLfAbs(bool delta_lf_multi, int i);
     uint8_t readDeltaQAbs();
 
+    bool readIntrabc();
+
     //for palette
     bool readHasPaletteY(uint8_t bsizeCtx, uint8_t ctx);
     uint8_t readPaletteSizeY(uint8_t bsizeCtx);

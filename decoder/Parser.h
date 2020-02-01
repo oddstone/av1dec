@@ -295,18 +295,21 @@ public:
 
 class RefInfo {
 public:
-    std::vector<RefFrame> m_refs;
+    RefFrame* m_refs;
     RefInfo()
     {
-        m_refs.resize(NUM_REF_FRAMES);
+        //+1 for intrabc
+        m_references.resize(NUM_REF_FRAMES + 1);
+        m_refs = &m_references[0] + 1;
     }
     void resetRefs()
     {
-        for (auto& r : m_refs) {
+        for (auto& r : m_references) {
             r.RefValid = false;
             r.RefOrderHint = 0;
         }
     }
+    std::vector<RefFrame> m_references;
 };
 
 struct Quantization {
@@ -360,7 +363,7 @@ struct DeltaLf {
     bool delta_lf_present;
     uint8_t delta_lf_res;
     bool delta_lf_multi;
-    bool parse(BitReader& br, const DeltaQ& deltaQ);
+    bool parse(BitReader& br, const DeltaQ& deltaQ, bool allow_intrabc);
 };
 
 struct LoopFilterParams {
@@ -596,7 +599,7 @@ private:
     Mv get_mv_projection(const Mv& mv, int numerator, int denominator);
 
     bool is_scaled(int refFrame) const;
-    void getScale(uint8_t refIdx, uint32_t& xScale, uint32_t& yScale) const;
+    void getScale(int8_t refIdx, uint32_t& xScale, uint32_t& yScale) const;
 
     bool read_global_param(BitReader& br, GlobalMotionType type, uint8_t ref, int idx);
 

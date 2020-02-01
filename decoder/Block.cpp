@@ -550,14 +550,23 @@ void Block::intra_frame_mode_info()
     RefFrame[1] = NONE_FRAME;
 
     if (m_frame.allow_intrabc) {
-        ASSERT(0 && "intrabc");
+        use_intrabc = m_entropy.readIntrabc();
     } else {
         use_intrabc = false;
     }
     if (use_intrabc) {
         is_inter = true;
         YMode = DC_PRED;
-        ASSERT(0);
+        UVMode = UV_DC_PRED;
+        motion_mode = SIMPLE_TRANSLATION;
+        compound_type = COMPOUND_AVERAGE;
+        PaletteSizeY = 0;
+        PaletteSizeUV = 0;
+        interp_filter[0] = BILINEAR;
+        interp_filter[1] = BILINEAR;
+        FindMvStack find(*this);
+        find.find_mv_stack();
+        assign_mv(find, false);
     } else {
         is_inter = false;
         YMode = intra_frame_y_mode();
@@ -1336,23 +1345,22 @@ void Block::assign_mv(const FindMvStack& find, bool isCompound)
             compMode = get_mode(i);
         }
         if (use_intrabc) {
-            ASSERT(0);
-            /*
-            PredMv[ 0 ] = RefStackMv[ 0 ][ 0 ];
-            if ( PredMv[ 0 ][ 0 ] == 0 && PredMv[ 0 ][ 1 ] == 0 ) {
-                PredMv[ 0 ] = RefStackMv[ 1 ][ 0 ]
+            PredMv[ 0 ] = find.RefStackMv[ 0 ][ 0 ];
+            if ( PredMv[ 0 ].mv[0] == 0 && PredMv[ 0 ].mv[ 1 ] == 0 ) {
+                PredMv[0] = find.RefStackMv[1][0];
             }
-            if ( PredMv[ 0 ][ 0 ] == 0 && PredMv[ 0 ][ 1 ] == 0 ) {
-                sbSize = use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64
-                sbSize4 = Num_4x4_Blocks_High[ sbSize ]
-                if ( MiRow - sbSize4 < MiRowStart ) {
-                    PredMv[ 0 ][ 0 ] = 0
-                    PredMv[ 0 ][ 1 ] = -(sbSize4 * MI_SIZE + INTRABC_DELAY_PIXELS) * 8
+            if ( PredMv[0].mv[0] == 0 && PredMv[0].mv[ 1 ] == 0 ) {
+                BLOCK_SIZE sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
+                int sbSize4 = Num_4x4_Blocks_High[sbSize];
+                if (MiRow - sbSize4 < m_tile.MiRowStart ) {
+                    static const int INTRABC_DELAY_PIXELS = 256;
+                    PredMv[0].mv[0] = 0;
+                    PredMv[0].mv[1] = -(sbSize4 * MI_SIZE + INTRABC_DELAY_PIXELS) * 8;
                 } else {
-                    PredMv[ 0 ][ 0 ] = -(sbSize4 * MI_SIZE * 8)
-                    PredMv[ 0 ][ 1 ] = 0
+                    PredMv[0].mv[0] = -(sbSize4 * MI_SIZE * 8);
+                    PredMv[0].mv[1] = 0;
                 }
-            }*/
+            }
         } else if (compMode == GLOBALMV) {
             PredMv[i] = find.GlobalMvs[i];
         } else {
