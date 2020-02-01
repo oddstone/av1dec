@@ -2190,7 +2190,7 @@ static void get_palette_color_context(const vector<vector<uint8_t>>& colorMap, i
 void Block::Palette::palette_tokens()
 {
     int onscreenWidth = std::min(bw, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
-    int onscreenHeight = std::min(bh, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
+    int onscreenHeight = std::min(bh, (m_frame.MiRows - m_block.MiRow) * MI_SIZE);
     int blockWidth = bw;
     int blockHeight = bh;
     uint8_t ColorOrder[PALETTE_COLORS];
