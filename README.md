@@ -9,7 +9,6 @@ av1dec is available under the terms of The 2-Clause BSD License. Files under aom
   * Only 4:2:0 content are tested.
   * No SVC
   * No segmentation
-  * The conformance test scipt onlys supports windows.
   
 # Build
 ## Windows* Operating Systems (64-bit)
