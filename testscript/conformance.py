@@ -76,7 +76,7 @@ def test(f, log = False):
         print(basename(f) + " has no ref md5")
         return SKIPPED
 
-    yuv = "test.yuv"
+    yuv = join(os.getcwd(), "test.yuv")
     decode(f, yuv)
     if not os.path.exists(yuv):
         print("decode failed for "+f)
