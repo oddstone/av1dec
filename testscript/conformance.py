@@ -59,7 +59,10 @@ def decode(input, output):
     #avoid md5 from old yuv file
     if os.path.exists(output):
         os.remove(output)
-    av1dec = join(dirname(realpath(__file__)), "../build/tests/Release/av1dec.exe")
+    if os.name == 'nt':
+        av1dec = join(dirname(realpath(__file__)), "../build/tests/Release/av1dec.exe")
+    else:
+        av1dec = join(dirname(realpath(__file__)), "../build/tests/av1dec")
     cmd = av1dec + " -i " + input + " " + output
     print(cmd)
     os.system(cmd)
