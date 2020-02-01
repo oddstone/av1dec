@@ -60,7 +60,7 @@ def decode(input, output):
     if os.path.exists(output):
         os.remove(output)
     if os.name == 'nt':
-        av1dec = join(dirname(realpath(__file__)), "../build/tests/Release/av1dec.exe")
+        av1dec = join(dirname(realpath(__file__)), "..\\build\\tests\\Release\\av1dec.exe")
     else:
         av1dec = join(dirname(realpath(__file__)), "../build/tests/av1dec")
     cmd = av1dec + " -i " + input + " " + output
