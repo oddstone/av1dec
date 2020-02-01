@@ -31,7 +31,6 @@ import re
 
 def get_md5(path):
     h = hashlib.md5()
-    print(path)
     with open(path, 'rb') as f:
         while True:
             data = f.read(64 * 1024)
@@ -57,9 +56,10 @@ def get_ref_md5(fn):
     return None
 
 def decode(input, output):
-    av1dec = join(dirname(realpath(__file__)), "../build/tests/Debug/av1dec.exe")
+    #avoid md5 from old yuv file
     if os.path.exists(output):
         os.remove(output)
+    av1dec = join(dirname(realpath(__file__)), "../build/tests/Release/av1dec.exe")
     cmd = av1dec + " -i " + input + " " + output
     print(cmd)
     os.system(cmd)
@@ -68,16 +68,20 @@ PASSED = 0
 FAILED = 1
 SKIPPED = 2
 def test(f, log = False):
+    refmd5 = get_ref_md5(f)
+    if not refmd5:
+        print(basename(f) + " has no ref md5")
+        return SKIPPED
+
     yuv = "test.yuv"
     decode(f, yuv)
     if not os.path.exists(yuv):
         print("decode failed for "+f)
         return FAILED
+
     md5 = get_md5(yuv)
-    refmd5 = get_ref_md5(f)
-    if not refmd5:
-        print(basename(f) + " has no ref md5")
-        return SKIPPED
+    if os.path.exists(yuv):
+        os.remove(yuv)
     if refmd5 == md5:
         return PASSED
     print("md5 mismatch ref = " + refmd5 + " md5 = "+md5)
@@ -112,7 +116,7 @@ if os.path.isfile(path):
     print(basename(path) + " passed" if pss  else " failed")
     sys.exit(0)
 
-status = [0, 0, 0]
+count = [0, 0, 0]
 summary = [[], [], []]
 for root, dirs, files in os.walk(path):
     for f in files:
@@ -121,13 +125,14 @@ for root, dirs, files in os.walk(path):
         #print("f = "+f)
         if is_candidiate(fn):
             s = test(fn)
-            status[s] += 1
+            count[s] += 1
             summary[s].append(f)
 print("")
-print("+++++++++ report +++++++++");
+print("+++++++++ report +++++++++")
 print_summary("failed", summary[FAILED])
 print_summary("skipped", summary[SKIPPED])
 print_summary("passed", summary[PASSED])
 print("")
-print("total = "+ str(status[PASSED] + status[FAILED] + status[SKIPPED]) +", failed = "+ str(status[FAILED]) + ", skipped = " + str(status[SKIPPED]))
+print("total = "+ str(count[PASSED] + count[FAILED] + count[SKIPPED]) +", failed = "+ str(count[FAILED]) + ", skipped = " + str(count[SKIPPED]))
 print("----------")
+sys.exit(count[FAILED])
