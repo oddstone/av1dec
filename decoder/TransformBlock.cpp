@@ -2290,8 +2290,8 @@ void TransformBlock::parse()
 uint8_t TransformBlock::getAllZeroCtx()
 {
     uint8_t ctx;
-    uint32_t maxX4 = m_frame.MiCols;
-    uint32_t maxY4 = m_frame.MiRows;
+    int maxX4 = m_frame.MiCols;
+    int maxY4 = m_frame.MiRows;
     if (plane > 0) {
         maxX4 = maxX4 >> m_sequence.subsampling_x;
         maxY4 = maxY4 >> m_sequence.subsampling_y;

@@ -476,7 +476,7 @@ bool Parser::parseTileGroup(BitReader& br, const FramePtr& frame, TileGroup& gro
     bool tile_start_and_end_present_flag = false;
     if (frame->NumTiles > 1)
         READ(tile_start_and_end_present_flag);
-    uint32_t tg_start, tg_end;
+    int tg_start, tg_end;
     if (frame->NumTiles == 1 || !tile_start_and_end_present_flag) {
         tg_start = 0;
         tg_end = frame->NumTiles - 1;
@@ -489,7 +489,7 @@ bool Parser::parseTileGroup(BitReader& br, const FramePtr& frame, TileGroup& gro
     const uint8_t* data = br.getCurrent();
     uint32_t size = br.getRemainingBitsCount() / 8;
 
-    for (uint32_t TileNum = tg_start; TileNum <= tg_end; TileNum++) {
+    for (int TileNum = tg_start; TileNum <= tg_end; TileNum++) {
 
         bool lastTile = (TileNum == tg_end);
         uint32_t tileSize;
@@ -845,7 +845,7 @@ bool project(int& v8, int delta, int dstSign, int max8, int maxOff8)
     return posValid;
 }
 
-bool FrameHeader::get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv)
+bool FrameHeader::get_block_position(int& PosX8, int& PosY8, int x8, int y8, int dstSign, const Mv& projMv)
 {
     static const int MAX_OFFSET_WIDTH = 8;
     static const int MAX_OFFSET_HEIGHT = 0;
@@ -865,10 +865,10 @@ bool FrameHeader::mvProject(const RefInfo& refInfo, uint8_t src, int dstSign)
         return false;
     int PosX8;
     int PosY8;
-    for (uint32_t y8 = 0; y8 < h8; y8++) {
-        for (uint32_t x8 = 0; x8 < w8; x8++) {
-            uint32_t row = 2 * y8 + 1;
-            uint32_t col = 2 * x8 + 1;
+    for (int y8 = 0; y8 < h8; y8++) {
+        for (int x8 = 0; x8 < w8; x8++) {
+            int row = 2 * y8 + 1;
+            int col = 2 * x8 + 1;
             int8_t srcRef = ref.SavedRefFrames[row][col];
             if (srcRef > INTRA_FRAME) {
                 int8_t refToCur = get_relative_dist(OrderHints[src], OrderHint);
@@ -2027,7 +2027,7 @@ bool CdefParams::parse(BitReader& br, const SequenceHeader& seq, const FrameHead
     }
     return true;
 }
-void CdefParams::read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize)
+void CdefParams::read_cdef(EntropyDecoder& entropy, int MiRow, int MiCol, uint32_t MiSize)
 {
     uint32_t cdefSize4 = Num_4x4_Blocks_Wide[BLOCK_64X64];
     uint32_t cdefMask4 = ~(cdefSize4 - 1);

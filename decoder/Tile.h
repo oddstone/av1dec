@@ -106,10 +106,10 @@ private:
     void clear_above_context();
     void clear_left_context();
 
-    uint32_t MiRowStart;
-    uint32_t MiRowEnd;
-    uint32_t MiColStart;
-    uint32_t MiColEnd;
+    int MiRowStart;
+    int MiRowEnd;
+    int MiColStart;
+    int MiColEnd;
     uint32_t CurrentQIndex;
 
     BlockDecoded m_decoded;

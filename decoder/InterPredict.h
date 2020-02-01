@@ -34,13 +34,13 @@ namespace YamiAv1 {
 class Block::InterPredict {
 public:
     InterPredict(Block& block, int plane, YuvFrame& yuv, const FrameStore& frameStore, std::vector<std::vector<uint8_t>>& mask);
-    void predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol);
+    void predict_inter(int x, int y, int w, int h, int candRow, int candCol);
 
 private:
     uint8_t getUseWarp(int x, int y, int refFrame);
     void motionVectorScaling(uint8_t refIdx, int x, int y, const Mv& mv);
     int getFilterIdx(int size, int candRow, int candCol, int dir);
-    void blockInterPrediction(uint8_t refIdx, int refList, uint32_t w, uint32_t h, int candRow, int candCol);
+    void blockInterPrediction(uint8_t refIdx, int refList, int w, int h, int candRow, int candCol);
     void blockWarp(int useWarp, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
     void intraModeVariantMask(int w, int h);
     void maskBlend(int x, int y, int w, int h);
@@ -55,8 +55,8 @@ private:
     const int plane;
     const int subX;
     const int subY;
-    const uint32_t MiRow;
-    const uint32_t MiCol;
+    const int MiRow;
+    const int MiCol;
     LocalWarp& m_localWarp;
     YuvFrame& m_yuv;
     const FrameStore& m_frameStore;
@@ -97,9 +97,9 @@ private:
     void sort(int start, int end);
     void swap_stack(int i, int j);
     static bool has_newmv(PREDICTION_MODE mode);
-    void searchStack(uint32_t mvRow, uint32_t mvCol, int candList, uint32_t weight);
-    void searchCompoundStack(uint32_t mvRow, uint32_t mvCol, uint32_t weight);
-    void add_ref_mv_candidate(uint32_t mvRow, uint32_t mvCol, uint32_t weight);
+    void searchStack(int mvRow, int mvCol, int candList, uint32_t weight);
+    void searchCompoundStack(int mvRow, int mvCol, uint32_t weight);
+    void add_ref_mv_candidate(int mvRow, int mvCol, uint32_t weight);
     void scanRow(int deltaRow);
     void scanCol(int deltaCol);
     void scanPoint(int deltaRow, int deltaCol);
@@ -121,10 +121,10 @@ private:
     int NumMvFound = 0;
     int NewMvCount = 0;
 
-    const uint32_t MiCol;
-    const uint32_t MiRow;
-    const uint32_t bw4;
-    const uint32_t bh4;
+    const int MiCol;
+    const int MiRow;
+    const int bw4;
+    const int bh4;
     const bool isCompound;
     bool FoundMatch;
     std::vector<uint8_t> DrlCtxStack;

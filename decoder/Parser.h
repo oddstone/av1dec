@@ -264,13 +264,13 @@ public:
 
     bool RefValid;
     uint32_t RefFrameId;
-    uint32_t RefUpscaledWidth;
-    uint32_t RefFrameWidth;
-    uint32_t RefFrameHeight;
-    uint32_t RefRenderWidth;
-    uint32_t RefRenderHeight;
-    uint32_t RefMiCols;
-    uint32_t RefMiRows;
+    int RefUpscaledWidth;
+    int RefFrameWidth;
+    int RefFrameHeight;
+    int RefRenderWidth;
+    int RefRenderHeight;
+    int RefMiCols;
+    int RefMiRows;
     uint8_t RefFrameType;
     int RefSubsamplingX;
     int RefSubsamplingY;
@@ -381,7 +381,7 @@ private:
 
 struct CdefParams {
     bool parse(BitReader& br, const SequenceHeader& seq, const FrameHeader& frame);
-    void read_cdef(EntropyDecoder& entropy, uint32_t MiRow, uint32_t MiCol, uint32_t MiSize);
+    void read_cdef(EntropyDecoder& entropy, int MiRow, int MiCol, uint32_t MiSize);
     const static int CDEF_SIZE = 8;
     uint8_t CdefDamping;
     uint8_t cdef_bits;
@@ -463,8 +463,8 @@ struct FrameHeader {
     uint32_t FrameHeight;
 
     //compute_image_size()
-    uint32_t MiCols;
-    uint32_t MiRows;
+    int MiCols;
+    int MiRows;
 
     uint32_t w8;
     uint32_t h8;
@@ -591,7 +591,7 @@ private:
 
     //for inter predict
     void motion_field_estimation(const RefInfo& refInfo);
-    bool get_block_position(int& PosX8, int& PosY8, uint32_t x8, uint32_t y8, int dstSign, const Mv& projMv);
+    bool get_block_position(int& PosX8, int& PosY8, int x8, int y8, int dstSign, const Mv& projMv);
     bool mvProject(const RefInfo& refInfo, uint8_t src, int dstSign);
     Mv get_mv_projection(const Mv& mv, int numerator, int denominator);
 

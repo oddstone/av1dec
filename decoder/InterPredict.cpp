@@ -194,7 +194,7 @@ const static int Subpel_Filters[6][16][8] = {
         { 0, 0, 4, 36, 62, 26, 0, 0 },
         { 0, 0, 2, 34, 62, 30, 0, 0 } }
 };
-void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, uint32_t w, uint32_t h, int candRow, int candCol)
+void Block::InterPredict::blockInterPrediction(uint8_t refIdx, int refList, int w, int h, int candRow, int candCol)
 {
     std::vector<std::vector<int16_t>>& pred = preds[refList];
     pred.assign(h, std::vector<int16_t>(w));
@@ -792,7 +792,7 @@ void Block::InterPredict::getDistanceWeights(int candRow, int candCol, int& FwdW
     }
 }
 
-void Block::InterPredict::predict_inter(int x, int y, uint32_t w, uint32_t h, int candRow, int candCol)
+void Block::InterPredict::predict_inter(int x, int y, int w, int h, int candRow, int candCol)
 {
     isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
     roundingVariablesDerivation(isCompound, m_sequence.BitDepth, InterRound0, InterRound1, InterPostRound);
@@ -1230,7 +1230,7 @@ uint8_t Block::FindMvStack::getNewMvCtx() const
 void Block::FindMvStack::scanCol(int deltaCol)
 {
     int deltaRow = 0;
-    uint32_t end4 = std::min(std::min(bh4, m_frame.MiRows - m_block.MiRow), (uint32_t)16);
+    int end4 = std::min(std::min(bh4, m_frame.MiRows - m_block.MiRow), 16);
     bool useStep16 = (bh4 >= 16);
     if (std::abs(deltaCol) > 1) {
         deltaRow = 1 - (MiRow & 1);
@@ -1238,8 +1238,8 @@ void Block::FindMvStack::scanCol(int deltaCol)
     }
     uint32_t i = 0;
     while (i < end4) {
-        uint32_t mvRow = MiRow + deltaRow + i;
-        uint32_t mvCol = MiCol + deltaCol;
+        int mvRow = MiRow + deltaRow + i;
+        int mvCol = MiCol + deltaCol;
         if (!m_tile.is_inside(mvRow, mvCol))
             break;
         int len = std::min((int)bh4, Num_4x4_Blocks_High[m_frame.MiSizes[mvRow][mvCol]]);
@@ -1256,7 +1256,7 @@ uint8_t Block::FindMvStack::getZeroMvCtx() const
 {
     return ZeroMvContext;
 }
-void Block::FindMvStack::searchStack(uint32_t mvRow, uint32_t mvCol, int candList, uint32_t weight)
+void Block::FindMvStack::searchStack(int mvRow, int mvCol, int candList, uint32_t weight)
 {
     Mv candMv;
     PREDICTION_MODE candMode = m_frame.YModes[mvRow][mvCol];
@@ -1329,8 +1329,8 @@ void Block::FindMvStack::generateRefAndNewMvContext(uint32_t CloseMatches, int n
 }
 void Block::FindMvStack::scanPoint(int deltaRow, int deltaCol)
 {
-    uint32_t mvRow = MiRow + deltaRow;
-    uint32_t mvCol = MiCol + deltaCol;
+    int mvRow = MiRow + deltaRow;
+    int mvCol = MiCol + deltaCol;
     uint32_t weight = 4;
     if (m_tile.is_inside(mvRow, mvCol)
         && m_frame.RefFrames[mvRow][mvCol][0] != NONE_FRAME) {
@@ -1386,7 +1386,7 @@ bool Block::FindMvStack::has_newmv(PREDICTION_MODE mode)
         || mode == NEAREST_NEWMV
         || mode == NEW_NEARESTMV);
 }
-void Block::FindMvStack::searchCompoundStack(uint32_t mvRow, uint32_t mvCol, uint32_t weight)
+void Block::FindMvStack::searchCompoundStack(int mvRow, int mvCol, uint32_t weight)
 {
     std::vector<Mv> candMvs = m_frame.Mvs[mvRow][mvCol];
     PREDICTION_MODE candMode = m_frame.YModes[mvRow][mvCol];
@@ -1420,7 +1420,7 @@ void Block::FindMvStack::searchCompoundStack(uint32_t mvRow, uint32_t mvCol, uin
         NumMvFound++;
     }
 }
-void Block::FindMvStack::add_ref_mv_candidate(uint32_t mvRow, uint32_t mvCol, uint32_t weight)
+void Block::FindMvStack::add_ref_mv_candidate(int mvRow, int mvCol, uint32_t weight)
 {
     if (!m_frame.IsInters[mvRow][mvCol])
         return;
@@ -1440,7 +1440,7 @@ void Block::FindMvStack::add_ref_mv_candidate(uint32_t mvRow, uint32_t mvCol, ui
 void Block::FindMvStack::scanRow(int deltaRow)
 {
     int deltaCol = 0;
-    uint32_t end4 = std::min(std::min(bw4, m_frame.MiCols - m_block.MiCol), (uint32_t)16);
+    int end4 = std::min(std::min(bw4, m_frame.MiCols - m_block.MiCol), 16);
     bool useStep16 = (bw4 >= 16);
     if (std::abs(deltaRow) > 1) {
         deltaRow += MiRow & 1;
@@ -1448,8 +1448,8 @@ void Block::FindMvStack::scanRow(int deltaRow)
     }
     uint32_t i = 0;
     while (i < end4) {
-        uint32_t mvRow = MiRow + deltaRow;
-        uint32_t mvCol = MiCol + deltaCol + i;
+        int mvRow = MiRow + deltaRow;
+        int mvCol = MiCol + deltaCol + i;
         if (!m_tile.is_inside(mvRow, mvCol))
             break;
         int len = std::min((int)bw4, Num_4x4_Blocks_Wide[m_frame.MiSizes[mvRow][mvCol]]);

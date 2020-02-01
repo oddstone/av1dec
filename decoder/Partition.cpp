@@ -114,7 +114,7 @@ BLOCK_SIZE Partition_Subsize[10][BLOCK_SIZES_ALL] = {
         BLOCK_INVALID, BLOCK_INVALID, BLOCK_INVALID }
 };
 
-Partition::Partition(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize)
+Partition::Partition(Tile& tile, int r, int c, BLOCK_SIZE bSize)
     : m_tile(tile)
     , m_frame(*tile.m_frame)
     , m_entropy(*tile.m_entropy)
@@ -126,11 +126,11 @@ Partition::Partition(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize)
 
 void Partition::parse()
 {
-    uint32_t r = m_r;
-    uint32_t c = m_c;
+    int r = m_r;
+    int c = m_c;
     BLOCK_SIZE bSize = m_bSize;
-    uint32_t MiRows = m_frame.MiRows;
-    uint32_t MiCols = m_frame.MiCols;
+    int MiRows = m_frame.MiRows;
+    int MiCols = m_frame.MiCols;
     if (r >= MiRows || c >= MiCols)
         return;
 
@@ -213,14 +213,14 @@ bool Partition::decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frame
     return true;
 }
 
-void Partition::parseSubPartition(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
+void Partition::parseSubPartition(int r, int c, BLOCK_SIZE bSize)
 {
     std::shared_ptr<BlockTree> partition(new Partition(m_tile, r, c, bSize));
     partition->parse();
     m_blocks.push_back(partition);
 }
 
-void Partition::parseBlock(uint32_t r, uint32_t c, BLOCK_SIZE bSize)
+void Partition::parseBlock(int r, int c, BLOCK_SIZE bSize)
 {
     std::shared_ptr<BlockTree> block(new Block(m_tile, r, c, bSize));
     block->parse();

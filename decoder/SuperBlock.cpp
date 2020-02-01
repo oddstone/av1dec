@@ -32,7 +32,7 @@
 
 namespace YamiAv1 {
 
-SuperBlock::SuperBlock(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE sbSize)
+SuperBlock::SuperBlock(Tile& tile, int r, int c, BLOCK_SIZE sbSize)
     : Partition(tile, r, c, sbSize)
 {
 }

@@ -71,10 +71,10 @@ class Block : public BlockTree {
         FrameHeader& m_frame;
         const SequenceHeader& m_sequence;
         EntropyDecoder& m_entropy;
-        const uint32_t bw;
-        const uint32_t bh;
-        const uint32_t MiCol;
-        const uint32_t MiRow;
+        const int bw;
+        const int bh;
+        const int MiCol;
+        const int MiRow;
         uint8_t& PaletteSizeY;
         uint8_t& PaletteSizeUV;
         std::vector<uint8_t> palette_colors_y;
@@ -109,14 +109,14 @@ class Block : public BlockTree {
 
         const int w4;
         const int h4;
-        const uint32_t MiRow;
-        const uint32_t MiCol;
+        const int MiRow;
+        const int MiCol;
         std::vector<std::vector<int16_t>> CandList;
         int LocalWarpParams[6];
     };
 
 public:
-    Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE bSize);
+    Block(Tile& tile, int r, int c, BLOCK_SIZE bSize);
     void parse();
     bool decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
@@ -143,16 +143,16 @@ private:
     void palette_tokens();
     void read_block_tx_size();
     void read_tx_size(bool allowSelect);
-    uint8_t getTxfmSplitCtx(uint32_t row, uint32_t col, TX_SIZE txSz);
-    void read_var_tx_size(uint32_t row, uint32_t col, TX_SIZE txSz, int depth);
+    uint8_t getTxfmSplitCtx(int row, int col, TX_SIZE txSz);
+    void read_var_tx_size(int row, int col, TX_SIZE txSz, int depth);
     void compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
     void reset_block_context();
     BLOCK_SIZE get_plane_residual_size(int subsize, int plane);
     bool is_tx_type_in_set(TxSet txSet, TX_TYPE txType);
     TX_TYPE compute_tx_type(int plane, TX_SIZE txSz, int blockX, int blockY);
-    int get_above_tx_width(uint32_t row, uint32_t col);
-    int get_left_tx_height(uint32_t row, uint32_t col);
+    int get_above_tx_width(int row, int col);
+    int get_left_tx_height(int row, int col);
     uint8_t getTxDepthCtx(TX_SIZE maxRectTxSize);
     TX_SIZE get_tx_size(int plane, TX_SIZE txSz);
     TxSet get_tx_set(TX_SIZE txSz);
@@ -197,13 +197,13 @@ private:
     BlockDecoded& m_decoded;
 
     //from spec
-    uint32_t MiRow;
-    uint32_t MiCol;
+    int MiRow;
+    int MiCol;
     BLOCK_SIZE MiSize;
-    uint32_t bw4;
-    uint32_t bh4;
-    uint32_t bw;
-    uint32_t bh;
+    int bw4;
+    int bh4;
+    int bw;
+    int bh;
     bool HasChroma;
     bool AvailU;
     bool AvailL;
@@ -229,7 +229,7 @@ private:
     TX_SIZE TxSize;
     int8_t RefFrame[2];
     bool use_intrabc;
-    uint32_t sbMask;
+    int sbMask;
 
     int MaxLumaW;
     int MaxLumaH;
@@ -267,7 +267,7 @@ private:
     //from tile
     bool& ReadDeltas;
     //keep a local copy of CurrentQIndex
-    uint32_t CurrentQIndex;
+    int CurrentQIndex;
 };
 
 inline bool is_directional_mode(PREDICTION_MODE mode)

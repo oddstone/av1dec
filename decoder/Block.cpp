@@ -43,7 +43,7 @@ namespace YamiAv1 {
 using namespace Yami;
 using std::vector;
 
-Block::Block(Tile& tile, uint32_t r, uint32_t c, BLOCK_SIZE subSize)
+Block::Block(Tile& tile, int r, int c, BLOCK_SIZE subSize)
     : m_frame(*tile.m_frame)
     , m_sequence(*tile.m_sequence)
     , m_entropy(*tile.m_entropy)
@@ -100,8 +100,8 @@ int16_t Block::get_q_idx()
 void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore)
 {
 
-    uint32_t subBlockMiRow = MiRow & sbMask;
-    uint32_t subBlockMiCol = MiCol & sbMask;
+    int subBlockMiRow = MiRow & sbMask;
+    int subBlockMiCol = MiCol & sbMask;
     std::vector<std::vector<uint8_t>> mask;
     for (int plane = 0; plane < 1 + HasChroma * 2; plane++) {
         int planeSz = get_plane_residual_size(MiSize, plane);
@@ -143,11 +143,11 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
             }
         }
         if (is_inter) {
-            uint32_t predW = bw >> subX;
-            uint32_t predH = bh >> subY;
+            int predW = bw >> subX;
+            int predH = bh >> subY;
             bool someUseIntra = false;
-            for (uint32_t r = 0; r < (num4x4H << subY); r++) {
-                for (uint32_t c = 0; c < (num4x4W << subX); c++) {
+            for (int r = 0; r < (num4x4H << subY); r++) {
+                for (int c = 0; c < (num4x4W << subX); c++) {
                     if (m_frame.RefFrames[candRow + r][candCol + c][0] == INTRA_FRAME)
                         someUseIntra = true;
                 }
@@ -158,10 +158,10 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
                 candRow = MiRow;
                 candCol = MiCol;
             }
-            uint32_t r = 0;
-            for (uint32_t y = 0; y < num4x4H * 4; y += predH) {
-                uint32_t c = 0;
-                for (uint32_t x = 0; x < num4x4W * 4; x += predW) {
+            int r = 0;
+            for (int y = 0; y < num4x4H * 4; y += predH) {
+                int c = 0;
+                for (int x = 0; x < num4x4W * 4; x += predW) {
                     InterPredict inter(*this, plane, *frame, frameStore, mask);
                     inter.predict_inter(baseX + x, baseY + y, predW, predH, candRow + r, candCol + c);
                     c++;
@@ -229,8 +229,8 @@ static TX_SIZE find_tx_size(int w, int h)
 
 void Block::transform_tree(int startX, int startY, int w, int h)
 {
-    uint32_t maxX = m_frame.MiCols * MI_SIZE;
-    uint32_t maxY = m_frame.MiRows * MI_SIZE;
+    int maxX = m_frame.MiCols * MI_SIZE;
+    int maxY = m_frame.MiRows * MI_SIZE;
 
     if (startX >= maxX || startY >= maxY) {
         return;
@@ -318,8 +318,8 @@ void Block::parse()
         reset_block_context();
     bool isCompound = RefFrame[1] > INTRA_FRAME;
 
-    uint32_t r = MiRow;
-    uint32_t c = MiCol;
+    int r = MiRow;
+    int c = MiCol;
     for (int y = 0; y < bh4; y++) {
         for (int x = 0; x < bw4; x++) {
             m_frame.YModes[r + y][c + x] = YMode;
@@ -918,13 +918,13 @@ void Block::read_compound_type(bool isCompound)
 bool Block::has_overlappable_candidates()
 {
     if (AvailU) {
-        for (uint32_t x4 = MiCol; x4 < std::min(m_frame.MiCols, MiCol + bw4); x4 += 2) {
+        for (int x4 = MiCol; x4 < std::min(m_frame.MiCols, MiCol + bw4); x4 += 2) {
             if (m_frame.RefFrames[MiRow - 1][x4 | 1][0] > INTRA_FRAME)
                 return true;
         }
     }
     if (AvailL) {
-        for (uint32_t y4 = MiRow; y4 < std::min(m_frame.MiRows, MiRow + bh4); y4 += 2) {
+        for (int y4 = MiRow; y4 < std::min(m_frame.MiRows, MiRow + bh4); y4 += 2) {
             if (m_frame.RefFrames[y4 | 1][MiCol - 1][0] > INTRA_FRAME)
                 return true;
         }
@@ -1001,8 +1001,8 @@ void Block::LocalWarp::add_sample(int deltaRow, int deltaCol)
     static const int LEAST_SQUARES_SAMPLES_MAX = 8;
     if (NumSamplesScanned >= LEAST_SQUARES_SAMPLES_MAX)
         return;
-    uint32_t mvRow = MiRow + deltaRow;
-    uint32_t mvCol = MiCol + deltaCol;
+    int mvRow = MiRow + deltaRow;
+    int mvCol = MiCol + deltaCol;
     if (!m_tile.is_inside(mvRow, mvCol))
         return;
     if (m_frame.RefFrames[mvRow][mvCol][0] == NONE_FRAME)
@@ -1437,7 +1437,7 @@ void Block::mode_info()
         inter_frame_mode_info();
 }
 
-int Block::get_above_tx_width(uint32_t row, uint32_t col)
+int Block::get_above_tx_width(int row, int col)
 {
     if (row == MiRow) {
         if (!AvailU) {
@@ -1449,7 +1449,7 @@ int Block::get_above_tx_width(uint32_t row, uint32_t col)
     return Tx_Width[m_frame.InterTxSizes[row - 1][col]];
 }
 
-int Block::get_left_tx_height(uint32_t row, uint32_t col)
+int Block::get_left_tx_height(int row, int col)
 {
     if (col == MiCol) {
         if (!AvailL) {
@@ -1501,7 +1501,7 @@ void Block::read_tx_size(bool allowSelect)
     }
 }
 
-uint8_t Block::getTxfmSplitCtx(uint32_t row, uint32_t col, TX_SIZE txSz)
+uint8_t Block::getTxfmSplitCtx(int row, int col, TX_SIZE txSz)
 {
     int above = get_above_tx_width(row, col) < Tx_Width[txSz];
     int left = get_left_tx_height(row, col) < Tx_Height[txSz];
@@ -1513,7 +1513,7 @@ uint8_t Block::getTxfmSplitCtx(uint32_t row, uint32_t col, TX_SIZE txSz)
     return ctx;
 }
 
-void Block::read_var_tx_size(uint32_t row, uint32_t col, TX_SIZE txSz, int depth)
+void Block::read_var_tx_size(int row, int col, TX_SIZE txSz, int depth)
 {
     if (row >= m_frame.MiRows || col >= m_frame.MiCols)
         return;
@@ -1546,8 +1546,8 @@ void Block::read_block_tx_size()
         TX_SIZE maxTxSz = Max_Tx_Size_Rect[MiSize];
         int txW4 = Tx_Width[maxTxSz] / MI_SIZE;
         int txH4 = Tx_Height[maxTxSz] / MI_SIZE;
-        for (uint32_t row = MiRow; row < MiRow + bh4; row += txH4)
-            for (uint32_t col = MiCol; col < MiCol + bw4; col += txW4)
+        for (int row = MiRow; row < MiRow + bh4; row += txH4)
+            for (int col = MiCol; col < MiCol + bw4; col += txW4)
                 read_var_tx_size(row, col, maxTxSz, 0);
     } else {
         read_tx_size(!skip || !is_inter);
@@ -2114,16 +2114,16 @@ void Block::Palette::palette_mode_info()
     }
 }
 
-static void extendBorder(vector<vector<uint8_t>>& ColorMap, uint32_t onscreenWidth, uint32_t onscreenHeight,
-    uint32_t blockWidth, uint32_t blockHeight)
+static void extendBorder(vector<vector<uint8_t>>& ColorMap, int onscreenWidth, int onscreenHeight,
+    int blockWidth, int blockHeight)
 {
-    for (uint32_t i = 0; i < onscreenHeight; i++) {
-        for (uint32_t j = onscreenWidth; j < blockWidth; j++) {
+    for (int i = 0; i < onscreenHeight; i++) {
+        for (int j = onscreenWidth; j < blockWidth; j++) {
             ColorMap[i][j] = ColorMap[i][onscreenWidth - 1];
         }
     }
-    for (uint32_t i = onscreenHeight; i < blockHeight; i++) {
-        for (uint32_t j = 0; j < blockWidth; j++) {
+    for (int i = onscreenHeight; i < blockHeight; i++) {
+        for (int j = 0; j < blockWidth; j++) {
             ColorMap[i][j] = ColorMap[onscreenHeight - 1][j];
         }
     }
@@ -2132,11 +2132,11 @@ static void extendBorder(vector<vector<uint8_t>>& ColorMap, uint32_t onscreenWid
 static const int PALETTE_NUM_NEIGHBORS = 3;
 static const int Palette_Color_Hash_Multipliers[PALETTE_NUM_NEIGHBORS] = { 1, 2, 2 };
 
-static void get_palette_color_context(const vector<vector<uint8_t>>& colorMap, uint32_t r, uint32_t c,
+static void get_palette_color_context(const vector<vector<uint8_t>>& colorMap, int r, int c,
     uint8_t n, uint8_t ColorOrder[PALETTE_COLORS], uint8_t& ColorContextHash)
 {
     uint32_t scores[PALETTE_COLORS];
-    for (uint32_t i = 0; i < PALETTE_COLORS; i++) {
+    for (int i = 0; i < PALETTE_COLORS; i++) {
         scores[i] = 0;
         ColorOrder[i] = i;
     }
@@ -2181,10 +2181,10 @@ static void get_palette_color_context(const vector<vector<uint8_t>>& colorMap, u
 
 void Block::Palette::palette_tokens()
 {
-    uint32_t onscreenWidth = std::min(bw, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
-    uint32_t onscreenHeight = std::min(bh, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
-    uint32_t blockWidth = bw;
-    uint32_t blockHeight = bh;
+    int onscreenWidth = std::min(bw, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
+    int onscreenHeight = std::min(bh, (m_frame.MiCols - m_block.MiCol) * MI_SIZE);
+    int blockWidth = bw;
+    int blockHeight = bh;
     uint8_t ColorOrder[PALETTE_COLORS];
     uint8_t ColorContextHash;
 
