@@ -7,10 +7,9 @@ av1dec is available under the terms of The 2-Clause BSD License. Files under aom
 # Known Limitations
   * Supports only 8-bits
   * Only 4:2:0 content are tested.
-  * No Intrabc
   * No SVC
   * No segmentation
-  * The conformance test scipt only supports windows.
+  * The conformance test scipt onlys supports windows.
   
 # Build
 ## Windows* Operating Systems (64-bit)
@@ -28,7 +27,7 @@ av1dec is available under the terms of The 2-Clause BSD License. Files under aom
   - CMake 3.5.1 or later
 - __Build Steps__
   - mkdir build && cd build && cmake .. && make -j32
-  - run the av1dec under build
+  - run the av1dec under build/tests
 
 # Code style
 - We general follows WebKit coding style in C++ code: http://www.webkit.org/coding/coding-style.html
