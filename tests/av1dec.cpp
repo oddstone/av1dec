@@ -73,8 +73,6 @@ public:
             m_duration[i] = duration<float>::zero();
             count[i] = 0;
         }
-
-
     }
     void startRead()
     {
