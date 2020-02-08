@@ -100,7 +100,7 @@ public:
     }
     void fps()
     {
-        std::cout << "decode fps: " << getFps(DECODE) << "\r";
+        std::cout << "decode fps: " << getFps(DECODE) << ", frame = " << count[DECODE] << "        \r";
     }
     void summary()
     {
