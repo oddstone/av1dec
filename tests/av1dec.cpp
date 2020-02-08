@@ -142,7 +142,7 @@ int main(int argc, char** argv)
     }
     SharedPtr<DecodeInput> input(DecodeInput::create(argv[2]));
     if (!input) {
-        printf("can't open input %s", argv[1]);
+        printf("can't open input %s\n", argv[2]);
         return -1;
     }
     FILE* out = NULL;
