@@ -33,7 +33,7 @@
 
 void usage(const char* app)
 {
-    printf("%s -i input output", app);
+    printf("%s -i input [output]", app);
 }
 
 void writeFrame(FILE* fp, std::shared_ptr<Yami::YuvFrame>& frame)
@@ -136,7 +136,7 @@ private:
 
 int main(int argc, char** argv)
 {
-    if (argc != 4 || strcmp(argv[1], "-i")) {
+    if ((argc != 4 && argc != 3) || strcmp(argv[1], "-i")) {
         usage(argv[0]);
         return -1;
     }
@@ -145,10 +145,13 @@ int main(int argc, char** argv)
         printf("can't open input %s", argv[1]);
         return -1;
     }
-    FILE* out = fopen(argv[3], "wb");
-    if (!out) {
-        printf("can't open %s for write");
-        return -1;
+    FILE* out = NULL;
+    if (argc != 3) {
+        out = fopen(argv[3], "wb");
+        if (!out) {
+            printf("can't open %s for write\n", argv[3]);
+            return -1;
+        }
     }
 
     VideoDecodeBuffer buf;
@@ -169,13 +172,16 @@ int main(int argc, char** argv)
 
         std::shared_ptr<Yami::YuvFrame> frame;
         while ((frame = decoder.getOutput())) {
-            fps.startWrite();
-            writeFrame(out, frame);
-            fps.endWrite();
-        }
+            if (out) {
+                fps.startWrite();
+                writeFrame(out, frame);
+                fps.endWrite();
+            }
+         }
     }
     fps.summary();
-    fclose(out);
+    if (out)
+        fclose(out);
     //getchar();
     return 0;
 }
