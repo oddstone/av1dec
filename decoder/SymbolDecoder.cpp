@@ -26,7 +26,7 @@
 
 #include "SymbolDecoder.h"
 #include "../aom/prob.h"
-#include "bitReader.h"
+#include "BitReader.h"
 #include <algorithm>
 
 namespace YamiAv1 {

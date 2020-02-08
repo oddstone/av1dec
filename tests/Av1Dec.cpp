@@ -26,7 +26,7 @@
 
 #include "Av1Decoder.h"
 #include "VideoFrame.h"
-#include "decodeinput.h"
+#include "DecodeInput.h"
 #include <chrono>
 #include <iostream>
 #include <string.h>

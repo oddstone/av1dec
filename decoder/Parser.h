@@ -27,7 +27,7 @@
 #pragma once
 
 #include "Tile.h"
-#include "bitReader.h"
+#include "BitReader.h"
 #include <list>
 #include <memory>
 #include <stdint.h>

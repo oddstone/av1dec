@@ -29,7 +29,7 @@
 #include "config.h"
 #endif
 
-#include "bitReader.h"
+#include "BitReader.h"
 #include <assert.h>
 
 #define LOAD8BYTESDATA_BE(x) \

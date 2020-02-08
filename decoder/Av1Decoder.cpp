@@ -30,7 +30,7 @@
 #include "LoopRestoration.h"
 #include "Parser.h"
 #include "VideoFrame.h"
-#include "bitReader.h"
+#include "BitReader.h"
 #include "log.h"
 
 namespace YamiAv1 {

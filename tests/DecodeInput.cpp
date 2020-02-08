@@ -34,7 +34,7 @@
 #endif
 
 #include "NonCopyable.h"
-#include "decodeinput.h"
+#include "DecodeInput.h"
 #include "log.h"
 #include <assert.h>
 #include <stdlib.h>
