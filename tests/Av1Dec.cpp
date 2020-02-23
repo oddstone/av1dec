@@ -141,27 +141,52 @@ public:
     ~Decode();
 
 private:
+    bool parseOption(int argc, char** argv, int& i);
     SharedPtr<DecodeInput> m_input;
     FILE* m_output = NULL;
     Fps m_fps;
 };
 
-bool Decode::parse(int argc, char** argv)
+bool Decode::parseOption(int argc, char** argv, int& i)
 {
-    if ((argc != 4 && argc != 3) || strcmp(argv[1], "-i")) {
-        usage(argv[0]);
+    if (strcmp(argv[i], "-i") == 0) {
+        i++;
+        if (i >= argc) {
+            printf("no input file followed -i option\n");
+            return false;
+        }
+        if (m_input) {
+            printf("only support one input\n");
+            return false;        
+        }
+        m_input.reset(DecodeInput::create(argv[i]));
+        if (!m_input) {
+            printf("can't open input %s\n", argv[i]);
+            return false;
+        }
+    } else {
+        printf("invalid command line param %s\n", argv[i]);
         return false;
     }
-    m_input.reset(DecodeInput::create(argv[2]));
-    if (!m_input) {
-        printf("can't open input %s\n", argv[2]);
-        return -1;
-    }
-    if (argc != 3) {
-        m_output = fopen(argv[3], "wb");
-        if (!m_output) {
-            printf("can't open %s for write\n", argv[3]);
-            return -1;
+    return true;
+}
+
+bool Decode::parse(int argc, char** argv)
+{
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0] == '-') {
+            if (!parseOption(argc, argv, i))
+                return false;            
+        } else {
+            if (m_output) {
+                printf("do not support multi output\n");
+                return false;
+            }
+            m_output = fopen(argv[i], "wb");
+            if (!m_output) {
+                printf("can't open %s for write\n", argv[3]);
+                return false;
+            }
         }
     }
     return true;
