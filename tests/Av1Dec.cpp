@@ -25,8 +25,8 @@
  */
 
 #include "Av1Decoder.h"
-#include "VideoFrame.h"
 #include "DecodeInput.h"
+#include "VideoFrame.h"
 #include <chrono>
 #include <iostream>
 #include <string.h>
@@ -134,54 +134,79 @@ private:
     int count[COUNT_OF_TAG];
 };
 
-int main(int argc, char** argv)
+class Decode {
+public:
+    bool parse(int argc, char** argv);
+    int run();
+    ~Decode();
+
+private:
+    SharedPtr<DecodeInput> m_input;
+    FILE* m_output = NULL;
+    Fps m_fps;
+};
+
+bool Decode::parse(int argc, char** argv)
 {
     if ((argc != 4 && argc != 3) || strcmp(argv[1], "-i")) {
         usage(argv[0]);
-        return -1;
+        return false;
     }
-    SharedPtr<DecodeInput> input(DecodeInput::create(argv[2]));
-    if (!input) {
+    m_input.reset(DecodeInput::create(argv[2]));
+    if (!m_input) {
         printf("can't open input %s\n", argv[2]);
         return -1;
     }
-    FILE* out = NULL;
     if (argc != 3) {
-        out = fopen(argv[3], "wb");
-        if (!out) {
+        m_output = fopen(argv[3], "wb");
+        if (!m_output) {
             printf("can't open %s for write\n", argv[3]);
             return -1;
         }
     }
+    return true;
+}
 
+int Decode::run()
+{
     VideoDecodeBuffer buf;
     YamiAv1::Decoder decoder;
-    Fps fps;
     while (1) {
         //printf("%d\r\n", buf.size);
-        fps.startRead();
-        if (!input->getNextDecodeUnit(buf))
+        m_fps.startRead();
+        if (!m_input->getNextDecodeUnit(buf))
             break;
-        fps.endRead();
+        m_fps.endRead();
 
-        fps.startDecode();
+        m_fps.startDecode();
         decoder.decode(buf.data, buf.size);
-        fps.endDecode();
+        m_fps.endDecode();
 
-        fps.fps();
+        m_fps.fps();
 
         std::shared_ptr<Yami::YuvFrame> frame;
         while ((frame = decoder.getOutput())) {
-            if (out) {
-                fps.startWrite();
-                writeFrame(out, frame);
-                fps.endWrite();
+            if (m_output) {
+                m_fps.startWrite();
+                writeFrame(m_output, frame);
+                m_fps.endWrite();
             }
-         }
+        }
     }
-    fps.summary();
-    if (out)
-        fclose(out);
-    //getchar();
+    m_fps.summary();
     return 0;
+}
+
+Decode::~Decode()
+{
+    if (m_output)
+        fclose(m_output);
+}
+
+int main(int argc, char** argv)
+{
+    Decode decode;
+    if (!decode.parse(argc, argv))
+        return -1;
+    return decode.run();
 }
