@@ -1,6 +1,7 @@
 file(GLOB all_files
     "*.h"
-    "*.cpp")
+    "*.cpp"
+	"*.c")
 
 include_directories(${PROJECT_SOURCE_DIR}/interface/
     ${PROJECT_SOURCE_DIR}/common/

@@ -126,6 +126,7 @@ private:
     bool parseOption(int argc, char** argv, int& i);
     SharedPtr<DecodeInput> m_input;
     std::shared_ptr<DecodeOutput> m_output;
+    std::shared_ptr<DecodeOutputMd5> m_md5;
     Fps m_fps;
 };
 
@@ -146,6 +147,8 @@ bool Decode::parseOption(int argc, char** argv, int& i)
             printf("can't open input %s\n", argv[i]);
             return false;
         }
+    } else if (strcmp(argv[i], "-md5") == 0) {
+        m_md5 = DecodeOutputMd5::create();
     } else {
         printf("invalid command line param %s\n", argv[i]);
         return false;
@@ -181,6 +184,9 @@ bool Decode::output(const std::shared_ptr<Yami::YuvFrame>& frame)
         if (!m_output->output(frame))
             return false;
         m_fps.endWrite();
+    }
+    if (m_md5) {
+        m_md5->output(frame);
     }
     return true;
 }
