@@ -26,6 +26,7 @@
 
 #include "Av1Decoder.h"
 #include "DecodeInput.h"
+#include "DecodeOutput.h"
 #include "VideoFrame.h"
 #include <chrono>
 #include <iostream>
@@ -34,25 +35,6 @@
 void usage(const char* app)
 {
     printf("%s -i input [output]", app);
-}
-
-void writeFrame(FILE* fp, std::shared_ptr<Yami::YuvFrame>& frame)
-{
-    for (int p = 0; p < Yami::YuvFrame::MAX_PLANES; p++) {
-        uint8_t* start = frame->data[p];
-        int stride = frame->strides[p];
-        int width = frame->width;
-        int height = frame->height;
-        if (p) {
-            width >>= 1;
-            height >>= 1;
-        }
-        for (int h = 0; h < height; h++) {
-            uint8_t* line = start + h * stride;
-            fwrite(line, 1, width, fp);
-        }
-    }
-    fflush(fp);
 }
 
 using std::chrono::duration;
@@ -138,12 +120,12 @@ class Decode {
 public:
     bool parse(int argc, char** argv);
     int run();
-    ~Decode();
+    bool output(const std::shared_ptr<Yami::YuvFrame>& frame);
 
 private:
     bool parseOption(int argc, char** argv, int& i);
     SharedPtr<DecodeInput> m_input;
-    FILE* m_output = NULL;
+    std::shared_ptr<DecodeOutput> m_output;
     Fps m_fps;
 };
 
@@ -157,7 +139,7 @@ bool Decode::parseOption(int argc, char** argv, int& i)
         }
         if (m_input) {
             printf("only support one input\n");
-            return false;        
+            return false;
         }
         m_input.reset(DecodeInput::create(argv[i]));
         if (!m_input) {
@@ -176,18 +158,29 @@ bool Decode::parse(int argc, char** argv)
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             if (!parseOption(argc, argv, i))
-                return false;            
+                return false;
         } else {
             if (m_output) {
                 printf("do not support multi output\n");
                 return false;
             }
-            m_output = fopen(argv[i], "wb");
+            m_output = DecodeOutput::create(argv[i]);
             if (!m_output) {
                 printf("can't open %s for write\n", argv[3]);
                 return false;
             }
         }
+    }
+    return true;
+}
+
+bool Decode::output(const std::shared_ptr<Yami::YuvFrame>& frame)
+{
+    if (m_output) {
+        m_fps.startWrite();
+        if (!m_output->output(frame))
+            return false;
+        m_fps.endWrite();
     }
     return true;
 }
@@ -211,21 +204,12 @@ int Decode::run()
 
         std::shared_ptr<Yami::YuvFrame> frame;
         while ((frame = decoder.getOutput())) {
-            if (m_output) {
-                m_fps.startWrite();
-                writeFrame(m_output, frame);
-                m_fps.endWrite();
-            }
+            if (!output(frame))
+                break;
         }
     }
     m_fps.summary();
     return 0;
-}
-
-Decode::~Decode()
-{
-    if (m_output)
-        fclose(m_output);
 }
 
 int main(int argc, char** argv)
