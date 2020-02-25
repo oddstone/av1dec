@@ -36,26 +36,27 @@ private:
 };
 
 #define ROOF(b, a) ((b + (a - 1)) & ~(a - 1))
+const int PAD = 16;
 std::shared_ptr<YuvFrame> YuvFrame::create(int width, int height)
 {
     std::shared_ptr<YuvFrameImp> p(new YuvFrameImp);
     int alignedW = ROOF(width, 128);
     int alignedH = ROOF(height, 128);
-    p->m_data.resize(alignedW * alignedH * 3 / 2);
+    int allocatedW = alignedW + PAD * 2;
+    int allocatedH = alignedH + PAD * 2;
+    p->m_data.resize(allocatedW * allocatedH * 3 / 2);
     p->width = width;
     p->height = height;
-    p->widths[0] = width;
-    p->widths[1] = width / 2;
-    p->widths[2] = width / 2;
-    p->heights[0] = height;
-    p->heights[1] = height / 2;
-    p->heights[2] = height / 2;
-    p->data[0] = &p->m_data[0];
-    p->data[1] = &p->m_data[alignedW * alignedH];
-    p->data[2] = &p->m_data[alignedW * alignedH * 5 / 4];
-    p->strides[0] = alignedW;
-    p->strides[1] = alignedW / 2;
-    p->strides[2] = alignedW / 2;
+    int sub[MAX_PLANES] = { 1, 2, 2 };
+    float offsets[MAX_PLANES] = { 0, 1, 5.0 / 4 };
+    for (int i = 0; i < MAX_PLANES; i++) {
+        p->widths[i] = width / sub[i];
+        p->heights[i] = height / sub[i];
+        p->strides[i] = allocatedW / sub[i];
+        p->data[i] = &p->m_data[0]
+            + (int)(allocatedW * allocatedH * offsets[i])
+            + (PAD * p->strides[i] + PAD) / sub[i];
+    }
     return std::dynamic_pointer_cast<YuvFrame>(p);
 }
 
