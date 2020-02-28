@@ -46,6 +46,155 @@ LoopRestoration::LoopRestoration(const ConstFramePtr& frame,
 {
 }
 
+struct LoopRestoration::PlaneInfo {
+    int subX = 0;
+    int subY = 0;
+    int unitSize;
+    int unitRows;
+    int unitCols;
+    int plane;
+    int PlaneEndX;
+    int PlaneEndY;
+    PlaneInfo(LoopRestoration& lr, int p)
+        : plane(p)
+    {
+        if (plane) {
+            subX = lr.m_sequence.subsampling_x;
+            subY = lr.m_sequence.subsampling_y;
+        }
+        unitSize = lr.m_loopRestoration.LoopRestorationSize[plane];
+        unitRows = count_units_in_frame(unitSize, ROUND2(lr.m_frame->FrameHeight, subY));
+        unitCols = count_units_in_frame(unitSize, ROUND2(lr.m_frame->UpscaledWidth, subX));
+        PlaneEndX = ROUND2(lr.m_frame->UpscaledWidth, subX);
+        PlaneEndY = ROUND2(lr.m_frame->FrameHeight, subY);
+    }
+};
+
+struct LoopRestoration::UnitInfo {
+    int x;
+    int y;
+    int w;
+    int h;
+    int row;
+    int col;
+    RestorationType type;
+    UnitInfo(const PlaneInfo& plane, int unitRow, int unitCol, RestorationType rType)
+        : type(rType)
+    {
+        const int lastRow = plane.unitRows - 1;
+        const int lastCol = plane.unitCols - 1;
+        const int unitSize = plane.unitSize;
+        row = unitRow;
+        col = unitCol;
+        x = unitCol * unitSize;
+        y = unitRow * unitSize;
+        if (y)
+            y -= 8 >> plane.subY;
+        w = (unitCol == lastCol) ? plane.PlaneEndX - x : unitSize;
+        if (unitRow == lastRow) {
+            h = plane.PlaneEndY - y;
+        } else {
+            h = unitSize;
+            if (!y) {
+                //first row is 8 pixel short
+                h -= 8 >> plane.subY;
+            }
+        }
+    }
+};
+
+struct LoopRestoration::StripeInfo {
+    //strip start and end
+    int start;
+    int end;
+
+    //position in current strip;
+    int y;
+    int h;
+    StripeInfo(const PlaneInfo& plane, const UnitInfo& unit)
+        : m_plane(plane)
+        , m_unit(unit)
+    {
+        start = unit.y;
+        int size = (start ? 64 : 56) >> plane.subY; //first strip is 8 pixel short.
+        end = start + size - 1;
+        getPos();
+    }
+    bool next()
+    {
+        if (end + 1 >= m_unit.y + m_unit.h)
+            return false;
+        start = end + 1;
+        end += (64 >> m_plane.subY);
+        getPos();
+        return true;
+    }
+
+private:
+    void getPos()
+    {
+        y = start;
+        h = std::min(end + 1, m_unit.y + m_unit.h) - y;
+    }
+    const PlaneInfo& m_plane;
+    const UnitInfo& m_unit;
+};
+
+void LoopRestoration::forEachStripe(std::shared_ptr<YuvFrame>& LrFrame, const PlaneInfo& plane, const UnitInfo& unit)
+{
+    StripeInfo stripe(plane, unit);
+    do {
+        forEachBlock(LrFrame, plane, unit, stripe);
+    } while (stripe.next());
+}
+
+void LoopRestoration::forEachBlock(std::shared_ptr<YuvFrame>& LrFrame,
+    const PlaneInfo& plane, const UnitInfo& unit, const StripeInfo& stripe)
+{
+    const int x = unit.x;
+    const int y = stripe.y;
+    int width = unit.w;
+    int height = stripe.h;
+    if (unit.type == RESTORE_WIENER) {
+        wienerFilter(LrFrame, plane.plane, unit.row, unit.col, x, y, width, height, stripe);
+    } else if (unit.type == RESTORE_SGRPROJ) {
+        selfGuidedFilter(LrFrame, plane.plane, unit.row, unit.col, x, y, width, height, stripe);
+    }
+}
+
+void LoopRestoration::forEachUnit(std::shared_ptr<YuvFrame>& LrFrame, const PlaneInfo& plane)
+{
+    for (int unitRow = 0; unitRow < plane.unitRows; unitRow++) {
+        for (int unitCol = 0; unitCol < plane.unitCols; unitCol++) {
+            RestorationType rType = m_frame->m_loopRestoration.LrType[plane.plane][unitRow][unitCol];
+            if (rType != RESTORE_NONE) {
+                UnitInfo unit(plane, unitRow, unitCol, rType);
+                forEachStripe(LrFrame, plane, unit);
+            }
+        }
+    }
+}
+
+void LoopRestoration::forEachPlane(std::shared_ptr<YuvFrame>& LrFrame)
+{
+    for (int p = 0; p < m_sequence.NumPlanes; p++) {
+        PlaneInfo info(*this, p);
+        if (m_loopRestoration.FrameRestorationType[p] != RESTORE_NONE) {
+#if 1
+            forEachUnit(LrFrame, info);
+#else
+            for (int y = 0; y < m_frame->FrameHeight; y += MI_SIZE) {
+                for (int x = 0; x < m_frame->UpscaledWidth; x += MI_SIZE) {
+                    int row = y >> MI_SIZE_LOG2;
+                    int col = x >> MI_SIZE_LOG2;
+                    loop_restore_block(LrFrame, p, row, col);
+                }
+            }
+#endif
+        }
+    }
+}
+
 std::shared_ptr<YuvFrame> LoopRestoration::filter()
 {
     if (!m_frame->m_loopRestoration.UsesLr) {
@@ -69,17 +218,7 @@ std::shared_ptr<YuvFrame> LoopRestoration::filter()
         InterRound0, InterRound1, InterPostRound);
 
     std::shared_ptr<YuvFrame> LrFrame = YuvFrame::create(UpscaledCdefFrame);
-    for (int y = 0; y < m_frame->FrameHeight; y += MI_SIZE) {
-        for (int x = 0; x < m_frame->UpscaledWidth; x += MI_SIZE) {
-            for (int plane = 0; plane < m_sequence.NumPlanes; plane++) {
-                if (m_loopRestoration.FrameRestorationType[plane] != RESTORE_NONE) {
-                    int row = y >> MI_SIZE_LOG2;
-                    int col = x >> MI_SIZE_LOG2;
-                    loop_restore_block(LrFrame, plane, row, col);
-                }
-            }
-        }
-    }
+    forEachPlane(LrFrame);
     return LrFrame;
 }
 
@@ -97,24 +236,24 @@ std::vector<int> getFilter(const std::vector<int8_t>& coeff)
 }
 
 uint8_t LoopRestoration::get_source_sample(int plane, int x, int y,
-    int StripeStartY, int StripeEndY)
+    const StripeInfo& stripe)
 {
     x = std::min(PlaneEndX[plane], x);
     x = std::max(0, x);
     y = std::min(PlaneEndY[plane], y);
     y = std::max(0, y);
-    if (y < StripeStartY) {
-        y = std::max(StripeStartY - 2, y);
+    if (y < stripe.start) {
+        y = std::max(stripe.start - 2, y);
         return UpscaledCurrFrame->getPixel(plane, x, y);
-    } else if (y > StripeEndY) {
-        y = std::min(StripeEndY + 2, y);
+    } else if (y > stripe.end) {
+        y = std::min(stripe.end + 2, y);
         return UpscaledCurrFrame->getPixel(plane, x, y);
     } else {
         return UpscaledCdefFrame->getPixel(plane, x, y);
     }
 }
 void LoopRestoration::wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
-    int plane, int unitRow, int unitCol, int x, int y, int w, int h, int StripeStartY, int StripeEndY)
+    int plane, int unitRow, int unitCol, int x, int y, int w, int h, const StripeInfo& stripe)
 {
     int BitDepth = m_sequence.BitDepth;
     std::vector<int> vfilter = getFilter(m_loopRestoration.LrWiener[plane][unitRow][unitCol][0]);
@@ -127,7 +266,7 @@ void LoopRestoration::wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
         for (int c = 0; c < w; c++) {
             int s = 0;
             for (int t = 0; t < 7; t++) {
-                s += hfilter[t] * get_source_sample(plane, x + c + t - 3, y + r - 3, StripeStartY, StripeEndY);
+                s += hfilter[t] * get_source_sample(plane, x + c + t - 3, y + r - 3, stripe);
             }
             int v = ROUND2(s, InterRound0);
             intermediate[r][c] = CLIP3(-offset, limit - offset, v);
@@ -145,7 +284,81 @@ void LoopRestoration::wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
     }
 }
 
-std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y, int w, int h, uint8_t set, int StripeStartY, int StripeEndY, int pass)
+inline int& getValue(int* sum, int y, int x)
+{
+    return sum[(LoopRestoration::REST_BORDER + y) * LoopRestoration::MAX_REST_WIDTH + LoopRestoration::REST_BORDER + x];
+}
+
+void boxsum1(int* sum, int w, int h)
+{
+    for (int y = -2; y < h + 2; y++) {
+        int a;
+        int b = getValue(sum, y, -2);
+        int c = getValue(sum, y, -1);
+        for (int x = -1; x < w + 1; x++) {
+            a = b;
+            b = c;
+            c = getValue(sum, y, x + 1);
+            getValue(sum, y, x) = a + b + c;
+        }
+    }
+    for (int x = -2; x < w + 2; x++) {
+        int a;
+        int b = getValue(sum, -2, x);
+        int c = getValue(sum, -1, x);
+        for (int y = -1; y < h + 1; y++) {
+            a = b;
+            b = c;
+            c = getValue(sum, y + 1, x);
+            getValue(sum, y, x) = a + b + c;
+        }
+    }
+}
+
+void boxsum2(int* sum, int w, int h)
+{
+    for (int y = -3; y < h + 3; y++) {
+        int a;
+        int b = getValue(sum, y, -3);
+        int c = getValue(sum, y, -2);
+        int d = getValue(sum, y, -1);
+        int e = getValue(sum, y, 0);
+
+        for (int x = -1; x < w + 1; x++) {
+            a = b;
+            b = c;
+            c = d;
+            d = e;
+            e = getValue(sum, y, x + 2);
+            getValue(sum, y, x) = a + b + c + d + e;
+        }
+    }
+    for (int x = -3; x < w + 3; x++) {
+        int a;
+        int b = getValue(sum, -3, x);
+        int c = getValue(sum, -2, x);
+        int d = getValue(sum, -1, x);
+        int e = getValue(sum, 0, x);
+        for (int y = -1; y < h + 1; y++) {
+            a = b;
+            b = c;
+            c = d;
+            d = e;
+            e = getValue(sum, y + 2, x);
+            getValue(sum, y, x) = a + b + c + d + e;
+        }
+    }
+}
+
+void boxsum(int* sum, int w, int h, int r)
+{
+    if (r == 1)
+        boxsum1(sum, w, h);
+    else
+        boxsum2(sum, w, h);
+}
+
+std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y, int w, int h, uint8_t set, const StripeInfo& stripe, int pass)
 {
     uint8_t BitDepth = m_sequence.BitDepth;
 
@@ -157,20 +370,38 @@ std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y
     std::vector<std::vector<int>> A(h + 2, std::vector<int>(w + 2));
     std::vector<std::vector<int>> B(h + 2, std::vector<int>(w + 2));
 
+
+    for (int dy = -(r + 1); dy < h + r + 1; dy++) {
+        for (int dx = -(r + 1); dx < w + r + 1; dx++) {
+            int c = get_source_sample(plane, x + dx, y + dy, stripe);
+            getValue(&sumA[0][0], dy, dx) = c * c;
+            getValue(&sumB[0][0], dy, dx) = c;
+        }
+    }
+    boxsum(&sumA[0][0], w, h, r);
+    boxsum(&sumB[0][0], w, h, r);
+
     int n = (2 * r + 1) * (2 * r + 1);
     int n2e = n * n * eps;
     int s = (((1 << SGRPROJ_MTABLE_BITS) + n2e / 2) / n2e);
     for (int i = -1; i < h + 1; i++) {
         for (int j = -1; j < w + 1; j++) {
+#if 0
             int a = 0;
             int b = 0;
             for (int dy = -r; dy <= r; dy++) {
                 for (int dx = -r; dx <= r; dx++) {
-                    int c = get_source_sample(plane, x + j + dx, y + i + dy, StripeStartY, StripeEndY);
+                    int c = get_source_sample(plane, x + j + dx, y + i + dy, stripe);
                     a += c * c;
                     b += c;
                 }
             }
+            ASSERT(sumA[REST_BORDER + i][REST_BORDER + j] == a);
+            ASSERT(sumB[REST_BORDER + i][REST_BORDER + j] == b);
+#else
+            int a = getValue(&sumA[0][0], i, j);
+            int b = getValue(&sumB[0][0], i, j);
+#endif
             a = ROUND2(a, 2 * (BitDepth - 8));
             int d = ROUND2(b, BitDepth - 8);
             int p = std::max(0, a * n - d * d);
@@ -221,11 +452,11 @@ std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y
 }
 
 void LoopRestoration::selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
-    int plane, int unitRow, int unitCol, int x, int y, int w, int h, int StripeStartY, int StripeEndY)
+    int plane, int unitRow, int unitCol, int x, int y, int w, int h, const StripeInfo& stripe)
 {
     uint8_t set = m_loopRestoration.LrSgrSet[plane][unitRow][unitCol];
-    std::vector<std::vector<int>> flt0 = boxFilter(plane, x, y, w, h, set, StripeStartY, StripeEndY, 0);
-    std::vector<std::vector<int>> flt1 = boxFilter(plane, x, y, w, h, set, StripeStartY, StripeEndY, 1);
+    std::vector<std::vector<int>> flt0 = boxFilter(plane, x, y, w, h, set, stripe, 0);
+    std::vector<std::vector<int>> flt1 = boxFilter(plane, x, y, w, h, set, stripe, 1);
     int w0 = m_loopRestoration.LrSgrXqd[plane][unitRow][unitCol][0];
     int w1 = m_loopRestoration.LrSgrXqd[plane][unitRow][unitCol][1];
     int w2 = (1 << SGRPROJ_PRJ_BITS) - w0 - w1;
@@ -249,32 +480,4 @@ void LoopRestoration::selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
     }
 }
 
-void LoopRestoration::loop_restore_block(const std::shared_ptr<YuvFrame>& LrFrame,
-    int plane, int row, int col)
-{
-    int lumaY = row * MI_SIZE;
-    int stripeNum = (lumaY + 8) / 64;
-    int subX = 0;
-    int subY = 0;
-    if (plane) {
-        subX = m_sequence.subsampling_x;
-        subY = m_sequence.subsampling_y;
-    }
-
-    int StripeStartY = ((-8 + stripeNum * 64) >> subY);
-    int StripeEndY = StripeStartY + (64 >> subY) - 1;
-    int unitRow = std::min(unitRows[plane] - 1, ((row * MI_SIZE + 8) >> subY) / unitSize[plane]);
-    int unitCol = std::min(unitCols[plane] - 1, (col * MI_SIZE >> subX) / unitSize[plane]);
-
-    int x = (col * MI_SIZE >> subX);
-    int y = (row * MI_SIZE >> subY);
-    int w = std::min(MI_SIZE >> subX, PlaneEndX[plane] - x + 1);
-    int h = std::min(MI_SIZE >> subY, PlaneEndY[plane] - y + 1);
-    RestorationType rType = m_frame->m_loopRestoration.LrType[plane][unitRow][unitCol];
-    if (rType == RESTORE_WIENER) {
-        wienerFilter(LrFrame, plane, unitRow, unitCol, x, y, w, h, StripeStartY, StripeEndY);
-    } else if (rType == RESTORE_SGRPROJ) {
-        selfGuidedFilter(LrFrame, plane, unitRow, unitCol, x, y, w, h, StripeStartY, StripeEndY);
-    }
-}
 }

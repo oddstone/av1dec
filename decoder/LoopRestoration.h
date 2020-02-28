@@ -39,21 +39,28 @@ public:
         const std::shared_ptr<YuvFrame>& upscaledCdefFrame,
         const std::shared_ptr<YuvFrame>& upscaledCurrFrame);
     std::shared_ptr<YuvFrame> filter();
+    const static int REST_BORDER = 3;
+    const static int MAX_REST_HEIGHT = (64 + REST_BORDER * 2);
+    const static int MAX_REST_WIDTH = (256 + REST_BORDER * 2);
 
 private:
-    uint8_t get_source_sample(int plane, int x, int y,
-        int StripeStartY, int StripeEndY);
+    struct PlaneInfo;
+    struct UnitInfo;
+    struct StripeInfo;
+    uint8_t get_source_sample(int plane, int x, int y, const StripeInfo& stripe);
     void wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
         int plane, int unitRow, int unitCol,
-        int x, int y, int w, int h, int StripeStartY, int StripeEndY);
+        int x, int y, int w, int h, const StripeInfo& stripe);
     std::vector<std::vector<int>> boxFilter(int plane, int x, int y,
-        int w, int h, uint8_t set, int StripeStartY, int StripeEndY, int pass);
+        int w, int h, uint8_t set, const StripeInfo& stripe, int pass);
 
     void selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
         int plane, int unitRow, int unitCol,
-        int x, int y, int w, int h, int StripeStartY, int StripeEndY);
-    void loop_restore_block(const std::shared_ptr<YuvFrame>& LrFrame,
-        int plane, int row, int col);
+        int x, int y, int w, int h, const StripeInfo& stripe);
+    void forEachPlane(std::shared_ptr<YuvFrame>& LrFrame);
+    void forEachUnit(std::shared_ptr<YuvFrame>& LrFrame, const PlaneInfo& info);
+    void forEachStripe(std::shared_ptr<YuvFrame>& LrFrame, const PlaneInfo& plane, const UnitInfo& unit);
+    void forEachBlock(std::shared_ptr<YuvFrame>& LrFrame, const PlaneInfo& plane, const UnitInfo& unit, const StripeInfo& stripe);
     ConstFramePtr m_frame;
     const SequenceHeader& m_sequence;
     const LoopRestorationpParams& m_loopRestoration;
@@ -68,5 +75,8 @@ private:
     int InterRound0;
     int InterRound1;
     int InterPostRound;
+
+    int sumA[MAX_REST_HEIGHT][MAX_REST_WIDTH];
+    int sumB[MAX_REST_HEIGHT][MAX_REST_WIDTH];
 };
 }
