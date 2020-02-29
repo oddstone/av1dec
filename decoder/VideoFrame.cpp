@@ -26,6 +26,7 @@
 
 #include "VideoFrame.h"
 #include <string.h>
+#include "log.h"
 
 namespace Yami {
 struct YuvFrameImp : public YuvFrame {
@@ -76,4 +77,27 @@ std::shared_ptr<YuvFrame> YuvFrame::create(const std::shared_ptr<YuvFrame>& othe
     }
     return frame;
 }
+
+void YuvFrame::extendBorder(int borders)
+{
+    ASSERT(borders < PAD / 2);
+    for (int p = 0; p < MAX_PLANES; p++) {
+        uint8_t* dest = data[p];
+        for (int h = 0; h < heights[p]; h++) {
+            uint8_t* d = dest + h * strides[p];
+            memset(d - borders, *d, borders);
+            d = d + widths[p];
+            memset(d, *(d - 1), borders);
+        }
+        uint8_t* top = dest - borders;
+        uint8_t* bottom = top + (heights[p] - 1) * strides[p];
+        int size = widths[p] + 2 * borders;
+        for (int i = 1; i <= borders; i++) {
+            memcpy(top - i * strides[p], top, size);
+            memcpy(bottom + i * strides[p], bottom, size);
+        }
+    }
+
+}
+
 }

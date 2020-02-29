@@ -49,13 +49,13 @@ private:
     struct StripeInfo;
     uint8_t get_source_sample(int plane, int x, int y, const StripeInfo& stripe);
     void wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
-        int plane, int unitRow, int unitCol,
+        int plane, const UnitInfo& unit,
         int x, int y, int w, int h, const StripeInfo& stripe);
     std::vector<std::vector<int>> boxFilter(int plane, int x, int y,
         int w, int h, uint8_t set, const StripeInfo& stripe, int pass);
 
     void selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
-        int plane, int unitRow, int unitCol,
+        int plane, const UnitInfo& unit,
         int x, int y, int w, int h, const StripeInfo& stripe);
     void forEachPlane(std::shared_ptr<YuvFrame>& LrFrame);
     void forEachUnit(std::shared_ptr<YuvFrame>& LrFrame, const PlaneInfo& info);
