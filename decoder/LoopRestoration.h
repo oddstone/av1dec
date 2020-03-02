@@ -51,8 +51,10 @@ private:
     void wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
         int plane, const UnitInfo& unit,
         int x, int y, int w, int h, const StripeInfo& stripe);
+
+    void computIntermedia(int plane, int x, int y, int w, int h, int r, const StripeInfo& stripe);
     std::vector<std::vector<int>> boxFilter(int plane, int x, int y,
-        int w, int h, uint8_t set, const StripeInfo& stripe, int pass);
+        int w, int h, uint8_t set, const StripeInfo& stripe, int pass, int r);
 
     void selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
         int plane, const UnitInfo& unit,

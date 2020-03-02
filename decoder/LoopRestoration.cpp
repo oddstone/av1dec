@@ -147,7 +147,7 @@ void LoopRestoration::forEachBlock(std::shared_ptr<YuvFrame>& LrFrame,
     const int x = unit.x;
     const int y = std::max(stripe.start, unit.y);
     int width = unit.w;
-    int height = std::min(stripe.end, unit.y + unit.h) - y ;
+    int height = std::min(stripe.end, unit.y + unit.h) - y;
     if (unit.type == RESTORE_WIENER) {
         wienerFilter(LrFrame, plane.plane, unit, x, y, width, height, stripe);
     } else if (unit.type == RESTORE_SGRPROJ) {
@@ -245,7 +245,7 @@ uint8_t LoopRestoration::get_source_sample(int plane, int x, int y,
     }
 }
 void LoopRestoration::wienerFilter(const std::shared_ptr<YuvFrame>& LrFrame,
-    int plane, const UnitInfo& unit,  int x, int y, int w, int h, const StripeInfo& stripe)
+    int plane, const UnitInfo& unit, int x, int y, int w, int h, const StripeInfo& stripe)
 {
     int BitDepth = m_sequence.BitDepth;
     std::vector<int> vfilter = getFilter(m_loopRestoration.LrWiener[plane][unit.row][unit.col][0]);
@@ -350,27 +350,14 @@ void boxsum(int* sum, int w, int h, int r)
         boxsum2(sum, w, h);
 }
 
-std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y, int w, int h, uint8_t set, const StripeInfo& stripe, int pass)
+std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y, int w, int h, uint8_t set, const StripeInfo& stripe, int pass, int r)
 {
     uint8_t BitDepth = m_sequence.BitDepth;
 
     std::vector<std::vector<int>> F(h, std::vector<int>(w));
-    int r = Sgr_Params[set][pass * 2 + 0];
-    if (r == 0)
-        return std::move(F);
     int eps = Sgr_Params[set][pass * 2 + 1];
     std::vector<std::vector<int>> A(h + 2, std::vector<int>(w + 2));
     std::vector<std::vector<int>> B(h + 2, std::vector<int>(w + 2));
-
-    for (int dy = -(r + 1); dy < h + r + 1; dy++) {
-        for (int dx = -(r + 1); dx < w + r + 1; dx++) {
-            int c = get_source_sample(plane, x + dx, y + dy, stripe);
-            getValue(&sumA[0][0], dy, dx) = c * c;
-            getValue(&sumB[0][0], dy, dx) = c;
-        }
-    }
-    boxsum(&sumA[0][0], w, h, r);
-    boxsum(&sumB[0][0], w, h, r);
 
     int n = (2 * r + 1) * (2 * r + 1);
     int n2e = n * n * eps;
@@ -442,17 +429,37 @@ std::vector<std::vector<int>> LoopRestoration::boxFilter(int plane, int x, int y
     return std::move(F);
 }
 
+void LoopRestoration::computIntermedia(int plane, int x, int y, int w, int h, int r, const StripeInfo& stripe)
+{
+    for (int dy = -(r + 1); dy < h + r + 1; dy++) {
+        for (int dx = -(r + 1); dx < w + r + 1; dx++) {
+            int c = get_source_sample(plane, x + dx, y + dy, stripe);
+            getValue(&sumA[0][0], dy, dx) = c * c;
+            getValue(&sumB[0][0], dy, dx) = c;
+        }
+    }
+    boxsum(&sumA[0][0], w, h, r);
+    boxsum(&sumB[0][0], w, h, r);
+}
 void LoopRestoration::selfGuidedFilter(const std::shared_ptr<YuvFrame>& LrFrame,
     int plane, const UnitInfo& unit, int x, int y, int w, int h, const StripeInfo& stripe)
 {
     uint8_t set = m_loopRestoration.LrSgrSet[plane][unit.row][unit.col];
-    std::vector<std::vector<int>> flt0 = boxFilter(plane, x, y, w, h, set, stripe, 0);
-    std::vector<std::vector<int>> flt1 = boxFilter(plane, x, y, w, h, set, stripe, 1);
+    std::vector<std::vector<int>> flt0;
+    std::vector<std::vector<int>> flt1;
+    int r0 = Sgr_Params[set][0];
+    if (r0) {
+        computIntermedia(plane, x, y, w, h, r0, stripe);
+        flt0 = boxFilter(plane, x, y, w, h, set, stripe, 0, r0);
+    }
+    int r1 = Sgr_Params[set][2];
+    if (r1 && (r0 != r1) ) {
+        computIntermedia(plane, x, y, w, h, r1, stripe);
+        flt1 = boxFilter(plane, x, y, w, h, set, stripe, 1, r1);
+    }
     int w0 = m_loopRestoration.LrSgrXqd[plane][unit.row][unit.col][0];
     int w1 = m_loopRestoration.LrSgrXqd[plane][unit.row][unit.col][1];
     int w2 = (1 << SGRPROJ_PRJ_BITS) - w0 - w1;
-    int r0 = Sgr_Params[set][0];
-    int r1 = Sgr_Params[set][2];
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
             int u = UpscaledCdefFrame->getPixel(plane, x + j, y + i) << SGRPROJ_RST_BITS;
