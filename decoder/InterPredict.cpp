@@ -194,6 +194,123 @@ const static int Subpel_Filters[6][16][8] = {
         { 0, 0, 4, 36, 62, 26, 0, 0 },
         { 0, 0, 2, 34, 62, 30, 0, 0 } }
 };
+
+struct Tap {
+    int start;
+    int end;
+};
+
+Tap Subpel_Filter_Taps[6][16] = {
+    {
+        { 3, 4 },
+        { 1, 6 },
+        { 1, 6 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 1, 7 },
+        { 2, 7 },
+        { 2, 7 },
+    },
+    {
+        { 3, 4 },
+        { 1, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 1, 6 },
+        { 1, 7 },
+        { 2, 7 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 7 },
+    },
+    {
+        { 3, 4 },
+        { 0, 7 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 0, 8 },
+        { 1, 8 },
+    },
+    {
+        { 3, 4 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+        { 3, 5 },
+    },
+    {
+        { 3, 4 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+    },
+    {
+        { 3, 4 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+        { 2, 6 },
+    },
+};
+
 void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w, int h, int candRow, int candCol)
 {
     std::vector<std::vector<int16_t>>& pred = preds[refList];
@@ -210,13 +327,18 @@ void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w
 
     for (int r = 0; r < intermediateHeight; r++) {
         for (int c = 0; c < w; c++) {
-            int s = 0;
             int p = startX + xStep * c;
-            for (int t = 0; t < 8; t++) {
-                uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, (p >> 10) + t - 3), CLIP3(0, lastY, (startY >> 10) + r - 3));
-                s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * pixel;
-            }
+            const int* filter = Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK];
+            const Tap& tap = Subpel_Filter_Taps[filterIdx][(p >> 6) & SUBPEL_MASK];
 
+            int x = (p >> 10);
+            int y = (startY >> 10) + r;
+
+            int s = 0;
+            for (int t = tap.start; t < tap.end; t++) {
+                uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + t - 3), CLIP3(0, lastY, y - 3));
+                s += filter[t] * pixel;
+            }
             intermediate[r][c] = ROUND2(s, InterRound0);
         }
     }
@@ -224,10 +346,15 @@ void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w
     filterIdx = getFilterIdx(h, candRow, candCol, 0);
     for (int r = 0; r < h; r++) {
         for (int c = 0; c < w; c++) {
-            int s = 0;
             int p = (startY & 1023) + yStep * r;
-            for (int t = 0; t < 8; t++)
-                s += Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK][t] * intermediate[(p >> 10) + t][c];
+            const int* filter = Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK];
+            const Tap& tap = Subpel_Filter_Taps[filterIdx][(p >> 6) & SUBPEL_MASK];
+
+            int y = p >> 10;
+
+            int s = 0;
+            for (int t = tap.start; t < tap.end; t++)
+                s += filter[t] * intermediate[y + t][c];
             pred[r][c] = ROUND2(s, InterRound1);
         }
     }
