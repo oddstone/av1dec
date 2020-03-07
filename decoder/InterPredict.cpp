@@ -311,16 +311,27 @@ Tap Subpel_Filter_Taps[6][16] = {
     },
 };
 
-void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w, int h, int candRow, int candCol)
+inline bool isSubPixel(int pos)
 {
-    std::vector<std::vector<int16_t>>& pred = preds[refList];
-    pred.assign(h, std::vector<int16_t>(w));
-    YuvFrame& ref = (refIdx == NONE_FRAME ? m_yuv : *m_frameStore[refIdx]);
+    return (pos >> 6) & SUBPEL_MASK;
+}
 
-    int lastX, lastY;
-    auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
-    lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
-    lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
+void Block::InterPredict::blockPixelPredict(std::vector<std::vector<int16_t>>& pred, const YuvFrame& ref, int w, int h, int lastX, int lastY)
+{
+    //shift to match blockSubPixelPredict
+    static const int shift = 14;
+    int x = startX >> SCALE_SUBPEL_BITS;
+    int y = startY >> SCALE_SUBPEL_BITS;
+    for (int r = 0; r < h; r++) {
+        for (int c = 0; c < w; c++) {
+            uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + c), CLIP3(0, lastY, y + r));
+            pred[r][c] = pixel << (14 - InterRound0 - InterRound1);
+        }
+    }
+}
+//sub pixel predict for block
+void Block::InterPredict::blockSubPixelPredict(std::vector<std::vector<int16_t>>& pred, const YuvFrame& ref, int w, int h, int candRow, int candCol, int lastX, int lastY)
+{
     const int intermediateHeight = (((h - 1) * yStep + (1 << SCALE_SUBPEL_BITS) - 1) >> SCALE_SUBPEL_BITS) + 8;
     std::vector<std::vector<int>> intermediate(intermediateHeight, std::vector<int>(w));
     int filterIdx = getFilterIdx(w, candRow, candCol, 1);
@@ -331,12 +342,12 @@ void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w
             const int* filter = Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK];
             const Tap& tap = Subpel_Filter_Taps[filterIdx][(p >> 6) & SUBPEL_MASK];
 
-            int x = (p >> 10);
-            int y = (startY >> 10) + r;
+            int x = (p >> 10) - 3;
+            int y = (startY >> 10) + r - 3;
 
             int s = 0;
             for (int t = tap.start; t < tap.end; t++) {
-                uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + t - 3), CLIP3(0, lastY, y - 3));
+                uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + t), CLIP3(0, lastY, y));
                 s += filter[t] * pixel;
             }
             intermediate[r][c] = ROUND2(s, InterRound0);
@@ -357,6 +368,25 @@ void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w
                 s += filter[t] * intermediate[y + t][c];
             pred[r][c] = ROUND2(s, InterRound1);
         }
+    }
+}
+
+void Block::InterPredict::blockInterPrediction(int8_t refIdx, int refList, int w, int h, int candRow, int candCol)
+{
+    std::vector<std::vector<int16_t>>& pred = preds[refList];
+    pred.assign(h, std::vector<int16_t>(w));
+    YuvFrame& ref = (refIdx == NONE_FRAME ? m_yuv : *m_frameStore[refIdx]);
+
+    int lastX, lastY;
+    auto& rinfo = m_frame.m_refInfo.m_refs[refIdx];
+    lastX = ((rinfo.RefUpscaledWidth + subX) >> subX) - 1;
+    lastY = ((rinfo.RefFrameHeight + subY) >> subY) - 1;
+    ASSERT(!isSubPixel(xStep) && !isSubPixel(yStep));
+
+    if (!isSubPixel(startX) && !isSubPixel(startY)) {
+        blockPixelPredict(pred, ref, w, h, lastX, lastY);
+    } else {
+        blockSubPixelPredict(pred, ref, w, h, candRow, candCol, lastX, lastY);
     }
 }
 

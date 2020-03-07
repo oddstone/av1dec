@@ -40,6 +40,8 @@ private:
     uint8_t getUseWarp(int x, int y, int refFrame);
     void motionVectorScaling(int8_t refIdx, int x, int y, const Mv& mv);
     int getFilterIdx(int size, int candRow, int candCol, int dir);
+    void blockPixelPredict(std::vector<std::vector<int16_t>>& pred, const YuvFrame& ref, int w, int h, int lastX, int lastY);
+    void blockSubPixelPredict(std::vector<std::vector<int16_t>>& pred, const YuvFrame& ref, int w, int h, int candRow, int candCol, int lastX, int lastY);
     void blockInterPrediction(int8_t refIdx, int refList, int w, int h, int candRow, int candCol);
     void blockWarp(int useWarp, uint8_t refIdx, int refList, int x, int y, int i8, int j8, int w, int h);
     void intraModeVariantMask(int w, int h);
