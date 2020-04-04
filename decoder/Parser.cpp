@@ -539,44 +539,11 @@ FrameHeader::FrameHeader(ConstSequencePtr& sequence)
 
 void FrameHeader::initGeometry()
 {
+    m_modeInfo.assign(AlignedMiRows, std::vector<ModeInfoBlock>(AlignedMiCols));
 
-    YModes.assign(AlignedMiRows, std::vector<PREDICTION_MODE>(AlignedMiCols));
-    UVModes.assign(AlignedMiRows, std::vector<UV_PREDICTION_MODE>(AlignedMiCols));
-    RefFrames.resize(AlignedMiRows);
-    for (int i = 0; i < AlignedMiRows; i++) {
-        RefFrames[i].assign(AlignedMiCols, std::vector<int>(2, NONE_FRAME));
-    }
-    TxTypes.assign(AlignedMiRows, std::vector<TX_TYPE>(AlignedMiCols));
-    IsInters.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
-    SkipModes.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
-    InterTxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
-    TxSizes.assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
-    MiSizes.assign(AlignedMiRows, std::vector<BLOCK_SIZE>(AlignedMiCols));
-    for (int i = 0; i < MAX_PLANES; i++) {
-        LoopfilterTxSizes[i].assign(AlignedMiRows, std::vector<TX_SIZE>(AlignedMiCols));
-    }
     SegmentIds.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
-    Skips.assign(AlignedMiRows, std::vector<bool>(AlignedMiCols));
-    for (int i = 0; i < FRAME_LF_COUNT; i++) {
-        DeltaLFs[i].assign(AlignedMiRows, std::vector<int8_t>(AlignedMiCols));
-    }
     MfRefFrames.assign(AlignedMiRows, std::vector<int8_t>(AlignedMiCols));
     MfMvs.assign(AlignedMiRows, std::vector<Mv>(AlignedMiCols));
-    Mvs.resize(AlignedMiRows);
-    for (int i = 0; i < AlignedMiRows; i++) {
-        Mvs[i].resize(AlignedMiCols, std::vector<Mv>(2));
-    }
-    CompGroupIdxs.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
-    CompoundIdxs.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
-    InterpFilters.resize(AlignedMiRows);
-    for (auto& i : InterpFilters) {
-        i.assign(AlignedMiCols, std::vector<InterpFilter>(2));
-    }
-    for (int i = 0; i < 2; i++) {
-        PaletteSizes[i].resize(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
-        std::vector<uint8_t> v;
-        PaletteColors[i].resize(AlignedMiRows, std::vector<std::vector<uint8_t>>(AlignedMiCols, v));
-    }
 }
 
 bool FrameHeader::loop_filter_params(BitReader& br)
@@ -1725,13 +1692,14 @@ void FrameHeader::motionVectorStorage()
 {
     for (uint32_t row = 0; row < MiRows; row++) {
         for (uint32_t col = 0; col < MiCols; col++) {
+            ModeInfoBlock& info = m_modeInfo[row][col];
             for (int list = 0; list < 2; list++) {
-                int r = RefFrames[row][col][list];
+                int r = info.RefFrames[list];
                 if (r > INTRA_FRAME) {
                     int dist = get_relative_dist(r);
                     if (dist < 0) {
-                        int16_t mvRow = Mvs[row][col][list].mv[0];
-                        int16_t mvCol = Mvs[row][col][list].mv[1];
+                        int16_t mvRow = info.Mvs[list].mv[0];
+                        int16_t mvCol = info.Mvs[list].mv[1];
                         const static int16_t REFMVS_LIMIT = (1 << 12) - 1;
                         if (std::abs(mvRow) <= REFMVS_LIMIT && std::abs(mvCol) <= REFMVS_LIMIT) {
                             MfRefFrames[row][col] = r;

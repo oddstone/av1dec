@@ -148,7 +148,8 @@ void Block::compute_prediction(std::shared_ptr<YuvFrame>& frame, const FrameStor
             bool someUseIntra = false;
             for (int r = 0; r < (num4x4H << subY); r++) {
                 for (int c = 0; c < (num4x4W << subX); c++) {
-                    if (m_frame.RefFrames[candRow + r][candCol + c][0] == INTRA_FRAME)
+                    const ModeInfoBlock& info = getModeInfo(candRow + r, candCol + c);
+                    if (info.RefFrames[0] == INTRA_FRAME)
                         someUseIntra = true;
                 }
             }
@@ -237,7 +238,7 @@ void Block::transform_tree(int startX, int startY, int w, int h)
     }
     int row = startY >> MI_SIZE_LOG2;
     int col = startX >> MI_SIZE_LOG2;
-    int lumaTxSz = m_frame.InterTxSizes[row][col];
+    int lumaTxSz = getModeInfo(row, col).InterTxSize;
     int lumaW = Tx_Width[lumaTxSz];
     int lumaH = Tx_Height[lumaTxSz];
     if (w <= lumaW && h <= lumaH) {
@@ -322,21 +323,22 @@ void Block::parse()
     int c = MiCol;
     for (int y = 0; y < bh4; y++) {
         for (int x = 0; x < bw4; x++) {
-            m_frame.YModes[r + y][c + x] = YMode;
+            ModeInfoBlock& info = getModeInfo(r + y, c + x);
+            info.YMode = YMode;
             if (RefFrame[0] == INTRA_FRAME && HasChroma)
-                m_frame.UVModes[r + y][c + x] = UVMode;
+                info.UVMode = UVMode;
             for (int refList = 0; refList < 2; refList++)
-                m_frame.RefFrames[r + y][c + x][refList] = RefFrame[refList];
+                info.RefFrames[refList] = RefFrame[refList];
             if (is_inter) {
                 if (!use_intrabc) {
-                    m_frame.CompGroupIdxs[r + y][c + x] = comp_group_idx;
-                    m_frame.CompoundIdxs[r + y][c + x] = compound_idx;
+                    info.CompGroupIdx = comp_group_idx;
+                    info.CompoundIdx = compound_idx;
                 }
                 for (int dir = 0; dir < 2; dir++) {
-                    m_frame.InterpFilters[r + y][c + x][dir] = interp_filter[dir];
+                    info.InterpFilters[dir] = interp_filter[dir];
                 }
                 for (int refList = 0; refList < 1 + isCompound; refList++) {
-                    m_frame.Mvs[r + y][c + x][refList] = m_mv[refList];
+                    info.Mvs[refList] = m_mv[refList];
                 }
             }
         }
@@ -344,16 +346,17 @@ void Block::parse()
     residual();
     for (int y = 0; y < bh4; y++) {
         for (int x = 0; x < bw4; x++) {
-            m_frame.IsInters[r + y][c + x] = is_inter;
-            m_frame.SkipModes[r + y][c + x] = skip_mode;
-            m_frame.Skips[r + y][c + x] = skip;
-            m_frame.TxSizes[r + y][c + x] = TxSize;
-            m_frame.MiSizes[r + y][c + x] = MiSize;
+            ModeInfoBlock& info = getModeInfo(r + y, c + x);
+            info.IsInter = is_inter;
+            info.SkipMode = skip_mode;
+            info.Skip = skip;
+            info.TxSize = TxSize;
+            info.MiSize = MiSize;
             m_frame.SegmentIds[r + y][c + x] = segment_id;
             m_palette.updateFrameContext(r + y, c + x);
 
             for (int i = 0; i < FRAME_LF_COUNT; i++) {
-                m_frame.DeltaLFs[i][r + y][c + x] = m_tile.DeltaLF[i];
+                info.DeltaLFs[i] = m_tile.DeltaLF[i];
             }
         }
     }
@@ -363,9 +366,9 @@ uint8_t Block::getSkipCtx()
 {
     uint8_t ctx = 0;
     if (AvailU)
-        ctx += m_frame.Skips[MiRow - 1][MiCol];
+        ctx += getModeInfo(MiRow - 1, MiCol).Skip;
     if (AvailL)
-        ctx += m_frame.Skips[MiRow][MiCol - 1];
+        ctx += getModeInfo(MiRow, MiCol - 1).Skip;
     return ctx;
 }
 
@@ -389,8 +392,7 @@ void Block::read_delta_qindex()
         return;
     if (ReadDeltas) {
         uint32_t delta_q_abs = m_entropy.readDeltaQAbs();
-        if (delta_q_abs == DELTA_Q_SMALL)
-        {
+        if (delta_q_abs == DELTA_Q_SMALL) {
             uint8_t delta_q_rem_bits = m_entropy.readLiteral(3) + 1;
             uint8_t delta_q_abs_bits = m_entropy.readLiteral(delta_q_rem_bits);
             delta_q_abs = delta_q_abs_bits + (1 << delta_q_rem_bits) + 1;
@@ -414,15 +416,13 @@ void Block::read_delta_lf()
     if (!(ReadDeltas && deltaLf.delta_lf_present))
         return;
     int frameLfCount = 1;
-    if (deltaLf.delta_lf_multi)
-    {
+    if (deltaLf.delta_lf_multi) {
         frameLfCount = (m_sequence.NumPlanes > 1) ? FRAME_LF_COUNT : (FRAME_LF_COUNT - 2);
     }
     for (int i = 0; i < frameLfCount; i++) {
         uint8_t delta_lf_abs = m_entropy.readDeltaLfAbs(deltaLf.delta_lf_multi, i);
         uint32_t deltaLfAbs;
-        if (delta_lf_abs == DELTA_LF_SMALL)
-        {
+        if (delta_lf_abs == DELTA_LF_SMALL) {
             uint8_t delta_lf_rem_bits;
             delta_lf_rem_bits = m_entropy.readLiteral(3);
             uint8_t n = delta_lf_rem_bits + 1;
@@ -444,8 +444,8 @@ PREDICTION_MODE Block::intra_frame_y_mode()
     uint8_t Intra_Mode_Context[INTRA_MODES] = {
         0, 1, 2, 3, 4, 4, 4, 4, 3, 0, 1, 2, 0
     };
-    PREDICTION_MODE above = AvailU ? m_frame.YModes[MiRow - 1][MiCol] : DC_PRED;
-    PREDICTION_MODE left = AvailL ? m_frame.YModes[MiRow][MiCol - 1] : DC_PRED;
+    PREDICTION_MODE above = AvailU ? getModeInfo(MiRow - 1, MiCol).YMode : DC_PRED;
+    PREDICTION_MODE left = AvailL ? getModeInfo(MiRow, MiCol - 1).YMode : DC_PRED;
     uint8_t aboveCtx = Intra_Mode_Context[above];
     uint8_t leftCtx = Intra_Mode_Context[left];
     return m_entropy.readIntraFrameYMode(aboveCtx, leftCtx);
@@ -616,9 +616,9 @@ int Block::getSkipModeCtx()
 {
     int ctx = 0;
     if (AvailU)
-        ctx += m_frame.SkipModes[MiRow - 1][MiCol];
+        ctx += getModeInfo(MiRow - 1, MiCol).SkipMode;
     if (AvailL)
-        ctx += m_frame.SkipModes[MiRow][MiCol - 1];
+        ctx += getModeInfo(MiRow, MiCol - 1).SkipMode;
     return ctx;
 }
 
@@ -737,12 +737,14 @@ uint8_t Block::getInterpFilterCtx(int dir)
     uint8_t leftType = 3;
     uint8_t aboveType = 3;
     if (AvailL) {
-        if (m_frame.RefFrames[MiRow][MiCol - 1][0] == RefFrame[0] || m_frame.RefFrames[MiRow][MiCol - 1][1] == RefFrame[0])
-            leftType = m_frame.InterpFilters[MiRow][MiCol - 1][dir];
+        const ModeInfoBlock& info = getModeInfo(MiRow, MiCol - 1);
+        if (info.RefFrames[0] == RefFrame[0] || info.RefFrames[1] == RefFrame[0])
+            leftType = info.InterpFilters[dir];
     }
     if (AvailU) {
-        if (m_frame.RefFrames[MiRow - 1][MiCol][0] == RefFrame[0] || m_frame.RefFrames[MiRow - 1][MiCol][1] == RefFrame[0])
-            aboveType = m_frame.InterpFilters[MiRow - 1][MiCol][dir];
+        const ModeInfoBlock& info = getModeInfo(MiRow - 1, MiCol);
+        if (info.RefFrames[0] == RefFrame[0] || info.RefFrames[1] == RefFrame[0])
+            aboveType = info.InterpFilters[dir];
     }
     if (leftType == aboveType)
         ctx += leftType;
@@ -848,13 +850,13 @@ uint8_t Block::getCompGroupIdxCtx()
     uint8_t ctx = 0;
     if (AvailU) {
         if (!AboveSingle)
-            ctx += m_frame.CompGroupIdxs[MiRow - 1][MiCol];
+            ctx += getModeInfo(MiRow - 1, MiCol).CompGroupIdx;
         else if (AboveRefFrame[0] == ALTREF_FRAME)
             ctx += 3;
     }
     if (AvailL) {
         if (!LeftSingle)
-            ctx += m_frame.CompGroupIdxs[MiRow][MiCol - 1];
+            ctx += getModeInfo(MiRow, MiCol - 1).CompGroupIdx;
         else if (LeftRefFrame[0] == ALTREF_FRAME)
             ctx += 3;
     }
@@ -869,13 +871,13 @@ uint8_t Block::getCompoundIdxCtx()
     uint8_t ctx = (fwd == bck) ? 3 : 0;
     if (AvailU) {
         if (!AboveSingle)
-            ctx += m_frame.CompoundIdxs[MiRow - 1][MiCol];
+            ctx += getModeInfo(MiRow - 1, MiCol).CompoundIdx;
         else if (AboveRefFrame[0] == ALTREF_FRAME)
             ctx++;
     }
     if (AvailL) {
         if (!LeftSingle)
-            ctx += m_frame.CompoundIdxs[MiRow][MiCol - 1];
+            ctx += getModeInfo(MiRow, MiCol - 1).CompoundIdx;
         else if (LeftRefFrame[0] == ALTREF_FRAME)
             ctx++;
     }
@@ -928,13 +930,13 @@ bool Block::has_overlappable_candidates()
 {
     if (AvailU) {
         for (int x4 = MiCol; x4 < std::min(m_frame.MiCols, MiCol + bw4); x4 += 2) {
-            if (m_frame.RefFrames[MiRow - 1][x4 | 1][0] > INTRA_FRAME)
+            if (getModeInfo(MiRow - 1, x4 | 1).RefFrames[0] > INTRA_FRAME)
                 return true;
         }
     }
     if (AvailL) {
         for (int y4 = MiRow; y4 < std::min(m_frame.MiRows, MiRow + bh4); y4 += 2) {
-            if (m_frame.RefFrames[y4 | 1][MiCol - 1][0] > INTRA_FRAME)
+            if (getModeInfo(y4 | 1, MiCol - 1).RefFrames[0] > INTRA_FRAME)
                 return true;
         }
     }
@@ -957,7 +959,7 @@ void Block::LocalWarp::find_warp_samples()
     bool doTopLeft = true;
     bool doTopRight = true;
     if (m_block.AvailU) {
-        BLOCK_SIZE srcSize = m_frame.MiSizes[MiRow - 1][MiCol];
+        BLOCK_SIZE srcSize = getModeInfo(MiRow - 1, MiCol).MiSize;
         int srcW = Num_4x4_Blocks_Wide[srcSize];
         if (w4 <= srcW) {
             int colOffset = -(MiCol & (srcW - 1));
@@ -969,7 +971,7 @@ void Block::LocalWarp::find_warp_samples()
         } else {
             int miStep;
             for (int i = 0; i < std::min(w4, (int)(m_frame.MiCols - MiCol)); i += miStep) {
-                srcSize = m_frame.MiSizes[MiRow - 1][MiCol + i];
+                srcSize = getModeInfo(MiRow - 1, MiCol + i).MiSize;
                 srcW = Num_4x4_Blocks_Wide[srcSize];
                 miStep = std::min(w4, srcW);
                 add_sample(-1, i);
@@ -977,7 +979,7 @@ void Block::LocalWarp::find_warp_samples()
         }
     }
     if (m_block.AvailL) {
-        BLOCK_SIZE srcSize = m_frame.MiSizes[MiRow][MiCol - 1];
+        BLOCK_SIZE srcSize = getModeInfo(MiRow, MiCol - 1).MiSize;
         int srcH = Num_4x4_Blocks_High[srcSize];
         if (h4 <= srcH) {
             int rowOffset = -(MiRow & (srcH - 1));
@@ -987,7 +989,7 @@ void Block::LocalWarp::find_warp_samples()
         } else {
             int miStep;
             for (int i = 0; i < std::min(h4, (int)(m_frame.MiRows - MiRow)); i += miStep) {
-                srcSize = m_frame.MiSizes[MiRow + i][MiCol - 1];
+                srcSize = getModeInfo(MiRow + i, MiCol - 1).MiSize;
                 srcH = Num_4x4_Blocks_High[srcSize];
                 miStep = std::min(h4, srcH);
                 add_sample(i, -1);
@@ -1005,6 +1007,12 @@ void Block::LocalWarp::find_warp_samples()
     if (NumSamples == 0 && NumSamplesScanned > 0)
         NumSamples = 1;
 }
+
+const ModeInfoBlock& Block::LocalWarp::getModeInfo(int row, int col)
+{
+    return m_block.getModeInfo(row, col);
+}
+
 void Block::LocalWarp::add_sample(int deltaRow, int deltaCol)
 {
     static const int LEAST_SQUARES_SAMPLES_MAX = 8;
@@ -1014,13 +1022,14 @@ void Block::LocalWarp::add_sample(int deltaRow, int deltaCol)
     int mvCol = MiCol + deltaCol;
     if (!m_tile.is_inside(mvRow, mvCol))
         return;
-    if (m_frame.RefFrames[mvRow][mvCol][0] == NONE_FRAME)
+    const ModeInfoBlock& info = getModeInfo(mvRow, mvCol);
+    if (info.RefFrames[0] == NONE_FRAME)
         return;
-    if (m_frame.RefFrames[mvRow][mvCol][0] != m_block.RefFrame[0])
+    if (info.RefFrames[0] != m_block.RefFrame[0])
         return;
-    if (m_frame.RefFrames[mvRow][mvCol][1] != NONE_FRAME)
+    if (info.RefFrames[1] != NONE_FRAME)
         return;
-    BLOCK_SIZE candSz = m_frame.MiSizes[mvRow][mvCol];
+    BLOCK_SIZE candSz = getModeInfo(mvRow, mvCol).MiSize;
     int candW4 = Num_4x4_Blocks_Wide[candSz];
     int candH4 = Num_4x4_Blocks_High[candSz];
     int candRow = mvRow & ~(candH4 - 1);
@@ -1028,14 +1037,15 @@ void Block::LocalWarp::add_sample(int deltaRow, int deltaCol)
     int midY = candRow * 4 + candH4 * 2 - 1;
     int midX = candCol * 4 + candW4 * 2 - 1;
     int threshold = CLIP3(16, 112, (int)std::max(m_block.bw, m_block.bh));
-    int mvDiffRow = std::abs(m_frame.Mvs[candRow][candCol][0].mv[0] - m_block.m_mv[0].mv[0]);
-    int mvDiffCol = std::abs(m_frame.Mvs[candRow][candCol][0].mv[1] - m_block.m_mv[0].mv[1]);
+    const ModeInfoBlock& candInfo = getModeInfo(candRow, candCol);
+    int mvDiffRow = std::abs(candInfo.Mvs[0].mv[0] - m_block.m_mv[0].mv[0]);
+    int mvDiffCol = std::abs(candInfo.Mvs[0].mv[1] - m_block.m_mv[0].mv[1]);
     bool valid = ((mvDiffRow + mvDiffCol) <= threshold);
     std::vector<int16_t> cand(4);
     cand[0] = midY * 8;
     cand[1] = midX * 8;
-    cand[2] = midY * 8 + m_frame.Mvs[candRow][candCol][0].mv[0];
-    cand[3] = midX * 8 + m_frame.Mvs[candRow][candCol][0].mv[1];
+    cand[2] = midY * 8 + candInfo.Mvs[0].mv[0];
+    cand[3] = midX * 8 + candInfo.Mvs[0].mv[1];
     NumSamplesScanned += 1;
     if (!valid && NumSamplesScanned > 1)
         return;
@@ -1345,14 +1355,14 @@ void Block::assign_mv(const FindMvStack& find, bool isCompound)
             compMode = get_mode(i);
         }
         if (use_intrabc) {
-            PredMv[ 0 ] = find.RefStackMv[ 0 ][ 0 ];
-            if ( PredMv[ 0 ].mv[0] == 0 && PredMv[ 0 ].mv[ 1 ] == 0 ) {
+            PredMv[0] = find.RefStackMv[0][0];
+            if (PredMv[0].mv[0] == 0 && PredMv[0].mv[1] == 0) {
                 PredMv[0] = find.RefStackMv[1][0];
             }
-            if ( PredMv[0].mv[0] == 0 && PredMv[0].mv[ 1 ] == 0 ) {
+            if (PredMv[0].mv[0] == 0 && PredMv[0].mv[1] == 0) {
                 BLOCK_SIZE sbSize = m_sequence.use_128x128_superblock ? BLOCK_128X128 : BLOCK_64X64;
                 int sbSize4 = Num_4x4_Blocks_High[sbSize];
-                if (MiRow - sbSize4 < m_tile.MiRowStart ) {
+                if (MiRow - sbSize4 < m_tile.MiRowStart) {
                     static const int INTRABC_DELAY_PIXELS = 256;
                     PredMv[0].mv[0] = 0;
                     PredMv[0].mv[1] = -(sbSize4 * MI_SIZE + INTRABC_DELAY_PIXELS) * 8;
@@ -1404,10 +1414,10 @@ void Block::intra_block_mode_info()
 void Block::inter_frame_mode_info()
 {
     use_intrabc = false;
-    LeftRefFrame[0] = AvailL ? m_frame.RefFrames[MiRow][MiCol - 1][0] : INTRA_FRAME;
-    AboveRefFrame[0] = AvailU ? m_frame.RefFrames[MiRow - 1][MiCol][0] : INTRA_FRAME;
-    LeftRefFrame[1] = AvailL ? m_frame.RefFrames[MiRow][MiCol - 1][1] : NONE_FRAME;
-    AboveRefFrame[1] = AvailU ? m_frame.RefFrames[MiRow - 1][MiCol][1] : NONE_FRAME;
+    LeftRefFrame[0] = AvailL ? getModeInfo(MiRow, MiCol - 1).RefFrames[0] : INTRA_FRAME;
+    AboveRefFrame[0] = AvailU ? getModeInfo(MiRow - 1, MiCol).RefFrames[0] : INTRA_FRAME;
+    LeftRefFrame[1] = AvailL ? getModeInfo(MiRow, MiCol - 1).RefFrames[1] : NONE_FRAME;
+    AboveRefFrame[1] = AvailU ? getModeInfo(MiRow - 1, MiCol).RefFrames[1] : NONE_FRAME;
     LeftIntra = LeftRefFrame[0] <= INTRA_FRAME;
     AboveIntra = AboveRefFrame[0] <= INTRA_FRAME;
     LeftSingle = LeftRefFrame[1] <= INTRA_FRAME;
@@ -1437,6 +1447,16 @@ void Block::inter_frame_mode_info()
         intra_block_mode_info();
 }
 
+ModeInfoBlock& Block::getModeInfo(int row, int col)
+{
+    return m_frame.m_modeInfo[row][col];
+}
+
+const ModeInfoBlock& Block::getModeInfo(int row, int col) const
+{
+    return m_frame.m_modeInfo[row][col];
+}
+
 void Block::mode_info()
 {
     if (m_frame.FrameIsIntra)
@@ -1450,11 +1470,14 @@ int Block::get_above_tx_width(int row, int col)
     if (row == MiRow) {
         if (!AvailU) {
             return 64;
-        } else if (m_frame.Skips[row - 1][col] && m_frame.IsInters[row - 1][col]) {
-            return Block_Width[m_frame.MiSizes[row - 1][col]];
+        } else {
+            const ModeInfoBlock& info = getModeInfo(row - 1, col);
+            if (info.Skip && info.IsInter)
+                return Block_Width[info.MiSize];
         }
     }
-    return Tx_Width[m_frame.InterTxSizes[row - 1][col]];
+    const ModeInfoBlock& info = getModeInfo(row - 1, col);
+    return Tx_Width[info.InterTxSize];
 }
 
 int Block::get_left_tx_height(int row, int col)
@@ -1462,11 +1485,14 @@ int Block::get_left_tx_height(int row, int col)
     if (col == MiCol) {
         if (!AvailL) {
             return 64;
-        } else if (m_frame.Skips[row][col - 1] && m_frame.IsInters[row][col - 1]) {
-            return Block_Height[m_frame.MiSizes[row][col - 1]];
+        } else {
+            const ModeInfoBlock& info = getModeInfo(row, col - 1);
+            if (info.Skip && info.IsInter)
+                return Block_Height[info.MiSize];
         }
     }
-    return Tx_Height[m_frame.InterTxSizes[row][col - 1]];
+    const ModeInfoBlock& info = getModeInfo(row, col - 1);
+    return Tx_Height[info.InterTxSize];
 }
 
 uint8_t Block::getTxDepthCtx(TX_SIZE maxRectTxSize)
@@ -1474,16 +1500,16 @@ uint8_t Block::getTxDepthCtx(TX_SIZE maxRectTxSize)
     int maxTxWidth = Tx_Width[maxRectTxSize];
     int maxTxHeight = Tx_Height[maxRectTxSize];
     int aboveW;
-    if (AvailU && m_frame.IsInters[MiRow - 1][MiCol]) {
-        aboveW = Block_Width[m_frame.MiSizes[MiRow - 1][MiCol]];
+    if (AvailU && getModeInfo(MiRow - 1, MiCol).IsInter) {
+        aboveW = Block_Width[getModeInfo(MiRow - 1, MiCol).MiSize];
     } else if (AvailU) {
         aboveW = get_above_tx_width(MiRow, MiCol);
     } else {
         aboveW = 0;
     }
     int leftH;
-    if (AvailL && m_frame.IsInters[MiRow][MiCol - 1]) {
-        leftH = Block_Height[m_frame.MiSizes[MiRow][MiCol - 1]];
+    if (AvailL && getModeInfo(MiRow, MiCol - 1).IsInter) {
+        leftH = Block_Height[getModeInfo(MiRow, MiCol - 1).MiSize];
     } else if (AvailL) {
         leftH = get_left_tx_height(MiRow, MiCol);
     } else {
@@ -1541,9 +1567,12 @@ void Block::read_var_tx_size(int row, int col, TX_SIZE txSz, int depth)
             for (int j = 0; j < w4; j += stepW)
                 read_var_tx_size(row + i, col + j, subTxSz, depth + 1);
     } else {
-        for (int i = 0; i < h4; i++)
-            for (int j = 0; j < w4; j++)
-                m_frame.InterTxSizes[row + i][col + j] = txSz;
+        for (int i = 0; i < h4; i++) {
+            for (int j = 0; j < w4; j++) {
+                ModeInfoBlock& info = getModeInfo(row + i, col + j);
+                info.InterTxSize = txSz;
+            }
+        }
         TxSize = txSz;
     }
 }
@@ -1560,8 +1589,10 @@ void Block::read_block_tx_size()
     } else {
         read_tx_size(!skip || !is_inter);
         for (int row = MiRow; row < MiRow + bh4; row++) {
-            for (int col = MiCol; col < MiCol + bw4; col++)
-                m_frame.InterTxSizes[row][col] = TxSize;
+            for (int col = MiCol; col < MiCol + bw4; col++) {
+                ModeInfoBlock& info = getModeInfo(row, col);
+                info.InterTxSize = TxSize;
+            }
         }
     }
 }
@@ -1921,9 +1952,9 @@ Block::Palette::Palette(Block& block)
 uint8_t Block::Palette::getHasPaletteYCtx()
 {
     uint8_t ctx = 0;
-    if (m_block.AvailU && m_frame.PaletteSizes[0][MiRow - 1][MiCol] > 0)
+    if (m_block.AvailU && m_block.getModeInfo(MiRow - 1, MiCol).PaletteSizes[0] > 0)
         ctx += 1;
-    if (m_block.AvailL && m_frame.PaletteSizes[0][MiRow][MiCol - 1] > 0)
+    if (m_block.AvailL && m_block.getModeInfo(MiRow, MiCol - 1).PaletteSizes[0] > 0)
         ctx += 1;
     return ctx;
 }
@@ -1958,11 +1989,11 @@ std::vector<uint8_t> Block::Palette::get_palette_cache(int plane) const
 {
     int aboveN = 0;
     if ((MiRow * MI_SIZE) % 64) {
-        aboveN = m_frame.PaletteSizes[plane][MiRow - 1][MiCol];
+        aboveN = m_block.getModeInfo(MiRow - 1, MiCol).PaletteSizes[plane];
     }
     int leftN = 0;
     if (m_block.AvailL) {
-        leftN = m_frame.PaletteSizes[plane][MiRow][MiCol - 1];
+        leftN = m_block.getModeInfo(MiRow, MiCol - 1).PaletteSizes[plane];
     }
 
     std::vector<uint8_t> PaletteCache(aboveN + leftN);
@@ -1971,8 +2002,8 @@ std::vector<uint8_t> Block::Palette::get_palette_cache(int plane) const
     int leftIdx = 0;
     int n = 0;
     while (aboveIdx < aboveN && leftIdx < leftN) {
-        uint8_t aboveC = m_frame.PaletteColors[plane][MiRow - 1][MiCol][aboveIdx];
-        uint8_t leftC = m_frame.PaletteColors[plane][MiRow][MiCol - 1][leftIdx];
+        uint8_t aboveC = m_frame.m_modeInfo[MiRow - 1][MiCol].PaletteColors[plane][aboveIdx];
+        uint8_t leftC = m_frame.m_modeInfo[MiRow][MiCol - 1].PaletteColors[plane][leftIdx];
         if (leftC < aboveC) {
             if (n == 0 || leftC != PaletteCache[n - 1]) {
                 PaletteCache[n] = leftC;
@@ -1991,7 +2022,7 @@ std::vector<uint8_t> Block::Palette::get_palette_cache(int plane) const
         }
     }
     while (aboveIdx < aboveN) {
-        uint8_t val = m_frame.PaletteColors[plane][MiRow - 1][MiCol][aboveIdx];
+        uint8_t val = m_frame.getModeInfo(MiRow - 1, MiCol).PaletteColors[plane][aboveIdx];
         aboveIdx++;
         if (n == 0 || val != PaletteCache[n - 1]) {
             PaletteCache[n] = val;
@@ -1999,7 +2030,7 @@ std::vector<uint8_t> Block::Palette::get_palette_cache(int plane) const
         }
     }
     while (leftIdx < leftN) {
-        uint8_t val = m_frame.PaletteColors[plane][MiRow][MiCol - 1][leftIdx];
+        uint8_t val = m_frame.getModeInfo(MiRow, MiCol - 1).PaletteColors[plane][leftIdx];
         leftIdx++;
         if (n == 0 || val != PaletteCache[n - 1]) {
             PaletteCache[n] = val;
@@ -2012,11 +2043,12 @@ std::vector<uint8_t> Block::Palette::get_palette_cache(int plane) const
 
 void Block::Palette::updateFrameContext(int y, int x)
 {
+    ModeInfoBlock& info = m_frame.m_modeInfo[y][x];
 
-    m_frame.PaletteSizes[0][y][x] = PaletteSizeY;
-    m_frame.PaletteSizes[1][y][x] = PaletteSizeUV;
-    m_frame.PaletteColors[0][y][x] = palette_colors_y;
-    m_frame.PaletteColors[1][y][x] = palette_colors_u;
+    info.PaletteSizes[0] = PaletteSizeY;
+    info.PaletteSizes[1] = PaletteSizeUV;
+    info.PaletteColors[0] = palette_colors_y;
+    info.PaletteColors[1] = palette_colors_u;
 }
 
 void Block::Palette::palette_mode_info()

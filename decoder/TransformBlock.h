@@ -41,6 +41,8 @@ enum TxClass {
     TX_CLASS_VERT
 };
 
+struct ModeInfoBlock;
+
 class TransformBlock {
 public:
     TransformBlock(Block& block, int plane, int baseX, int baseY, int startX, int startY, TX_SIZE txSz, bool skip);
@@ -55,6 +57,9 @@ private:
     int16_t get_q_idx();
     void transform_type(TX_TYPE type);
     void transform_type();
+
+    ModeInfoBlock& getModeInfo(int row, int col);
+    const ModeInfoBlock& getModeInfo(int row, int col) const;
 
     const int16_t* get_mrow_scan() const;
     const int16_t* get_mcol_scan() const;

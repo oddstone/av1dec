@@ -31,6 +31,8 @@
 
 namespace YamiAv1 {
 
+struct ModeInfoBlock;
+
 class Partition : public BlockTree {
 public:
     Partition(Tile& tile, int r, int c, BLOCK_SIZE sbSize);

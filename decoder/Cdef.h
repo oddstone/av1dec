@@ -33,6 +33,7 @@
 namespace YamiAv1 {
 
 struct CdefParams;
+struct ModeInfoBlock;
 
 class Cdef {
 public:
@@ -52,6 +53,7 @@ private:
     void cdef_block(const std::shared_ptr<YuvFrame>& cdef,
         const std::shared_ptr<YuvFrame>& frame,
         int r, int c, int idx);
+    const ModeInfoBlock& getModeInfo(int row, int col);
     ConstFramePtr m_frame;
     const SequenceHeader& m_sequence;
     const CdefParams& m_cdef;

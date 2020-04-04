@@ -100,12 +100,14 @@ void LoopFilter::loop_filter_edge(const std::shared_ptr<YuvFrame>& frame,
     int yP = y >> subY;
     int prevRow = row - (dy << subY);
     int prevCol = col - (dx << subX);
-    BLOCK_SIZE MiSize = m_frame->MiSizes[row][col];
-    TX_SIZE txSz = m_frame->LoopfilterTxSizes[plane][row >> subY][col >> subX];
+
+    const ModeInfoBlock& info = m_frame->getModeInfo(row, col);
+    BLOCK_SIZE MiSize = info.MiSize;
+    TX_SIZE txSz = info.LoopfilterTxSizes[plane];
     BLOCK_SIZE planeSize = m_sequence.get_plane_residual_size(MiSize, plane);
-    bool skip = m_frame->Skips[row][col];
-    bool isIntra = m_frame->RefFrames[row][col][0] <= INTRA_FRAME;
-    TX_SIZE prevTxSz = m_frame->LoopfilterTxSizes[plane][prevRow >> subY][prevCol >> subX];
+    bool skip = info.Skip;
+    bool isIntra = info.RefFrames[0] <= INTRA_FRAME;
+    TX_SIZE prevTxSz = m_frame->getModeInfo(prevRow, prevCol).LoopfilterTxSizes[plane];
     bool isBlockEdge = getIsBlockEdge(xP, yP, planeSize, pass);
     bool isTxEdge = getIsTxEdge(xP, yP, txSz, pass);
     bool applyFilter = getApplyFilter(isTxEdge, isBlockEdge, skip, isIntra);
@@ -298,9 +300,10 @@ int LoopFilter::getFilterSize(TX_SIZE txSz, TX_SIZE prevTxSz, int pass, int plan
 }
 void LoopFilter::getFilterStrength(int row, int col, int plane, int pass, int& lvl, int& limit, int& blimit, int& thresh) const
 {
+    const ModeInfoBlock& info = m_frame->getModeInfo(row, col);
     uint8_t segment = m_frame->SegmentIds[row][col];
-    int ref = m_frame->RefFrames[row][col][0];
-    PREDICTION_MODE mode = m_frame->YModes[row][col];
+    int ref = info.RefFrames[0];
+    PREDICTION_MODE mode = info.YMode;
     int modeType = mode >= NEARESTMV && mode != GLOBALMV && mode != GLOBAL_GLOBALMV;
     int8_t deltaLF = getDeltaLF(row, col, plane, pass);
     lvl = getLvl(segment, ref, modeType, deltaLF, plane, pass);
@@ -349,9 +352,10 @@ int8_t LoopFilter::getLvl(uint8_t segment, int ref, int modeType, int8_t deltaLF
 }
 int8_t LoopFilter::getDeltaLF(int row, int col, int plane, int pass) const
 {
+    const ModeInfoBlock& info = m_frame->getModeInfo(row, col);
     if (!m_deltaLF.delta_lf_multi)
-        return m_frame->DeltaLFs[0][row][col];
-    return m_frame->DeltaLFs[plane == 0 ? pass : (plane + 1)][row][col];
+        return info.DeltaLFs[0];
+    return info.DeltaLFs[plane == 0 ? pass : (plane + 1)];
 }
 
 bool LoopFilter::isOnScreen(int x, int y, int pass) const

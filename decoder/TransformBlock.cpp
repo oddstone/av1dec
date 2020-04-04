@@ -1252,12 +1252,12 @@ TX_TYPE TransformBlock::compute_tx_type() const
         return DCT_DCT;
     TxSet txSet = get_tx_set();
     if (plane == 0) {
-        return m_frame.TxTypes[y4][x4];
+        return getModeInfo(y4, x4).TxType;
     }
     if (m_block.is_inter) {
         int i = std::max((int)m_block.MiCol, x4 << (plane ? m_sequence.subsampling_x : 0));
         int j = std::max((int)m_block.MiRow, y4 << (plane ? m_sequence.subsampling_y : 0));
-        TX_TYPE txType = m_frame.TxTypes[j][i];
+        TX_TYPE txType = getModeInfo(j, i).TxType;
         if (!is_tx_type_in_set(txSet, txType))
             return DCT_DCT;
         return txType;
@@ -1272,7 +1272,7 @@ void TransformBlock::transform_type(TX_TYPE type)
 {
     for (int i = 0; i < w4; i++) {
         for (int j = 0; j < h4; j++) {
-            m_frame.TxTypes[y4 + j][x4 + i] = type;
+            getModeInfo(y4 + j, x4 + i).TxType = type;
         }
     }
 }
@@ -2443,10 +2443,26 @@ bool TransformBlock::decode(std::shared_ptr<YuvFrame>& frame)
 
     for (int i = 0; i < stepY; i++) {
         for (int j = 0; j < stepX; j++) {
-            m_frame.LoopfilterTxSizes[plane][(row >> subY) + i][(col >> subX) + j] = txSz;
+            for (int xx = 0; xx < subX + 1; xx++) {
+                for (int yy = 0; yy < subY + 1; yy++) {
+                    ModeInfoBlock& info = getModeInfo(row  + (i << subY) + yy, col  + (j << subX) + xx);
+                    info.LoopfilterTxSizes[plane] = txSz;
+                }
+            }
             m_block.m_decoded.setFlag(plane, (subBlockMiRow >> subY) + i, (subBlockMiCol >> subX) + j);
         }
     }
     return true;
 }
+
+ModeInfoBlock& TransformBlock::getModeInfo(int row, int col)
+{
+    return m_block.getModeInfo(row, col);
+}
+
+const ModeInfoBlock& TransformBlock::getModeInfo(int row, int col) const
+{
+    return m_block.getModeInfo(row, col);
+}
+
 }

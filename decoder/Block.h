@@ -44,6 +44,7 @@ namespace YamiAv1 {
 
 class SymbolDecoder;
 class TransformBlock;
+struct ModeInfoBlock;
 
 class Block : public BlockTree {
     friend class TransformBlock;
@@ -97,6 +98,7 @@ class Block : public BlockTree {
         bool LocalValid;
 
     private:
+        const ModeInfoBlock& getModeInfo(int row, int col);
         void add_sample(int deltaRow, int deltaCol);
 
         void resolveDivisor(int64_t d, int& divShift, int& divFactor) const;
@@ -121,6 +123,8 @@ public:
     bool decode(std::shared_ptr<YuvFrame>& frame, const FrameStore& frameStore);
 
 private:
+    const ModeInfoBlock& getModeInfo(int row, int col) const ;
+    ModeInfoBlock& getModeInfo(int row, int col);
     void intra_segment_id();
     void mode_info();
     void read_cfl_alphas();

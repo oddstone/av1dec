@@ -64,6 +64,11 @@ const int Cdef_Uv_Dir[2][2][8] = {
         { 0, 1, 2, 3, 4, 5, 6, 7 } }
 };
 
+const ModeInfoBlock& Cdef::getModeInfo(int row, int col)
+{
+    return m_frame->getModeInfo(row, col);
+}
+
 void Cdef::cdef_block(const std::shared_ptr<YuvFrame>& cdef,
     const std::shared_ptr<YuvFrame>& frame,
     int r, int c, int idx)
@@ -71,8 +76,8 @@ void Cdef::cdef_block(const std::shared_ptr<YuvFrame>& cdef,
     if (idx == -1)
         return;
     int coeffShift = m_sequence.BitDepth - 8;
-    bool skip = (m_frame->Skips[r][c] && m_frame->Skips[r + 1][c]
-        && m_frame->Skips[r][c + 1] && m_frame->Skips[r + 1][c + 1]);
+    bool skip = (getModeInfo(r, c).Skip && getModeInfo(r + 1, c).Skip
+        && getModeInfo(r, c + 1).Skip && getModeInfo(r + 1, c + 1).Skip);
     if (skip)
         return;
 

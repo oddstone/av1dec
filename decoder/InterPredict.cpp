@@ -84,7 +84,7 @@ void Block::InterPredict::motionVectorScaling(int8_t refIdx, int x, int y, const
 
 inline int Block::InterPredict::getFilterIdx(int size, int candRow, int candCol, int dir)
 {
-    InterpFilter interpFilter = m_frame.InterpFilters[candRow][candCol][dir];
+    InterpFilter interpFilter = m_block.getModeInfo(candRow, candCol).InterpFilters[dir];
     int idx = (int)interpFilter;
     if (size <= 4) {
         if (interpFilter == EIGHTTAP || interpFilter == EIGHTTAP_SHARP) {
@@ -599,8 +599,9 @@ void Block::InterPredict::maskBlend(int dstX, int dstY, int w, int h)
 
 void Block::InterPredict::predict_overlap(int pass, int candRow, int candCol, int x4, int y4, int predW, int predH, const uint8_t* mask)
 {
-    Mv mv = m_frame.Mvs[candRow][candCol][0];
-    int8_t refIdx = m_frame.ref_frame_idx[m_frame.RefFrames[candRow][candCol][0] - LAST_FRAME];
+    const ModeInfoBlock& info = m_block.getModeInfo(candRow, candCol);
+    Mv mv = info.Mvs[0];
+    int8_t refIdx = m_frame.ref_frame_idx[info.RefFrames[0] - LAST_FRAME];
     int predX = (x4 * 4) >> subX;
     int predY = (y4 * 4) >> subY;
     motionVectorScaling(refIdx, predX, predY, mv);
@@ -657,9 +658,10 @@ void Block::InterPredict::overlappedMotionCompensation(int w, int h)
             while (nCount < nLimit && x4 < std::min(m_frame.MiCols, MiCol + w4)) {
                 int candRow = MiRow - 1;
                 int candCol = x4 | 1;
-                BLOCK_SIZE candSz = m_frame.MiSizes[candRow][candCol];
+                const ModeInfoBlock& info = m_block.getModeInfo(candRow, candCol);
+                BLOCK_SIZE candSz = info.MiSize;
                 int step4 = CLIP3(2, 16, Num_4x4_Blocks_Wide[candSz]);
-                if (m_frame.RefFrames[candRow][candCol][0] > INTRA_FRAME) {
+                if (info.RefFrames[0] > INTRA_FRAME) {
                     nCount += 1;
                     int predW = std::min(w, (step4 * MI_SIZE) >> subX);
                     int predH = std::min(h >> 1, 32 >> subY);
@@ -680,9 +682,10 @@ void Block::InterPredict::overlappedMotionCompensation(int w, int h)
         while (nCount < nLimit && y4 < std::min(m_frame.MiRows, MiRow + h4)) {
             int candCol = MiCol - 1;
             int candRow = y4 | 1;
-            BLOCK_SIZE candSz = m_frame.MiSizes[candRow][candCol];
+            const ModeInfoBlock& info = m_block.getModeInfo(candRow, candCol);
+            BLOCK_SIZE candSz = info.MiSize;
             int step4 = CLIP3(2, 16, Num_4x4_Blocks_High[candSz]);
-            if (m_frame.RefFrames[candRow][candCol][0] > INTRA_FRAME) {
+            if (info.RefFrames[0] > INTRA_FRAME) {
                 nCount += 1;
                 int predW = std::min(w >> 1, 32 >> subX);
                 int predH = std::min(h, (step4 * MI_SIZE) >> subY);
@@ -917,7 +920,7 @@ void Block::InterPredict::getDistanceWeights(int candRow, int candCol, int& FwdW
     int refList = 0;
     int dist[2];
     for (refList = 0; refList < 2; refList++) {
-        uint8_t ref = m_frame.RefFrames[candRow][candCol][refList];
+        uint8_t ref = m_block.getModeInfo(candRow, candCol).RefFrames[refList];
         int d = std::abs(m_frame.get_relative_dist(ref));
         dist[refList] = CLIP3(0, MAX_FRAME_DISTANCE, d);
     }
@@ -947,7 +950,8 @@ void Block::InterPredict::getDistanceWeights(int candRow, int candCol, int& FwdW
 
 void Block::InterPredict::predict_inter(int x, int y, int w, int h, int candRow, int candCol)
 {
-    isCompound = m_frame.RefFrames[candRow][candCol][1] > INTRA_FRAME;
+    const ModeInfoBlock& info = m_block.getModeInfo(candRow, candCol);
+    isCompound = info.RefFrames[1] > INTRA_FRAME;
     roundingVariablesDerivation(isCompound, m_sequence.BitDepth, InterRound0, InterRound1, InterPostRound);
     if (!plane && m_block.motion_mode == LOCALWARP) {
         m_localWarp.warpEstimation();
@@ -955,13 +959,13 @@ void Block::InterPredict::predict_inter(int x, int y, int w, int h, int candRow,
     }
     int refList = 0;
     for (refList = 0; refList < 1 + isCompound; refList++) {
-        int refFrame = m_frame.RefFrames[candRow][candCol][refList];
+        int refFrame = info.RefFrames[refList];
         if ((m_block.YMode == GLOBALMV || m_block.YMode == GLOBAL_GLOBALMV) && m_frame.GmType[refFrame] > TRANSLATION) {
             int alpha, beta, gamma, delta;
             globaValid = m_localWarp.setupShear(m_frame.gm_params[refFrame], alpha, beta, gamma, delta);
         }
         uint8_t useWarp = getUseWarp(w, h, refFrame);
-        Mv mv = m_frame.Mvs[candRow][candCol][refList];
+        Mv mv = info.Mvs[refList];
         int8_t refIdx;
         if (!m_block.use_intrabc) {
             refIdx = m_frame.ref_frame_idx[refFrame - LAST_FRAME];
@@ -1140,12 +1144,13 @@ void Block::FindMvStack::temporalScan()
 
 void Block::FindMvStack::add_extra_mv_candidate(int mvRow, int mvCol)
 {
+    const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
     if (isCompound) {
         for (int candList = 0; candList < 2; candList++) {
-            int candRef = m_frame.RefFrames[mvRow][mvCol][candList];
+            int candRef = info.RefFrames[candList];
             if (candRef > INTRA_FRAME) {
                 for (int list = 0; list < 2; list++) {
-                    Mv candMv = m_frame.Mvs[mvRow][mvCol][candList];
+                    Mv candMv = info.Mvs[candList];
                     if (candRef == m_block.RefFrame[list] && RefIdMvs[list].size() < 2) {
                         RefIdMvs[list].push_back(candMv);
                     } else if (RefDiffMvs[list].size() < 2) {
@@ -1160,9 +1165,9 @@ void Block::FindMvStack::add_extra_mv_candidate(int mvRow, int mvCol)
         }
     } else {
         for (int candList = 0; candList < 2; candList++) {
-            int candRef = m_frame.RefFrames[mvRow][mvCol][candList];
+            int candRef = info.RefFrames[candList];
             if (candRef > INTRA_FRAME) {
-                Mv candMv = m_frame.Mvs[mvRow][mvCol][candList];
+                Mv candMv = info.Mvs[candList];
                 if (m_frame.RefFrameSignBias[candRef] != m_frame.RefFrameSignBias[m_block.RefFrame[0]]) {
                     candMv.mv[0] *= -1;
                     candMv.mv[1] *= -1;
@@ -1207,10 +1212,11 @@ void Block::FindMvStack::extraSearch()
             if (!m_tile.is_inside(mvRow, mvCol))
                 break;
             add_extra_mv_candidate(mvRow, mvCol);
+            const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
             if (pass == 0) {
-                idx += Num_4x4_Blocks_Wide[m_frame.MiSizes[mvRow][mvCol]];
+                idx += Num_4x4_Blocks_Wide[info.MiSize];
             } else {
-                idx += Num_4x4_Blocks_High[m_frame.MiSizes[mvRow][mvCol]];
+                idx += Num_4x4_Blocks_High[info.MiSize];
             }
         }
     }
@@ -1402,7 +1408,8 @@ void Block::FindMvStack::scanCol(int deltaCol)
         int mvCol = MiCol + deltaCol;
         if (!m_tile.is_inside(mvRow, mvCol))
             break;
-        int len = std::min((int)bh4, Num_4x4_Blocks_High[m_frame.MiSizes[mvRow][mvCol]]);
+        const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
+        int len = std::min((int)bh4, Num_4x4_Blocks_High[info.MiSize]);
         if (std::abs(deltaCol) > 1)
             len = std::max(2, len);
         if (useStep16)
@@ -1419,15 +1426,16 @@ uint8_t Block::FindMvStack::getZeroMvCtx() const
 void Block::FindMvStack::searchStack(int mvRow, int mvCol, int candList, uint32_t weight)
 {
     Mv candMv;
-    PREDICTION_MODE candMode = m_frame.YModes[mvRow][mvCol];
-    BLOCK_SIZE candSize = m_frame.MiSizes[mvRow][mvCol];
+    const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
+    PREDICTION_MODE candMode = info.YMode;
+    BLOCK_SIZE candSize = info.MiSize;
     bool large = std::min(Block_Width[candSize], Block_Height[candSize]) >= 8;
     if ((candMode == GLOBALMV || candMode == GLOBAL_GLOBALMV)
         && m_frame.GmType[m_block.RefFrame[0]] > TRANSLATION
         && large) {
         candMv = GlobalMvs[0];
     } else {
-        candMv = m_frame.Mvs[mvRow][mvCol][candList];
+        candMv = info.Mvs[candList];
     }
     lower_mv_precision(candMv);
     if (has_newmv(candMode))
@@ -1492,8 +1500,9 @@ void Block::FindMvStack::scanPoint(int deltaRow, int deltaCol)
     int mvRow = MiRow + deltaRow;
     int mvCol = MiCol + deltaCol;
     uint32_t weight = 4;
+    const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
     if (m_tile.is_inside(mvRow, mvCol)
-        && m_frame.RefFrames[mvRow][mvCol][0] != NONE_FRAME) {
+        && info.RefFrames[0] != NONE_FRAME) {
         add_ref_mv_candidate(mvRow, mvCol, weight);
     }
 }
@@ -1548,9 +1557,10 @@ bool Block::FindMvStack::has_newmv(PREDICTION_MODE mode)
 }
 void Block::FindMvStack::searchCompoundStack(int mvRow, int mvCol, uint32_t weight)
 {
-    std::vector<Mv> candMvs = m_frame.Mvs[mvRow][mvCol];
-    PREDICTION_MODE candMode = m_frame.YModes[mvRow][mvCol];
-    BLOCK_SIZE candSize = m_frame.MiSizes[mvRow][mvCol];
+    const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
+    Mv candMvs[2] = { info.Mvs[0], info.Mvs[1] };
+    PREDICTION_MODE candMode = info.YMode;
+    BLOCK_SIZE candSize = info.MiSize;
     if (candMode == GLOBAL_GLOBALMV) {
         for (int i = 0; i <= 1; i++) {
             if (m_frame.GmType[m_block.RefFrame[i]] > TRANSLATION) {
@@ -1582,17 +1592,18 @@ void Block::FindMvStack::searchCompoundStack(int mvRow, int mvCol, uint32_t weig
 }
 void Block::FindMvStack::add_ref_mv_candidate(int mvRow, int mvCol, uint32_t weight)
 {
-    if (!m_frame.IsInters[mvRow][mvCol])
+    const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
+    if (!info.IsInter)
         return;
     if (!isCompound) {
         for (int candList = 0; candList <= 1; candList++) {
-            if (m_frame.RefFrames[mvRow][mvCol][candList] == m_block.RefFrame[0]) {
+            if (info.RefFrames[candList] == m_block.RefFrame[0]) {
                 searchStack(mvRow, mvCol, candList, weight);
             }
         }
     } else {
-        if (m_frame.RefFrames[mvRow][mvCol][0] == m_block.RefFrame[0]
-            && m_frame.RefFrames[mvRow][mvCol][1] == m_block.RefFrame[1]) {
+        if (info.RefFrames[0] == m_block.RefFrame[0]
+            && info.RefFrames[1] == m_block.RefFrame[1]) {
             searchCompoundStack(mvRow, mvCol, weight);
         }
     }
@@ -1612,7 +1623,8 @@ void Block::FindMvStack::scanRow(int deltaRow)
         int mvCol = MiCol + deltaCol + i;
         if (!m_tile.is_inside(mvRow, mvCol))
             break;
-        int len = std::min((int)bw4, Num_4x4_Blocks_Wide[m_frame.MiSizes[mvRow][mvCol]]);
+        const ModeInfoBlock& info = m_block.getModeInfo(mvRow, mvCol);
+        int len = std::min((int)bw4, Num_4x4_Blocks_Wide[info.MiSize]);
         if (std::abs(deltaRow) > 1)
             len = std::max(2, len);
         if (useStep16)

@@ -232,8 +232,8 @@ void Partition::getPartitionTypeCtx(uint8_t& ctx, uint8_t& bsl)
     bool AvailU = m_tile.is_inside(m_r - 1, m_c);
     bool AvailL = m_tile.is_inside(m_r, m_c - 1);
     bsl = Mi_Width_Log2[m_bSize];
-    uint8_t above = AvailU && (Mi_Width_Log2[m_frame.MiSizes[m_r - 1][m_c]] < bsl);
-    uint8_t left = AvailL && (Mi_Height_Log2[m_frame.MiSizes[m_r][m_c - 1]] < bsl);
+    uint8_t above = AvailU && (Mi_Width_Log2[m_frame.getModeInfo(m_r - 1, m_c).MiSize] < bsl);
+    uint8_t left = AvailL && (Mi_Height_Log2[m_frame.getModeInfo(m_r, m_c - 1).MiSize] < bsl);
     ctx = left * 2 + above;
 }
 

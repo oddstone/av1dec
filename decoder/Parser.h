@@ -26,8 +26,8 @@
 
 #pragma once
 
-#include "Tile.h"
 #include "BitReader.h"
+#include "Tile.h"
 #include <list>
 #include <memory>
 #include <stdint.h>
@@ -428,6 +428,32 @@ const static uint8_t REF_SCALE_SHIFT = 14;
 const static uint8_t SUBPEL_BITS = 4;
 const static uint8_t SCALE_SUBPEL_BITS = 10;
 
+const static int MAX_PLANES = 3;
+struct ModeInfoBlock {
+    PREDICTION_MODE YMode;
+    UV_PREDICTION_MODE UVMode;
+    int RefFrames[2];
+    TX_TYPE TxType;
+    bool IsInter;
+    bool SkipMode;
+    bool Skip;
+    TX_SIZE InterTxSize;
+    TX_SIZE TxSize;
+    BLOCK_SIZE MiSize;
+    TX_SIZE LoopfilterTxSizes[MAX_PLANES];
+    //uint8_t SegmentId;
+    int8_t DeltaLFs[FRAME_LF_COUNT];
+    //int8_t MfRefFrame;
+    //Mv MfMv;
+    Mv Mvs[2];
+    uint8_t CompGroupIdx;
+    uint8_t CompoundIdx;
+    InterpFilter InterpFilters[2];
+    //uint8_t PrevSegmentId;
+    uint8_t PaletteSizes[2];
+    std::vector<uint8_t> PaletteColors[2];
+};
+
 struct FrameHeader {
     friend class Block;
     friend class TransformBlock;
@@ -515,38 +541,21 @@ struct FrameHeader {
     bool skip_mode_present;
     uint8_t SkipModeFrame[2];
 
-    const static int MAX_PLANES = 3;
     GlobalMotionType GmType[NUM_REF_FRAMES];
     int gm_params[NUM_REF_FRAMES][6];
     int PrevGmParams[NUM_REF_FRAMES][6];
 
     std::vector<int> MiColStarts;
     std::vector<int> MiRowStarts;
-    std::vector<std::vector<PREDICTION_MODE>> YModes;
-    std::vector<std::vector<UV_PREDICTION_MODE>> UVModes;
-    std::vector<std::vector<std::vector<int>>> RefFrames;
-    std::vector<std::vector<TX_TYPE>> TxTypes;
-    std::vector<std::vector<bool>> IsInters;
-    std::vector<std::vector<bool>> SkipModes;
-    std::vector<std::vector<bool>> Skips;
-    std::vector<std::vector<TX_SIZE>> InterTxSizes;
-    std::vector<std::vector<TX_SIZE>> TxSizes;
-    std::vector<std::vector<BLOCK_SIZE>> MiSizes;
-    std::vector<std::vector<TX_SIZE>> LoopfilterTxSizes[MAX_PLANES];
+
     std::vector<std::vector<uint8_t>> SegmentIds;
-    std::vector<std::vector<int8_t>> DeltaLFs[FRAME_LF_COUNT];
     std::vector<std::vector<int8_t>> MfRefFrames;
     std::vector<std::vector<Mv>> MfMvs;
-    std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;
-    std::vector<std::vector<std::vector<Mv>>> Mvs;
-    std::vector<std::vector<uint8_t>> CompGroupIdxs;
-    std::vector<std::vector<uint8_t>> CompoundIdxs;
-    std::vector<std::vector<std::vector<InterpFilter>>> InterpFilters;
-    std::shared_ptr<Cdfs> m_cdfs;
     std::vector<std::vector<uint8_t>> PrevSegmentIds;
-    std::vector<std::vector<uint8_t>> PaletteSizes[2];
-    std::vector<std::vector<std::vector<uint8_t>>> PaletteColors[2];
 
+    std::vector<std::vector<std::vector<Mv>>> MotionFieldMvs;
+
+    std::shared_ptr<Cdfs> m_cdfs;
     Quantization m_quant;
     Segmentation m_segmentation;
     DeltaQ m_deltaQ;
@@ -566,6 +575,8 @@ struct FrameHeader {
 
     void referenceFrameLoading();
     void motionVectorStorage();
+    inline ModeInfoBlock& getModeInfo(int row, int col);
+    inline const ModeInfoBlock& getModeInfo(int row, int col) const;
 
 private:
     void setup_past_independence();
@@ -610,12 +621,23 @@ private:
 
     int16_t get_qindex(bool ignoreDeltaQ, int16_t CurrentQIndex, int segmentId) const;
 
+    std::vector<std::vector<ModeInfoBlock>> m_modeInfo;
 
     const static uint8_t SUPERRES_DENOM_MIN = 9;
 
     const static uint8_t SUPERRES_DENOM_BITS = 3;
     const static uint8_t TX_MODES = 3;
 };
+
+inline ModeInfoBlock& FrameHeader::getModeInfo(int row, int col)
+{
+    return m_modeInfo[row][col];
+}
+
+inline const ModeInfoBlock& FrameHeader::getModeInfo(int row, int col) const
+{
+    return m_modeInfo[row][col];
+}
 
 class Parser {
 public:

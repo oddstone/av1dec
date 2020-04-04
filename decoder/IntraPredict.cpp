@@ -246,14 +246,15 @@ bool Block::IntraPredict::getAboveSmooth() const
 
 bool Block::IntraPredict::getSmooth(int r, int c) const
 {
+    const ModeInfoBlock& info = m_block.getModeInfo(r, c);
 
     int mode;
     if (!plane) {
-        mode = m_frame.YModes[r][c];
+        mode = info.YMode;
     } else {
-        if (m_frame.RefFrames[r][c][0] > INTRA_FRAME)
+        if (info.RefFrames[0] > INTRA_FRAME)
             return 0;
-        mode = m_frame.UVModes[r][c];
+        mode = info.UVMode;
     }
     return (mode == SMOOTH_PRED || mode == SMOOTH_V_PRED || mode == SMOOTH_H_PRED);
 }
