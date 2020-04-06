@@ -86,7 +86,8 @@ public:
     }
     void summary()
     {
-        std::cout << "decode fps = " << getFps(DECODE)
+        std::cout << count[DECODE] << " frames decoded, "
+                  << "decode fps = " << getFps(DECODE)
                   << ", read fps = " << getFps(READ)
                   << ", write fps = " << getFps(WRITE) << std::endl;
     }
