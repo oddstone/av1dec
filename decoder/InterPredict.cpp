@@ -340,20 +340,28 @@ void Block::InterPredict::blockSubPixelPredict(std::vector<std::vector<int16_t>>
     int filterIdx = getFilterIdx(w, candRow, candCol, 1);
 
     for (int r = 0; r < intermediateHeight; r++) {
+        int y = (startY >> 10) + r - 3;
+        y = CLIP3(0, lastY, y);
         for (int c = 0; c < w; c++) {
             int p = startX + xStep * c;
             const int* filter = Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK];
             const Tap& tap = Subpel_Filter_Taps[filterIdx][(p >> 6) & SUBPEL_MASK];
 
             int x = (p >> 10) - 3;
-            int y = (startY >> 10) + r - 3;
 
             int s = 0;
-            for (int t = tap.start; t < tap.end; t++) {
-                uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + t), CLIP3(0, lastY, y));
-                s += filter[t] * pixel;
-            }
-            intermediate[r][c] = ROUND2(s, InterRound0);
+            if (x + tap.start >= 0 && x + tap.end <= lastX) {
+                for (int t = tap.start; t < tap.end; t++) {
+                    uint8_t pixel = ref.getPixel(plane, x + t, y);
+                    s += filter[t] * pixel;
+                }
+            } else {
+                for (int t = tap.start; t < tap.end; t++) {
+                    uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + t), y);
+                    s += filter[t] * pixel;
+                }
+           }
+           intermediate[r][c] = ROUND2(s, InterRound0);
         }
     }
 
