@@ -537,13 +537,21 @@ FrameHeader::FrameHeader(ConstSequencePtr& sequence)
     m_sequence = sequence;
 }
 
+template <class E>
+void InitVector2D(std::vector<std::vector<E>>& vec, uint32_t r, uint32_t c)
+{
+    vec.resize(r);
+    for (auto& v : vec) {
+        v.resize(c);
+    }
+}
+
 void FrameHeader::initGeometry()
 {
-    m_modeInfo.assign(AlignedMiRows, std::vector<ModeInfoBlock>(AlignedMiCols));
-
-    SegmentIds.assign(AlignedMiRows, std::vector<uint8_t>(AlignedMiCols));
-    MfRefFrames.assign(AlignedMiRows, std::vector<int8_t>(AlignedMiCols));
-    MfMvs.assign(AlignedMiRows, std::vector<Mv>(AlignedMiCols));
+    InitVector2D(m_modeInfo, AlignedMiRows, AlignedMiCols);
+    InitVector2D(SegmentIds, AlignedMiRows, AlignedMiCols);
+    InitVector2D(MfRefFrames, AlignedMiRows, AlignedMiCols);
+    InitVector2D(MfMvs, AlignedMiRows, AlignedMiCols);
 }
 
 bool FrameHeader::loop_filter_params(BitReader& br)
