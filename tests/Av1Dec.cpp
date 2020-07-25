@@ -34,7 +34,7 @@
 
 void usage(const char* app)
 {
-    printf("%s -i input [output]", app);
+    printf("usage: %s -i input [output]", app);
 }
 
 using std::chrono::duration;
@@ -159,6 +159,10 @@ bool Decode::parseOption(int argc, char** argv, int& i)
 
 bool Decode::parse(int argc, char** argv)
 {
+    if (argc == 1) {
+        usage("av1dec");
+        return false;    
+    }
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             if (!parseOption(argc, argv, i))
