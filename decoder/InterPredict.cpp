@@ -333,7 +333,10 @@ void Block::InterPredict::blockPixelPredict(std::vector<std::vector<int16_t>>& p
 void Block::InterPredict::blockSubPixelPredict(std::vector<std::vector<int16_t>>& pred, const YuvFrame& ref, int w, int h, int candRow, int candCol, int lastX, int lastY)
 {
     const int intermediateHeight = (((h - 1) * yStep + (1 << SCALE_SUBPEL_BITS) - 1) >> SCALE_SUBPEL_BITS) + 8;
-    std::vector<std::vector<int>> intermediate(intermediateHeight, std::vector<int>(w));
+
+    //std::vector<std::vector<int>> intermediate(intermediateHeight, std::vector<int>(w));
+    ASSERT(w <= 128 && intermediateHeight <= (128 + 8));
+    int intermediate[128 + 8][128];
     int filterIdx = getFilterIdx(w, candRow, candCol, 1);
 
     for (int r = 0; r < intermediateHeight; r++) {
