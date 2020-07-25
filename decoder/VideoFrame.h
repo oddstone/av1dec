@@ -43,6 +43,7 @@ struct YuvFrame {
     static std::shared_ptr<YuvFrame> create(int width, int height);
     static std::shared_ptr<YuvFrame> create(const std::shared_ptr<YuvFrame>&);
     inline uint8_t getPixel(int plane, int x, int y) const;
+    inline uint8_t* getPixelPtr(int plane, int x, int y) const;
     inline void setPixel(int plane, int x, int y, uint8_t pixel);
     void extendBorder(int borders);
 };
@@ -50,6 +51,11 @@ struct YuvFrame {
 inline uint8_t YuvFrame::getPixel(int plane, int x, int y) const
 {
     return data[plane][y * strides[plane] + x];
+}
+
+inline uint8_t* YuvFrame::getPixelPtr(int plane, int x, int y) const
+{
+    return &data[plane][y * strides[plane] + x];
 }
 
 inline void YuvFrame::setPixel(int plane, int x, int y, uint8_t pixel)

@@ -195,119 +195,146 @@ const static int Subpel_Filters[6][16][8] = {
         { 0, 0, 2, 34, 62, 30, 0, 0 } }
 };
 
+template <int N>
+inline int tapsMulti(const uint8_t* p, const int* t)
+{
+    return tapsMulti<N - 1>(p, t) + p[N - 1] * t[N - 1];
+}
+template <>
+inline int tapsMulti<1>(const uint8_t* p, const int* t)
+{
+    return p[0] * t[0];
+}
+
+template <int N>
+inline int tapsMultiInt(const int* p, const int* t)
+{
+    return tapsMultiInt<N - 1>(p, t) + p[N - 1] * t[N - 1];
+}
+
+template <>
+inline int tapsMultiInt<1>(const int* p, const int* t)
+{
+    return p[0] * t[0];
+}
+
 struct Tap {
     int start;
     int end;
+    int len;
+    int (*multi)(const uint8_t* p, const int* t);
+    int (*multiInt)(const int* p, const int* t);
 };
 
-Tap Subpel_Filter_Taps[6][16] = {
+#define TAPS(s, e) s, e, s - e, tapsMulti<e - s>, tapsMultiInt<e - s>
+const Tap Subpel_Filter_Taps[6][16] = {
     {
-        { 3, 4 },
-        { 1, 6 },
-        { 1, 6 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 1, 7 },
-        { 2, 7 },
-        { 2, 7 },
+        { TAPS(3, 4) },
+        { TAPS(1, 6) },
+        { TAPS(1, 6) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(1, 7) },
+        { TAPS(2, 7) },
+        { TAPS(2, 7) },
     },
     {
-        { 3, 4 },
-        { 1, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 1, 6 },
-        { 1, 7 },
-        { 2, 7 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 7 },
+        { TAPS(3, 4) },
+        { TAPS(1, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(1, 6) },
+        { TAPS(1, 7) },
+        { TAPS(2, 7) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 7) },
     },
     {
-        { 3, 4 },
-        { 0, 7 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 0, 8 },
-        { 1, 8 },
+        { TAPS(3, 4) },
+        { TAPS(0, 7) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(0, 8) },
+        { TAPS(1, 8) },
     },
     {
-        { 3, 4 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
-        { 3, 5 },
+        { TAPS(3, 4) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
+        { TAPS(3, 5) },
     },
     {
-        { 3, 4 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
+        { TAPS(3, 4) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
     },
     {
-        { 3, 4 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
-        { 2, 6 },
+        { TAPS(3, 4) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
+        { TAPS(2, 6) },
     },
 };
 
@@ -336,7 +363,8 @@ void Block::InterPredict::blockSubPixelPredict(std::vector<std::vector<int16_t>>
 
     //std::vector<std::vector<int>> intermediate(intermediateHeight, std::vector<int>(w));
     ASSERT(w <= 128 && intermediateHeight <= (128 + 8));
-    int intermediate[128 + 8][128];
+    //we use transposed intermediate
+    int intermediate[128][128 + 8];
     int filterIdx = getFilterIdx(w, candRow, candCol, 1);
 
     for (int r = 0; r < intermediateHeight; r++) {
@@ -351,32 +379,30 @@ void Block::InterPredict::blockSubPixelPredict(std::vector<std::vector<int16_t>>
 
             int s = 0;
             if (x + tap.start >= 0 && x + tap.end <= lastX) {
-                for (int t = tap.start; t < tap.end; t++) {
-                    uint8_t pixel = ref.getPixel(plane, x + t, y);
-                    s += filter[t] * pixel;
-                }
+                uint8_t* ptr = ref.getPixelPtr(plane, x, y);
+                s = tap.multi(ptr + tap.start, filter + tap.start);
             } else {
                 for (int t = tap.start; t < tap.end; t++) {
                     uint8_t pixel = ref.getPixel(plane, CLIP3(0, lastX, x + t), y);
                     s += filter[t] * pixel;
                 }
-           }
-           intermediate[r][c] = ROUND2(s, InterRound0);
+            }
+            //transposed
+            intermediate[c][r] = ROUND2(s, InterRound0);
         }
     }
 
     filterIdx = getFilterIdx(h, candRow, candCol, 0);
     for (int r = 0; r < h; r++) {
+        int p = (startY & 1023) + yStep * r;
+        int y = p >> 10;
         for (int c = 0; c < w; c++) {
-            int p = (startY & 1023) + yStep * r;
+
             const int* filter = Subpel_Filters[filterIdx][(p >> 6) & SUBPEL_MASK];
             const Tap& tap = Subpel_Filter_Taps[filterIdx][(p >> 6) & SUBPEL_MASK];
-
-            int y = p >> 10;
-
             int s = 0;
-            for (int t = tap.start; t < tap.end; t++)
-                s += filter[t] * intermediate[y + t][c];
+            int* ptr = &intermediate[c][y];
+            s= tap.multiInt(ptr, filter);
             pred[r][c] = ROUND2(s, InterRound1);
         }
     }
